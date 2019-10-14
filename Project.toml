@@ -1,0 +1,13 @@
+name = "MonteCarloX"
+uuid = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
+authors = ["Johannes Zierenberg"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
