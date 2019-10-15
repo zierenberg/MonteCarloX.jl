@@ -6,6 +6,7 @@ greet() = print("Hello World!")
 
 include("Metropolis.jl")
 include("Gillespie.jl")
+include("ClusterWolff.jl")
 
 
 end # module
