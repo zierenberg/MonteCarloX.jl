@@ -7,6 +7,5 @@ greet() = print("Hello World!")
 include("Metropolis.jl")
 #include("gillespie.jl")
 
-testf() = 5
 
 end # module
