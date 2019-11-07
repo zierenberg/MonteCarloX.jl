@@ -90,4 +90,3 @@ err = sqrt((avg_activity2-avg_activity*avg_activity)/(T-1))
 println(avg_activity, " ", err, " ", T)
 
 
-
