@@ -18,7 +18,7 @@ Metropolis update probabilities of new and old states taking multiple arguments 
 
 this could also include the selection bias (Hastings)
 """
-function update(args_new,args_old,P,rng)
+function update(P,args_new,args_old,rng::AbstractRNG)
   ratio = P(args_new...)/P(args_old...)
   if ratio > 1
     return true
@@ -34,7 +34,7 @@ Metropolis update probabilities of new and old states taking multiple arguments 
 
 PLEASE BE CAREFUL AND KNOW WHAT YOU DO
 """
-function update_diff(args_new,args_old,P,rng)
+function update_diff(P,args_new,args_old,rng)
   args_diff = args_new .- args_old
   if rand(rng) < P(args_diff...)
     return true
