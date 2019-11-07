@@ -54,6 +54,8 @@ function next_event_for_collection(rates, max_rate::Float64, rng::AbstractRNG)
       next_index -= 1;
     end
   end
+
+  return next_time, next_index
 end
 
 export InhomogeneousPoissonProcess
