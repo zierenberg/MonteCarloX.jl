@@ -9,6 +9,6 @@ include("ClusterWolff.jl")
 
 
 include("Gillespie.jl")
-include("InhomogeneousPoissonProcess")
+include("InhomogeneousPoissonProcess.jl")
 
 end # module

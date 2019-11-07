@@ -1,5 +1,6 @@
 module InhomogeneousPoissonProcess
 using Random
+using Distributions
 
 """
 Generate a new event from an inhomogeneous poisson process with rate Lambda(t).
@@ -35,6 +36,7 @@ end
 """
 event = (time,id)
 TODO: BETTER NAME AND CHECK SPEED
+NEEDs to move to sth like Hawkes process?
 """
 function next_event_for_collection(rates, max_rate::Float64, rng::AbstractRNG)
   rate(t)=sum(map(f->f(t),rates))
@@ -56,6 +58,8 @@ function next_event_for_collection(rates, max_rate::Float64, rng::AbstractRNG)
   end
 
   return next_time, next_index
+end
+
 end
 
 export InhomogeneousPoissonProcess
