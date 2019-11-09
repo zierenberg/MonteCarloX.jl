@@ -6,6 +6,43 @@ import Distributions.pdf
 import Distributions.cdf
 
 
+""" Testing if sampling single event correctly"""
+function test_poisson_single()
+  LambdaMaxs = [1.0, 2.0] # testing for two different max-sample-rates
+  Lambda(t) = 10.0
+  pass = true
+  
+  # Regular sampler
+  for LambdaMax in LambdaMaxs
+    rng = MersenneTwister(1000)
+    nSamples = 1000
+    samples = zeros(nSamples)
+
+    for i in 1:nSamples
+      t0 = InhomogeneousPoissonProcess.next_event_time(Lambda, LambdaMax, rng)
+      samples[i] = t0
+    end
+
+    test = HypothesisTests.ExactOneSampleKSTest(samples, Exponential(1.0/10.0))
+    pass &= pvalue(test) > 0.05
+  end
+
+  # Decreasing sampler
+  rng = MersenneTwister(1000)
+  nSamples = 1000
+  samples = zeros(nSamples)
+
+  for i in 1:nSamples
+    t0 = InhomogeneousPoissonProcess.next_event_time_for_piece_wise_decreasing_rate(Lambda, rng)
+    samples[i] = t0
+  end
+
+  test = HypothesisTests.ExactOneSampleKSTest(samples, Exponential(1.0/10.0))
+  pass &= pvalue(test) > 0.05
+
+  return pass
+end
+
 """ Testing if sampling the uniform case correctly"""
 function test_poisson_constant()
   LambdaMaxs = [1.0, 2.0] # testing for two different max-sample-rates
