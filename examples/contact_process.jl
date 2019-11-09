@@ -35,7 +35,7 @@ function run(m,h,T,T_therm,N::Int,p,rng)
     # find next dt
     #
     # rand(rng,Exponential()
-    dt = rand(rng,Exponential(R))
+    dt = rand(rng,Exponential(1.0/R))
     dtime += dt;
     # measure observables in discrete time 
     # use values from last step because they were valid inbetween
