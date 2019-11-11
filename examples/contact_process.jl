@@ -3,10 +3,13 @@ using Distributions
 using MonteCarloX
 using Random
 
-function run(m,h,T,T_therm,N::Int,p,rng)
+function run(N::Int,m::Float64,h::Float64,p::Float64,T::Float64,T_therm::Float64,seed::Int; flag_fast = true)
+  rng = MersenneTwister(seed);
+  rng2 = MersenneTwister(seed);
+
   # directed ER graph
   neuron = zeros(N);
-  graph = LightGraphs.SimpleGraphs.erdos_renyi(N, p, is_directed=true)
+  graph = LightGraphs.SimpleGraphs.erdos_renyi(N, p, is_directed=true, seed=seed)
   #graph.fadjlist gives outgoing nodes
   #inneighbors(graph,v) -> works
   
@@ -32,14 +35,15 @@ function run(m,h,T,T_therm,N::Int,p,rng)
   avg_activity  = 0;
   avg_activity2 = 0;
   while time < T_total
-    # find next dt
-    #
-    # rand(rng,Exponential()
-    dt = rand(rng,Exponential(1.0/R))
-    dtime += dt;
+    # find next event (dt and time) to be updated
+    if flag_fast
+      dt,n = Gillespie.next_event_fast(rate,R,rng)
+    else
+      dt,n = Gillespie.next_event(rate,rng)
+    end
     # measure observables in discrete time 
     # use values from last step because they were valid inbetween
-    time_run = time;
+    dtime += dt;
     while dtime > dtime_step
       dtime_sum += dtime_step;
       dtime     -= dtime_step;
@@ -49,9 +53,8 @@ function run(m,h,T,T_therm,N::Int,p,rng)
         N_meas        += 1;
       end
     end
+    # evolve time 
     time += dt;
-    # find next rate to be updated
-    n = Gillespie.update(rate,R,rng)
     # update neuron n, rate list, sum of rates R,
     rate_n_old = rate[n];
     dstate = 0;
@@ -83,10 +86,10 @@ function run(m,h,T,T_therm,N::Int,p,rng)
 end
 
 ##############################run
-rng = MersenneTwister(1000);
-avg_activity, avg_activity2, T = run(1,1e-3,1e6,1e3,Int(1e3),1e-2,rng)
-println(avg_activity, " ", avg_activity2, " ", T)
-err = sqrt((avg_activity2-avg_activity*avg_activity)/(T-1))
-println(avg_activity, " ", err, " ", T)
+#avg_activity, avg_activity2, T = run(Int(1e3),1.0,1e-3,1e-2,1e6,1e3,rng)
+#println(avg_activity, " ", avg_activity2, " ", T)
+
+#err = sqrt((avg_activity2-avg_activity*avg_activity)/(T-1))
+#println(avg_activity, " ", err, " ", T)
 
 

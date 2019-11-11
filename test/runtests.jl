@@ -14,4 +14,7 @@ import Distributions.cdf
   @test test_poisson_single()
   @test test_poisson_constant()
   @test test_poisson_sin_wave()
+
+  include("test_gillespie.jl")
+  @test test_gillespie_fast()
 end

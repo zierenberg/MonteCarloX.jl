@@ -63,23 +63,42 @@ TODO: BETTER NAME AND CHECK SPEED
 NEEDs to move to sth like Hawkes process?
 """
 function next_event_for_collection(rates, max_rate::Float64, rng::AbstractRNG)
+  #Problem: here, we are already summing over rates ... then we do not need the cumulative sum below to get the rate at time t
   rate(t)=sum(map(f->f(t),rates))
-  next_time = next_event_time(rate, max_rate, rng)
-  
-  theta = rand(rng)
-  next_index = 1
+  dt = next_event_time(rate, max_rate, rng)
+  #??? at which time is rates evaluated?
   cumulated_rates = cumsum(rates)
   sum_rate = cumulated_rates[end]
-  if theta < 0.5
-    while cumulated_rates[next_index]/sum_rate < theta 
-      next_index += 1
+  theta = rand(rng)*sum_rate
+  #catch lower-bound case that cannot be reached by binary search
+  if theta < cumulated_rates[1] 
+    id = 1
+  else 
+    #binary search
+    index_l = 1
+    index_r = length(cumulated_rates)
+    while index_l < index_r-1
+      index_m = floor(Int,(index_l+index_r)/2)
+      if cumulated_rates[index_m] < theta
+        index_l = index_m
+      else
+        index_r = index_m
+      end
     end
-  else  
-    next_index = length(list_rates);
-    while cumulated_rates[next_index]/sum_rate > theta
-      next_index -= 1;
-    end
+    id = index_r
   end
+  return dt, id
+
+  #if theta < 0.5
+  #  while cumulated_rates[next_index]/sum_rate < theta 
+  #    next_index += 1
+  #  end
+  #else  
+  #  next_index = length(list_rates);
+  #  while cumulated_rates[next_index]/sum_rate > theta
+  #    next_index -= 1;
+  #  end
+  #end
 
   return next_time, next_index
 end
