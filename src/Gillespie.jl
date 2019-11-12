@@ -80,6 +80,14 @@ function next_event_fast(list_rates,sum_rates,rng)
     #  println("ERROR: fast backwards")
     #end
   end
+  #if theta< 0.5*sum_rates
+  #  cumulated_rates=cumsum(list_rates)
+  #  if id>1 
+  #    println(cumulated_rates[id-1], " ", theta," ", cumulated_rates[id])
+  #  else
+  #    println("0 ", theta," ", cumulated_rates[id])
+  #  end
+  #end
   return dt,id
 end
 
