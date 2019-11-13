@@ -8,7 +8,7 @@ import Distributions.cdf
 
 """ Testing if sampling single event correctly"""
 function test_poisson_single()
-  LambdaMaxs = [1.0, 2.0] # testing for two different max-sample-rates
+  LambdaMaxs = [10.0, 20.0] # testing for two different max-sample-rates
   Lambda(t) = 10.0
   pass = true
   
