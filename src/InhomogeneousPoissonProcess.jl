@@ -73,11 +73,11 @@ function next_event_for_collection(rates, max_rate::Float64, rng::AbstractRNG)
   rate(t)=sum(rates(t))
   dt = next_event_time(rate, max_rate, rng)
   
-  theta = rand(rng)
   next_index = 1
   cumulated_rates = cumsum(rates(dt))
   sum_rate = cumulated_rates[end]
 
+  theta = rand(rng) * sum_rate
   #catch lower-bound case that cannot be reached by binary search
   if theta < cumulated_rates[1] 
     id = 1
