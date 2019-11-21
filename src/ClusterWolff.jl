@@ -149,10 +149,11 @@ end
 """
 Wolff single cluster update
 
-API:
-* system = of Ising type
-* beta = inverse temperature
-* rng = random number generator
+#Arguments:
+* `spins` : array of spin values
+* `nearest_neighbors` : function that returns a list of nearest neighbors to index i
+* `beta` : inverse temperature
+* `rng`  : random number generator
 
 Ref: U. Wolff, Phys. Rev. Lett. 62, 361 (1989)
 
@@ -163,27 +164,27 @@ consider BlumeCapel implementation
 
 todo: return dE?
 
-Problem: this is inconsistent API....
+Problem: this is inconsistent API....still?
 """
-function update(system::IsingSystem, beta, rng)
-  N = length(system.spins)
+function update(spins::Array{Int32}, nearest_neighbors::Any, beta, rng)
+  N = length(spins)
 
   # Get random spin and flip it
   i = rand(rng, 1:N)
-  s_i = system.spins[i]
-  system.spins[i] *= -1
+  s_i = spins[i]
+  spins[i] *= -1
 
   # depth first search in neighborhood and check for all 
   # connected neighbors j that s_j == s_i and update state with probl
   # rand(rng) < 1.0 - exp(-2*beta)
   p = 1.0 - exp(-2*beta)
   visited = BitSet([i])  
-  unvisited = copy(outneighbors(system.lattice, i))
+  unvisited = copy(nearest_neighbors(i))
   while !isempty(unvisited)
     j = pop!(unvisited)
-    if !in(j, visited) && system.spins[j] == s_i && rand(rng) < p
-      system.spins[j] *= -1
-      append!(unvisited, outneighbors(system.lattice, j))
+    if !in(j, visited) && spins[j] == s_i && rand(rng) < p
+      spins[j] *= -1
+      append!(unvisited, nearest_neighbors(j))
     end
     push!(visited, j)
   end
