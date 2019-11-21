@@ -58,18 +58,26 @@ function next_event_time_for_piece_wise_decreasing_rate(rate, rng::AbstractRNG)
 end
 
 """
-event = (time,id)
-TODO: BETTER NAME AND CHECK SPEED
-NEEDs to move to sth like Hawkes process?
+Generate a new event from a collection of inhomogeneous poisson processes with 
+rates Lambda(t).
+# Arguments
+- `rate`: rate(dt); Float -> [Float]
+- `max_rate`: maximal rate in near future (has to be evaluated externally)
+- `rng`: random number generator 
+
+API - output
+* returns the next event time and its id ass tuple (dt, id)
+
 """
 function next_event_for_collection(rates, max_rate::Float64, rng::AbstractRNG)
-  #Problem: here, we are already summing over rates ... then we do not need the cumulative sum below to get the rate at time t
-  rate(t)=sum(map(f->f(t),rates))
+  rate(t)=sum(rates(t))
   dt = next_event_time(rate, max_rate, rng)
-  #??? at which time is rates evaluated?
-  cumulated_rates = cumsum(rates)
+  
+  next_index = 1
+  cumulated_rates = cumsum(rates(dt))
   sum_rate = cumulated_rates[end]
-  theta = rand(rng)*sum_rate
+
+  theta = rand(rng) * sum_rate
   #catch lower-bound case that cannot be reached by binary search
   if theta < cumulated_rates[1] 
     id = 1
@@ -87,20 +95,8 @@ function next_event_for_collection(rates, max_rate::Float64, rng::AbstractRNG)
     end
     id = index_r
   end
-  return dt, id
 
-  #if theta < 0.5
-  #  while cumulated_rates[next_index]/sum_rate < theta 
-  #    next_index += 1
-  #  end
-  #else  
-  #  next_index = length(list_rates);
-  #  while cumulated_rates[next_index]/sum_rate > theta
-  #    next_index -= 1;
-  #  end
-  #end
-
-  return next_time, next_index
+  return dt, Int(id)
 end
 
 end
