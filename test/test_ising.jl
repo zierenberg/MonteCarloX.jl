@@ -6,7 +6,6 @@ using Distributions
 import Distributions.pdf
 import Distributions.cdf
 using StatsBase
-using Plots
 
 struct IsingSystem
   dims :: Array{Int32}
