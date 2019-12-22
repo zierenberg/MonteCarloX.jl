@@ -2,7 +2,7 @@ module MonteCarloX
 
 greet() = print("Loading MonteCarloX...")
 
-include("Basic_functions.jl")
+#include("Basic_functions.jl")
 
 #todo: sort code according to classic, canonical, ..? 
 
