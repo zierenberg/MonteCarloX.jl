@@ -6,30 +6,100 @@ using Distributions
 import Distributions.pdf
 import Distributions.cdf
 using StatsBase
+import StatsBase.kldivergence
 
-struct IsingSystem
-  dims :: Array{Int32}
-  lattice :: SimpleGraph
-  spins :: Array{Int32}
-end
+""" Testing reweighting on 2D Ising model"""
+function test_ising_reweighting()
+  log_P(E,beta) = -beta*E
+  P(E,beta) = exp(-beta*E)
 
-function constructIsing(dims, rng)
-  lattice = LightGraphs.SimpleGraphs.grid(dims, periodic=true)
-  spins = rand(rng, [-1,1], dims...)
-  s = IsingSystem(dims, lattice, spins)
-  return s
-end
+  list_beta = [0.0,0.3,0.7,1.0,1.5,2.0]
+  pass = true
 
-#J=1
-function energy(system::IsingSystem)
-  E = 0.0
-  N = 0
-  for (i,s_i) in enumerate(system.spins)
-    for j in outneighbors(system.lattice,i) 
-      E += -1*s_i*system.spins[j] 
+  rng = MersenneTwister(1000)
+  system = constructIsing([8,8], rng)
+  nearest_neighbors(index) = outneighbors(system.lattice, index)
+  N = length(system.spins)
+
+  for beta in list_beta
+    samples = 1000
+    list_energy = zeros(samples)
+    # thermalization 100 sweeps
+    for sweep in 1:samples+100
+      #Metropolis:
+      for i in 1:N
+        index_i = rand(rng,1:N)
+        dE = 0.0
+        for index_j in nearest_neighbors(index_i)
+          dE += 2.0*system.spins[index_i]*system.spins[index_j]  
+        end
+        if Metropolis.update_diff(dE->exp(-beta*dE),dE,0,rng)
+          system.spins[index_i] *= -1
+        end
+      end
+      if sweep > 100
+        list_energy[sweep-100] = energy(system)
+      end
     end
+    H_E    = countmap(list_energy)
+    P_meas = proportionmap(list_energy)
+    # reweighting both with timeseries (list_energy) and histrogram
+    beta_source = beta
+    beta_target = beta+0.05
+    log_P_source(E) = log_P(E,beta_source)
+    log_P_target(E) = log_P(E,beta_target)
+    P_source(E) = P(E,beta_source)
+    P_target(E) = P(E,beta_target)
+    E_ref = analytic_expectation_value_E(beta_target,log_dos_beale_8x8) 
+    P_ref_source = BoltzmannDistribution(beta_source,log_dos_beale_8x8).pdf
+    P_ref_target = BoltzmannDistribution(beta_target,log_dos_beale_8x8).pdf
+    kld_ref = kldivergence(P_meas, P_ref_source)
+    println("result analytic = $(E_ref)")
+    ###########################################################################
+    E_reweight_list1 = Reweighting.expectation_value_from_timeseries_log(log_P_target, log_P_source, list_energy, list_energy) 
+    E_reweight_list1_error = abs((E_reweight_list1 - E_ref)/E_ref)
+    println("result expectation_value_from_timeseries_log: <E> = $(E_reweight_list1); difference from exact = $(E_reweight_list1_error)")
+    pass &= E_reweight_list1_error < 0.1
+    ###########################################################################
+    E_reweight_list2 = Reweighting.expectation_value_from_timeseries(P_target, P_source, list_energy, list_energy) 
+    E_reweight_list2_error = abs(E_reweight_list1 - E_reweight_list2)
+    println("result expectation_value_from_timeseries: <E> = $(E_reweight_list2); difference from ..._log = $(E_reweight_list2_error)")
+    pass &= E_reweight_list2_error < 0.1
+    ###########################################################################
+    P_reweight_list = Reweighting.distribution_from_timeseries_log(log_P_target, log_P_source, list_energy) 
+    kld_source = kldivergence(P_reweight_list, P_ref_source)
+    kld_target = kldivergence(P_reweight_list, P_ref_target)
+    println("result distribution_from_timeseries_log: kld_target ($(kld_target)) !< kld_source ($(kld_source))")
+    #only compare reweighted distribution to target and source. There result is comparable.
+    pass &= kld_target < kld_source
+    ###########################################################################
+    E_reweight_hist1 = Reweighting.expectation_value_from_histogram_log(E->E, log_P_target, log_P_source, H_E) 
+    E_reweight_hist1_error = abs((E_reweight_hist1 - E_ref)/E_ref)
+    println("result expectation_value_from_histogram_log-1: <E> = $(E_reweight_hist1); difference from exact = $(E_reweight_hist1_error)")
+    println("result expectation_value_from_histogram_log-1: <E> = $(E_reweight_hist1); difference from timeseries = $(E_reweight_hist1 - E_reweight_list1)")
+    pass &= E_reweight_hist1_error < 0.1
+    ###########################################################################
+    hist_obs = Dict()
+    for (E,H) in H_E
+      hist_obs[E] = E*H
+    end
+    E_reweight_hist2 = Reweighting.expectation_value_from_histogram_log(log_P_target, log_P_source, H_E, hist_obs) 
+    E_reweight_hist2_error = abs(E_reweight_hist2 - E_reweight_list1)
+    println("result expectation_value_from_histogram_log: <E> = $(E_reweight_hist2); difference from timeseries = $(E_reweight_hist2_error)")
+    pass &= E_reweight_hist2_error < 0.1
+    ###########################################################################
+    #E_reweight_hist = Reweighting.expectation_value_from_histogram_log(log_P_source, log_P_target, hist_energy, hist_energy) 
+    #
+    #P_reweight_hist = Reweighting.distribution_from_histrogram_log(log_P_source, log_P_target, hist_energy) 
+    #TODO: compare both approaches (consistency)
+    #TOOD: compare with Boltzmann for beta and beta_target
+    #println(beta, " ", kldivergence, " ", length(keys(P_meas)))
+    #pass &= kldivergence < 0.1
   end
-  return E/2.0
+
+  #TODO: multi-histogram reweighting
+
+  return pass
 end
 
 
@@ -175,6 +245,47 @@ function test_ising_cluster()
 end
 
 
+
+###############################################################################
+###############################################################################
+### Details functions 
+ 
+struct IsingSystem
+  dims :: Array{Int32}
+  lattice :: SimpleGraph
+  spins :: Array{Int32}
+end
+
+function constructIsing(dims, rng)
+  lattice = LightGraphs.SimpleGraphs.grid(dims, periodic=true)
+  spins = rand(rng, [-1,1], dims...)
+  s = IsingSystem(dims, lattice, spins)
+  return s
+end
+
+#J=1
+function energy(system::IsingSystem)
+  E = 0.0
+  N = 0
+  for (i,s_i) in enumerate(system.spins)
+    for j in outneighbors(system.lattice,i) 
+      E += -1*s_i*system.spins[j] 
+    end
+  end
+  return E/2.0
+end
+
+function analytic_expectation_value_E(beta,log_dos)
+  mean_E  = 0.0
+  norm    = 0.0
+  for (E,log_d) in log_dos
+    mean_E  +=   E*exp(log_d-beta*E)
+    norm    +=     exp(log_d-beta*E)
+  end
+  mean_E  /= norm
+  return mean_E
+end
+
 #""" Definition of the Boltzmann distribution for hypothesis testing."""
 struct BoltzmannDistribution <: ContinuousUnivariateDistribution
     pdf::Dict{Any,Float64}
@@ -190,22 +301,11 @@ pdf(d::BoltzmannDistribution, E::Real) = d.pdf[E]
 #cumulated probability distribution
 cdf(d::BoltzmannDistribution, E::Real) = d.cdf[E]
 
-#implements logarithmic sum of C = e^c = A+B = e^a + e^b
-# c = ln(A+B) = a + ln(1+e^{b-a})
-# with b-a < 1
-function log_sum(a,b)
-  if b < a
-    return a + log(1+exp(b-a)) 
-  else
-    return b + log(1+exp(a-b))
-  end
-end
-
 function initialize_BoltzmannDistribution(beta,log_dos)
   #partition sum
-  log_Z = 0
+  log_Z = -Inf
   for (E,log_d) in log_dos
-    log_Z = log_sum(log_Z, log_d - beta*E)
+    log_Z = Reweighting.log_sum(log_Z, log_d - beta*E)
   end
 
   pdf = Dict{Int64,Float64}()
@@ -214,7 +314,7 @@ function initialize_BoltzmannDistribution(beta,log_dos)
   log_cdf = 0
   for (E,log_d) in log_dos
     log_pdf = log_d - beta*E - log_Z
-    log_cdf = log_sum(log_cdf, log_pdf)
+    log_cdf = Reweighting.log_sum(log_cdf, log_pdf)
     pdf[E] = exp(log_pdf)
     cdf[E] = exp(log_cdf)
   end 
@@ -222,69 +322,24 @@ function initialize_BoltzmannDistribution(beta,log_dos)
 end
 
 
-log_dos_beale_8x8 = [ (-128, 0.6931471805599453  ),
-                      (-124, 0.0                 ),
-                      (-120, 4.852030263919617   ),
-                      (-116, 5.545177444479562   ),
-                      (-112, 8.449342524508063   ),
-                      (-108, 9.793672686528922   ),
-                      (-104, 11.887298863200714  ),
-                      (-100, 13.477180596840947  ),
-                      (-96 , 15.268195474147658  ),
-                      (-92 , 16.912371686315282  ),
-                      (-88 , 18.59085846191256   ),
-                      (-84 , 20.230089202801466  ),
-                      (-80 , 21.870810400320693  ),
-                      (-76 , 23.498562234123614  ),
-                      (-72 , 25.114602234581373  ),
-                      (-68 , 26.70699035290573   ),
-                      (-64 , 28.266152815389898  ),
-                      (-60 , 29.780704423363996  ),
-                      (-56 , 31.241053997806176  ),
-                      (-52 , 32.63856452513369   ),
-                      (-48 , 33.96613536105969   ),
-                      (-44 , 35.217576663643314  ),
-                      (-40 , 36.3873411250109    ),
-                      (-36 , 37.47007844691906   ),
-                      (-32 , 38.46041522581422   ),
-                      (-28 , 39.35282710786369   ),
-                      (-24 , 40.141667825183845  ),
-                      (-20 , 40.82130289691285   ),
-                      (-16 , 41.38631975325592   ),
-                      (-12 , 41.831753810069756  ),
-                      (-8  , 42.153328313883975  ),
-                      (-4  , 42.34770636939425   ),
-                      (0   , 42.41274640460084   ),
-                      (4   , 42.34770636939425   ),
-                      (8   , 42.153328313883975  ),
-                      (12  , 41.831753810069756  ),
-                      (16  , 41.38631975325592   ),
-                      (20  , 40.82130289691285   ),
-                      (24  , 40.141667825183845  ),
-                      (28  , 39.35282710786369   ),
-                      (32  , 38.46041522581422   ),
-                      (36  , 37.47007844691906   ),
-                      (40  , 36.3873411250109    ),
-                      (44  , 35.217576663643314  ),
-                      (48  , 33.96613536105969   ),
-                      (52  , 32.63856452513369   ),
-                      (56  , 31.241053997806176  ),
-                      (60  , 29.780704423363996  ),
-                      (64  , 28.266152815389898  ),
-                      (68  , 26.70699035290573   ),
-                      (72  , 25.114602234581373  ),
-                      (76  , 23.498562234123614  ),
-                      (80  , 21.870810400320693  ),
-                      (84  , 20.230089202801466  ),
-                      (88  , 18.59085846191256   ),
-                      (92  , 16.912371686315282  ),
-                      (96  , 15.268195474147658  ),
-                      (100 , 13.477180596840947  ),
-                      (104 , 11.887298863200714  ),
-                      (108 , 9.793672686528922   ),
-                      (112 , 8.449342524508063   ),
-                      (116 , 5.545177444479562   ),
-                      (120 , 4.852030263919617   ),
-                      (124 , 0.0                 ),
-                      (128 , 0.6931471805599453  )
-                     ];
+log_dos_beale_8x8 = [ (-128, 0.6931471805599453  ), (-124, 0.0                 ), (-120, 4.852030263919617   ), (-116, 5.545177444479562   ), (-112, 8.449342524508063   ), (-108, 9.793672686528922   ), (-104, 11.887298863200714  ), (-100, 13.477180596840947  ), (-96 , 15.268195474147658  ), (-92 , 16.912371686315282  ), (-88 , 18.59085846191256   ), (-84 , 20.230089202801466  ), (-80 , 21.870810400320693  ), (-76 , 23.498562234123614  ), (-72 , 25.114602234581373  ), (-68 , 26.70699035290573   ), (-64 , 28.266152815389898  ), (-60 , 29.780704423363996  ), (-56 , 31.241053997806176  ), (-52 , 32.63856452513369   ), (-48 , 33.96613536105969   ), (-44 , 35.217576663643314  ), (-40 , 36.3873411250109    ), (-36 , 37.47007844691906   ), (-32 , 38.46041522581422   ), (-28 , 39.35282710786369   ), (-24 , 40.141667825183845  ), (-20 , 40.82130289691285   ), (-16 , 41.38631975325592   ), (-12 , 41.831753810069756  ), (-8  , 42.153328313883975  ), (-4  , 42.34770636939425   ), (0   , 42.41274640460084   ), (4   , 42.34770636939425   ), (8   , 42.153328313883975  ), (12  , 41.831753810069756  ), (16  , 41.38631975325592   ), (20  , 40.82130289691285   ), (24  , 40.141667825183845  ), (28  , 39.35282710786369   ), (32  , 38.46041522581422   ), (36  , 37.47007844691906   ), (40  , 36.3873411250109    ), (44  , 35.217576663643314  ), (48  , 33.96613536105969   ), (52  , 32.63856452513369   ), (56  , 31.241053997806176  ), (60  , 29.780704423363996  ), (64  , 28.266152815389898  ), (68  , 26.70699035290573   ), (72  , 25.114602234581373  ), (76  , 23.498562234123614  ), (80  , 21.870810400320693  ), (84  , 20.230089202801466  ), (88  , 18.59085846191256   ), (92  , 16.912371686315282  ), (96  , 15.268195474147658  ), (100 , 13.477180596840947  ), (104 , 11.887298863200714  ), (108 , 9.793672686528922   ), (112 , 8.449342524508063   ), (116 , 5.545177444479562   ), (120 , 4.852030263919617   ), (124 , 0.0                 ), (128 , 0.6931471805599453  ) ];
+
+"""
+Kullback-Leibler divergence between two distributions
+
+distributions are here considered to be dictionaries
+
+valid for n-dimensional dictionaries (args=Tuple or larger?)
+"""
+function kldivergence(P::Dict,Q::Dict)
+    ##KL divergence sum P(args)logP(args)/Q(args) 
+    ## P=P_meas, Q=P_true s.t P(args)=0 simply ignored
+    #
+    kld = 0.0
+    for (args,p) in P
+      q = Q[args]
+      kld += p*log(p/q)
+    end
+    return kld
+end
+
