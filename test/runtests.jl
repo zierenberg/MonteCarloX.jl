@@ -19,6 +19,7 @@ import Distributions.cdf
   @test test_gillespie_fast()
 
   include("test_ising.jl")
+  @test test_ising_reweighting()
   @test test_ising_metropolis()
   @test test_ising_cluster()
 end
