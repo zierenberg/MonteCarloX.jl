@@ -17,8 +17,11 @@ using Random
 Metropolis update probabilities of new and old states taking multiple arguments defined by model
 
 this could also include the selection bias (Hastings)
+
+TODO: add sth lik (... ; stats=None) where things like acceptance rates etc can be cumulated in stats
+TODO: rename update check/accept?
 """
-function update(P,args_new,args_old,rng::AbstractRNG)
+function accept(P,args_new,args_old,rng::AbstractRNG)
   ratio = P(args_new...)/P(args_old...)
   if ratio > 1
     return true
@@ -34,7 +37,7 @@ Metropolis update probabilities of new and old states taking multiple arguments 
 
 PLEASE BE CAREFUL AND KNOW WHAT YOU DO
 """
-function update_diff(P,args_new,args_old,rng)
+function accept_diff(P,args_new,args_old,rng)
   args_diff = args_new .- args_old
   if rand(rng) < P(args_diff...)
     return true
@@ -43,7 +46,26 @@ function update_diff(P,args_new,args_old,rng)
   end
 end
 
-end
+##TODO: Think about making everything in log?
+#function update(P,system,update,rng; stats=empty)
+#  args_new, args_old, update_diff = update(system, rng)
+#  if Metropolis.accept(P,args_new, args_old, rng)
+#    #accept
+#    stats.accept += 1
+#  else
+#    #reject
+#    stats.reject += 1
+#    update_undo(system, update_diff)
+#  end
+#end
+#
+#function sweep(P_sampling, list_updates, system, rng, number_updates=10)
+#  for i in 1:number_updates
+#    id = next_event_probability(list_probabilities)
+#  end
+#end
 
+
+end
 export Metropolis
 

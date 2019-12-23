@@ -33,7 +33,7 @@ function test_ising_reweighting()
         for index_j in nearest_neighbors(index_i)
           dE += 2.0*system.spins[index_i]*system.spins[index_j]  
         end
-        if Metropolis.update_diff(dE->exp(-beta*dE),dE,0,rng)
+        if Metropolis.accept_diff(dE->exp(-beta*dE),dE,0,rng)
           system.spins[index_i] *= -1
         end
       end
@@ -88,13 +88,7 @@ function test_ising_reweighting()
     println("result expectation_value_from_histogram_log: <E> = $(E_reweight_hist2); difference from timeseries = $(E_reweight_hist2_error)")
     pass &= E_reweight_hist2_error < 0.1
     ###########################################################################
-    #E_reweight_hist = Reweighting.expectation_value_from_histogram_log(log_P_source, log_P_target, hist_energy, hist_energy) 
-    #
-    #P_reweight_hist = Reweighting.distribution_from_histrogram_log(log_P_source, log_P_target, hist_energy) 
-    #TODO: compare both approaches (consistency)
-    #TOOD: compare with Boltzmann for beta and beta_target
-    #println(beta, " ", kldivergence, " ", length(keys(P_meas)))
-    #pass &= kldivergence < 0.1
+    #TODO: canonical reweighting
   end
 
   #TODO: multi-histogram reweighting
@@ -103,7 +97,7 @@ function test_ising_reweighting()
 end
 
 
-""" Testing Metropolis update on 2D Ising model"""
+""" Testing Metropolis accept on 2D Ising model"""
 function test_ising_metropolis()
   list_beta = [0.0,0.3,0.7,1.0,1.5,2.0]
   pass = true
@@ -125,7 +119,7 @@ function test_ising_metropolis()
         for index_j in nearest_neighbors(index_i)
           dE += 2.0*system.spins[index_i]*system.spins[index_j]  
         end
-        if Metropolis.update_diff(dE->exp(-beta*dE),dE,0,rng)
+        if Metropolis.accept_diff(dE->exp(-beta*dE),dE,0,rng)
           system.spins[index_i] *= -1
         end
       end
@@ -164,7 +158,7 @@ function test_ising_metropolis()
           E_old += -1*system.spins[index_i]*system.spins[index_j]  
           E_new += +1*system.spins[index_i]*system.spins[index_j]  
         end
-        if Metropolis.update(E->exp(-beta*E),E_new,E_old,rng)
+        if Metropolis.accept(E->exp(-beta*E),E_new,E_old,rng)
           system.spins[index_i] *= -1
         end
       end

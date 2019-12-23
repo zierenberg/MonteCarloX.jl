@@ -2,6 +2,14 @@ module Gillespie
 using Random
 using Distributions
 
+#TODO: rewrite Gillespie to "manage" list of events and call event handler (i.e. one layer up in hierarchy when looking at example of contact process)
+# I imagine somehting like passing list of updates and list of rates and to then perform the particular one that is brought up by next_event
+#
+# potentially also in terms of having populations that all have the same rates (resort and keep updated) and where then only one of a couple of rates is drawn randomly
+#
+# In other case, also keep the list of rates updated? Then one would need a map, or a function that is called upon accepting a certain rate...
+
+
 """
 Gillespie update
 as wrapper around inhomogeneous Poisson process? 
