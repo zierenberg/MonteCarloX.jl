@@ -79,7 +79,7 @@ function run(system, beta, n_meas, n_therm, rng)
       for index_j in nearest_neighbors(index_i)
         dE += 2.0*system.spins[index_i]*system.spins[index_j]  
       end
-      if Metropolis.update_diff(dE->exp(-beta*dE),dE,0,rng)
+      if Metropolis.accept_diff(dE->exp(-beta*dE),dE,0,rng)
         system.spins[index_i] *= -1
         current_E             += dE
         metropolis_ar         += 1

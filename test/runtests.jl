@@ -10,6 +10,9 @@ import Distributions.cdf
   # Write your own tests here.
   @test Metropolis.update(x->exp(-1*x),1,2,MersenneTwister(1000))==true
 
+  include("test_equilibrium.jl")
+  @test test_unimodal_metropolis()
+
   include("test_inhomogenous_poisson.jl")
   @test test_poisson_single()
   @test test_poisson_constant()
@@ -21,4 +24,5 @@ import Distributions.cdf
   include("test_ising.jl")
   @test test_ising_metropolis()
   @test test_ising_cluster()
+  
 end

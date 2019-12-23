@@ -7,6 +7,8 @@
 
 
 # API notes
+- work in log_P or log_weight scheme? do this for reweighting anyways...
+- order of arguments? 
 
 # equilibrium part
 READY for advanced updates: pass energy new, energy old 
@@ -14,7 +16,6 @@ READY for advanced updates: pass energy new, energy old
 * muca gets weight function, 
 * parallel tempering needs also temperatures .... but only in additional swap move..)
 * population annealing also uses metropolis but additional resampling step
-* cluster update? -> try to solve this today
 
 # what I learned
 

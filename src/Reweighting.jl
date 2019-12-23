@@ -1,14 +1,9 @@
+"""
+# MonteCarloX.Reweighting
+Module for timeseries and histogram reweighting
+"""
 module Reweighting
 using Distributions
-
-include("Histogram.jl")
-#function add(hist::Dict, args; value=1)
-#  if args in keys(hist)
-#    hist[args] += value
-#  else
-#    hist[args]  = value
-#  end
-#end
 
 #TODO: move to helper class
 """
@@ -98,7 +93,7 @@ function distribution_from_timeseries_log(log_P_target, log_P_source, list_args)
   end
   distribution=Dict{typeof(list_args[1]),Float64}() 
   for i in 1:N
-    add(distribution, list_args[i], value = exp(list_log_weight_ratio[i] - log_norm))
+    Histogram.add(distribution, list_args[i], value = exp(list_log_weight_ratio[i] - log_norm))
   end
   normalize!(distribution)
   return distribution
