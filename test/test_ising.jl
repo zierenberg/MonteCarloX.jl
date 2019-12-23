@@ -9,7 +9,7 @@ using StatsBase
 import StatsBase.kldivergence
 
 """ Testing reweighting on 2D Ising model"""
-function test_ising_reweighting()
+function test_ising_reweighting(;output=false)
   log_P(E,beta) = -beta*E
   P(E,beta) = exp(-beta*E)
 
@@ -54,29 +54,39 @@ function test_ising_reweighting()
     P_ref_source = BoltzmannDistribution(beta_source,log_dos_beale_8x8).pdf
     P_ref_target = BoltzmannDistribution(beta_target,log_dos_beale_8x8).pdf
     kld_ref = kldivergence(P_meas, P_ref_source)
-    println("result analytic = $(E_ref)")
+    if output
+      println("result analytic = $(E_ref)")
+    end
     ###########################################################################
     E_reweight_list1 = Reweighting.expectation_value_from_timeseries_log(log_P_target, log_P_source, list_energy, list_energy) 
     E_reweight_list1_error = abs((E_reweight_list1 - E_ref)/E_ref)
-    println("result expectation_value_from_timeseries_log: <E> = $(E_reweight_list1); difference from exact = $(E_reweight_list1_error)")
+    if output
+      println("result expectation_value_from_timeseries_log: <E> = $(E_reweight_list1); difference from exact = $(E_reweight_list1_error)")
+    end
     pass &= E_reweight_list1_error < 0.1
     ###########################################################################
     E_reweight_list2 = Reweighting.expectation_value_from_timeseries(P_target, P_source, list_energy, list_energy) 
     E_reweight_list2_error = abs(E_reweight_list1 - E_reweight_list2)
-    println("result expectation_value_from_timeseries: <E> = $(E_reweight_list2); difference from ..._log = $(E_reweight_list2_error)")
+    if output
+      println("result expectation_value_from_timeseries: <E> = $(E_reweight_list2); difference from ..._log = $(E_reweight_list2_error)")
+    end
     pass &= E_reweight_list2_error < 0.1
     ###########################################################################
     P_reweight_list = Reweighting.distribution_from_timeseries_log(log_P_target, log_P_source, list_energy) 
     kld_source = kldivergence(P_reweight_list, P_ref_source)
     kld_target = kldivergence(P_reweight_list, P_ref_target)
-    println("result distribution_from_timeseries_log: kld_target ($(kld_target)) !< kld_source ($(kld_source))")
+    if output
+      println("result distribution_from_timeseries_log: kld_target ($(kld_target)) !< kld_source ($(kld_source))")
+    end
     #only compare reweighted distribution to target and source. There result is comparable.
     pass &= kld_target < kld_source
     ###########################################################################
     E_reweight_hist1 = Reweighting.expectation_value_from_histogram_log(E->E, log_P_target, log_P_source, H_E) 
     E_reweight_hist1_error = abs((E_reweight_hist1 - E_ref)/E_ref)
-    println("result expectation_value_from_histogram_log-1: <E> = $(E_reweight_hist1); difference from exact = $(E_reweight_hist1_error)")
-    println("result expectation_value_from_histogram_log-1: <E> = $(E_reweight_hist1); difference from timeseries = $(E_reweight_hist1 - E_reweight_list1)")
+    if output
+      println("result expectation_value_from_histogram_log-1: <E> = $(E_reweight_hist1); difference from exact = $(E_reweight_hist1_error)")
+      println("result expectation_value_from_histogram_log-1: <E> = $(E_reweight_hist1); difference from timeseries = $(E_reweight_hist1 - E_reweight_list1)")
+    end
     pass &= E_reweight_hist1_error < 0.1
     ###########################################################################
     hist_obs = Dict()
@@ -85,7 +95,9 @@ function test_ising_reweighting()
     end
     E_reweight_hist2 = Reweighting.expectation_value_from_histogram_log(log_P_target, log_P_source, H_E, hist_obs) 
     E_reweight_hist2_error = abs(E_reweight_hist2 - E_reweight_list1)
-    println("result expectation_value_from_histogram_log: <E> = $(E_reweight_hist2); difference from timeseries = $(E_reweight_hist2_error)")
+    if output
+      println("result expectation_value_from_histogram_log: <E> = $(E_reweight_hist2); difference from timeseries = $(E_reweight_hist2_error)")
+    end
     pass &= E_reweight_hist2_error < 0.1
     ###########################################################################
     #TODO: canonical reweighting
