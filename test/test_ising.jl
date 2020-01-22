@@ -9,7 +9,7 @@ using StatsBase
 import StatsBase.kldivergence
 
 """ Testing reweighting on 2D Ising model"""
-function test_ising_reweighting(;output=false)
+function test_ising_reweighting(;verbose=false)
   log_P(E,beta) = -beta*E
   P(E,beta) = exp(-beta*E)
 
@@ -28,17 +28,10 @@ function test_ising_reweighting(;output=false)
     for sweep in 1:samples+100
       #Metropolis:
       for i in 1:N
-        index_i = rand(rng,1:N)
-        dE = 0.0
-        for index_j in nearest_neighbors(index_i)
-          dE += 2.0*system.spins[index_i]*system.spins[index_j]  
-        end
-        if Metropolis.accept_diff(dE->exp(-beta*dE),dE,0,rng)
-          system.spins[index_i] *= -1
-        end
+        update_spin_flip(system,beta,rng)
       end
       if sweep > 100
-        list_energy[sweep-100] = energy(system)
+        list_energy[sweep-100] = E(system)
       end
     end
     H_E    = countmap(list_energy)
@@ -54,20 +47,20 @@ function test_ising_reweighting(;output=false)
     P_ref_source = BoltzmannDistribution(beta_source,log_dos_beale_8x8).pdf
     P_ref_target = BoltzmannDistribution(beta_target,log_dos_beale_8x8).pdf
     kld_ref = kldivergence(P_meas, P_ref_source)
-    if output
+    if verbose
       println("result analytic = $(E_ref)")
     end
     ###########################################################################
     E_reweight_list1 = Reweighting.expectation_value_from_timeseries_log(log_P_target, log_P_source, list_energy, list_energy) 
     E_reweight_list1_error = abs((E_reweight_list1 - E_ref)/E_ref)
-    if output
+    if verbose
       println("result expectation_value_from_timeseries_log: <E> = $(E_reweight_list1); difference from exact = $(E_reweight_list1_error)")
     end
     pass &= E_reweight_list1_error < 0.1
     ###########################################################################
     E_reweight_list2 = Reweighting.expectation_value_from_timeseries(P_target, P_source, list_energy, list_energy) 
     E_reweight_list2_error = abs(E_reweight_list1 - E_reweight_list2)
-    if output
+    if verbose
       println("result expectation_value_from_timeseries: <E> = $(E_reweight_list2); difference from ..._log = $(E_reweight_list2_error)")
     end
     pass &= E_reweight_list2_error < 0.1
@@ -75,7 +68,7 @@ function test_ising_reweighting(;output=false)
     P_reweight_list = Reweighting.distribution_from_timeseries_log(log_P_target, log_P_source, list_energy) 
     kld_source = kldivergence(P_reweight_list, P_ref_source)
     kld_target = kldivergence(P_reweight_list, P_ref_target)
-    if output
+    if verbose
       println("result distribution_from_timeseries_log: kld_target ($(kld_target)) !< kld_source ($(kld_source))")
     end
     #only compare reweighted distribution to target and source. There result is comparable.
@@ -83,7 +76,7 @@ function test_ising_reweighting(;output=false)
     ###########################################################################
     E_reweight_hist1 = Reweighting.expectation_value_from_histogram_log(E->E, log_P_target, log_P_source, H_E) 
     E_reweight_hist1_error = abs((E_reweight_hist1 - E_ref)/E_ref)
-    if output
+    if verbose
       println("result expectation_value_from_histogram_log-1: <E> = $(E_reweight_hist1); difference from exact = $(E_reweight_hist1_error)")
       println("result expectation_value_from_histogram_log-1: <E> = $(E_reweight_hist1); difference from timeseries = $(E_reweight_hist1 - E_reweight_list1)")
     end
@@ -95,7 +88,7 @@ function test_ising_reweighting(;output=false)
     end
     E_reweight_hist2 = Reweighting.expectation_value_from_histogram_log(log_P_target, log_P_source, H_E, hist_obs) 
     E_reweight_hist2_error = abs(E_reweight_hist2 - E_reweight_list1)
-    if output
+    if verbose
       println("result expectation_value_from_histogram_log: <E> = $(E_reweight_hist2); difference from timeseries = $(E_reweight_hist2_error)")
     end
     pass &= E_reweight_hist2_error < 0.1
@@ -110,7 +103,7 @@ end
 
 
 """ Testing Metropolis accept on 2D Ising model"""
-function test_ising_metropolis()
+function test_ising_metropolis(;verbose=false)
   list_beta = [0.0,0.3,0.7,1.0,1.5,2.0]
   pass = true
 
@@ -126,78 +119,29 @@ function test_ising_metropolis()
     for sweep in 1:samples+100
       #Metropolis:
       for i in 1:N
-        index_i = rand(rng,1:N)
-        dE = 0.0
-        for index_j in nearest_neighbors(index_i)
-          dE += 2.0*system.spins[index_i]*system.spins[index_j]  
-        end
-        if Metropolis.accept_diff(dE->exp(-beta*dE),dE,0,rng)
-          system.spins[index_i] *= -1
-        end
+        update_spin_flip(system,beta,rng)
       end
       if sweep > 100
-        list_energy[sweep-100] = energy(system)
+        list_energy[sweep-100] = E(system)
       end
     end
-    P_meas = countmap(list_energy)
+    H_E    = countmap(list_energy)
+    P_meas = proportionmap(list_energy)
     P_true = BoltzmannDistribution(beta,log_dos_beale_8x8).pdf
     #KL divergence sum P(E)logP(E)/Q(E) 
     # P=P_meas, Q=P_true s.t P(E)=0 simply ignored
-    kldivergence = 0.0
-    for (E,P) in P_meas
-      P = P/length(list_energy)
-      Q = P_true[E]
-      kldivergence += P*log(P/Q)
+    kld = abs(kldivergence(P_meas, P_true))
+    if verbose
+      println(beta, " ", kld, " ", length(keys(P_meas)))
     end
-    #println(beta, " ", kldivergence, " ", length(keys(P_meas)))
-    #kldivergence depends on sample size, correlation, etc..
-    pass &= kldivergence < 0.1
-  end
-
-
-  system = constructIsing([8,8], rng)
-  for beta in list_beta
-    samples = 1000
-    list_energy = zeros(samples)
-    # thermalization 100 sweeps
-    for sweep in 1:samples+100
-      #Metropolis:
-      for i in 1:N
-        index_i = rand(rng,1:N)
-        E_old = 0.0
-        E_new = 0.0
-        for index_j in nearest_neighbors(index_i)
-          E_old += -1*system.spins[index_i]*system.spins[index_j]  
-          E_new += +1*system.spins[index_i]*system.spins[index_j]  
-        end
-        if Metropolis.accept(E->exp(-beta*E),E_new,E_old,rng)
-          system.spins[index_i] *= -1
-        end
-      end
-      if sweep > 100
-        list_energy[sweep-100] = energy(system)
-      end
-    end
-    P_meas = countmap(list_energy)
-    P_true = BoltzmannDistribution(beta,log_dos_beale_8x8).pdf
-    #KL divergence sum P(E)logP(E)/Q(E) 
-    # P=P_meas, Q=P_true s.t P(E)=0 simply ignored
-    kldivergence = 0.0
-    for (E,P) in P_meas
-      P = P/length(list_energy)
-      Q = P_true[E]
-      kldivergence += P*log(P/Q)
-    end
-    #println(beta, " ", kldivergence, " ", length(keys(P_meas)))
-    #kldivergence depends on sample size, correlation, etc..
-    pass &= kldivergence < 0.1
+    pass &= kld < 0.1
   end
 
   return pass
 end
 
 """ Testing Cluster update on 2D Ising model"""
-function test_ising_cluster()
+function test_ising_cluster(;verbose=false)
   #avoid beta_c = 0.44
   #why does it consistently fail around beta=0.6
   list_beta = [0,0.3,0.5,1,1.5,2.0]
@@ -218,30 +162,15 @@ function test_ising_cluster()
         ClusterWolff.update(system.spins, nearest_neighbors, beta, rng)
       end
       if sweep > 100
-        list_energy[sweep-100] = energy(system)
+        list_energy[sweep-100] = E(system)
       end
     end
 
-    P_meas = countmap(list_energy)
+    P_meas = Histograms.distribution(list_energy)
     P_true = BoltzmannDistribution(beta,log_dos_beale_8x8).pdf
-    #x=sort(collect(keys(P_meas)))
-    #display(plot(x,[P_meas[x_]/length(list_energy) for x_ in x]))
-    #println(x)
-    #println([P_meas[x_]/length(list_energy) for x_ in x])
-    #println([P_true[x_] for x_ in x])
-    #display(plot!(x,[P_true[x_] for x_ in x],label="true"))
 
-    #KL divergence sum P(E)logP(E)/Q(E) 
-    # P=P_meas, Q=P_true s.t P(E)=0 simply ignored
-    kldivergence = 0.0
-    for (E,P) in P_meas
-      P = P/length(list_energy)
-      Q = P_true[E]
-      kldivergence += P*log(P/Q)
-    end
-    #println(beta, " ", kldivergence, " ", length(keys(P_meas)))
-    #kldivergence depends on sample size, correlation, etc..
-    pass &= kldivergence < 0.02
+    kld = abs(kldivergence(P_meas, P_true))
+    pass &= kld < 0.02
     
     #test = HypothesisTests.ExactOneSampleKSTest(list_energy, BoltzmannDistribution(beta,log_dos_beale_8x8))
     #pass &= pvalue(test) > 0.05
@@ -255,33 +184,46 @@ end
 ###############################################################################
 ###############################################################################
 ### Details functions 
- 
-struct IsingSystem
-  dims :: Array{Int32}
-  lattice :: SimpleGraph
-  spins :: Array{Int32}
-end
 
-function constructIsing(dims, rng)
-  lattice = LightGraphs.SimpleGraphs.grid(dims, periodic=true)
-  spins = rand(rng, [-1,1], dims...)
-  s = IsingSystem(dims, lattice, spins)
-  return s
-end
+"""
+Kullback-Leibler divergence between two distributions
 
-#J=1
-function energy(system::IsingSystem)
-  E = 0.0
-  N = 0
-  for (i,s_i) in enumerate(system.spins)
-    for j in outneighbors(system.lattice,i) 
-      E += -1*s_i*system.spins[j] 
+distributions are here considered to be dictionaries
+
+valid for n-dimensional dictionaries (args=Tuple or larger?)
+"""
+function kldivergence(P::Dict,Q::Function)::Float64
+    ##KL divergence sum P(args)logP(args)/Q(args) 
+    ## P=P_meas, Q=P_true s.t P(args)=0 simply ignored
+    kld = 0.0
+    for (E,p) in P
+      p = p
+      q = Q[E]
+      kld += p*log(p/q)
     end
-  end
-  return E/2.0
+    return kld
 end
 
-function analytic_expectation_value_E(beta,log_dos)
+ 
+struct IsingSystem{F}
+  dims :: Vector{Int}
+  lattice :: SimpleGraph
+  spins :: Vector{Int}
+  nearest_neighbors :: F
+end
+
+function constructIsing(dims::Vector{Int}, rng::AbstractRNG)::IsingSystem
+  lattice = LightGraphs.SimpleGraphs.grid(dims, periodic=true)
+  spins   = rand(rng, [-1,1], nv(lattice))
+  nearest_neighbors(i) = outneighbors(lattice,i)
+  return IsingSystem(dims, lattice, spins, nearest_neighbors)
+end
+
+function M(system::IsingSystem)::Int
+  return abs(sum(system.spins))
+end
+
+function analytic_expectation_value_E(beta::Float64,log_dos::Vector{Tuple{Int, Float64}})::Float64
   mean_E  = 0.0
   norm    = 0.0
   for (E,log_d) in log_dos
@@ -290,6 +232,38 @@ function analytic_expectation_value_E(beta,log_dos)
   end
   mean_E  /= norm
   return mean_E
+end
+
+#J=1
+#E=-J*sum s_i s_j
+function E(system::IsingSystem)::Int
+  E = 0
+  for i in 1:length(system.spins)
+    E += E_local(system,i)
+  end
+  return E/2
+end
+
+function E_local(system::IsingSystem, index::Int)::Int
+  e = 0
+  for j in system.nearest_neighbors(index)
+    e -= system.spins[index]*system.spins[j]
+  end
+  return e
+end
+
+function update_spin_flip(system::IsingSystem, beta::Float64, rng::AbstractRNG)::Int
+  #define weight function via energy change and simply pass 0 as second argument
+  log_weight(dE::Int)::Float64 = -beta*dE
+
+  index = rand(rng,1:length(system.spins))
+  dE    = -2*E_local(system, index)
+  if Metropolis.accept(log_weight,dE,0,rng)
+    system.spins[index] *= -1
+  else
+    dE = 0
+  end
+  return dE
 end
 
 #""" Definition of the Boltzmann distribution for hypothesis testing."""
