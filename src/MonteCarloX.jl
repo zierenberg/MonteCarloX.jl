@@ -1,35 +1,34 @@
 module MonteCarloX
+#Maybe embedd this into StatisticalPhysics.jl the including SpinSystems.jl PolymerSystems.jl etc ;)
+#
 
 greet() = print("Loading MonteCarloX...")
 
-#include("Utils.jl")
-include("Histograms.jl")
+include("Utils.jl")
 
 #todo: sort code according to classic, canonical, ..? 
 #todo: implement function integration as test and prime example!!!
 
+#TODO: Metropolis.sweep (or MonteCarloX.sweep? I guess this is well suited there
 include("Metropolis.jl")
+#TODO: Move this to SpinSystems.Updates
 include("ClusterWolff.jl")
 
-#Todo: implemeent a sweep by passing array of possible updates that are then performed with probability
-#include("Sweep.jl")
-
+#TODO: Gillespie.advance(T)
 include("Gillespie.jl")
+include("KineticMonteCarlo.jl")
 include("InhomogeneousPoissonProcess.jl")
 
+include("Histograms.jl")
 include("Reweighting.jl")
-include("EventHandler.jl")
 
-function sweep(list_updates, list_probabilities, rng; number_updates=1)
-  #TODO: find out if this is a speed problem
-  @assert length(list_updates) == length(list_probabilities)
-  @assert sum(list_probabilities) == 1
 
-  for i in 1:number_updates
-    id = EventHandler.next_event_probability(list_probabilities,rng)
-    #calls metropolis itself
-    list_updates[id]()
-  end
-end
+
+#TODO: how to sort these?
+#obviously in external modules
+#("ContactProcess.jl")
+#("CellularAutomata.jl)
+
+#TODO: NeuralNetworks.jl (including Networks.jl?)
 
 end # module

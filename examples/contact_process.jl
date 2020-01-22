@@ -3,86 +3,132 @@ using Distributions
 using MonteCarloX
 using Random
 
-function run(N::Int,m::Float64,h::Float64,p::Float64,T::Float64,T_therm::Float64,seed::Int; flag_fast = true)
-  rng = MersenneTwister(seed);
-  rng2 = MersenneTwister(seed);
 
-  # directed ER graph
-  neuron = zeros(N);
-  graph = LightGraphs.SimpleGraphs.erdos_renyi(N, p, is_directed=true, seed=seed)
-  #graph.fadjlist gives outgoing nodes
-  #inneighbors(graph,v) -> works
-  
-  # number of active neighbors for fast update of local lambdi_i
-  neuron_active_neighbors = zeros(Int8,N);
-  # rate array
-  rate = ones(Float64,N).*h;
-  R = sum(rate)
+#this runs 5s for run(1000,0.1,1.0,1e-3,1e5,1/1e-3,1000) as does my C code... :P
+#
+#TODO: reduce allocations? pass arrays?
+
+function run(N::Int,p::Float64,m::Float64,h::Float64,T::Float64,T_therm::Float64,seed::Int; flag_fast = true)::Tuple{Float64,Float64,Int}
+  rng = MersenneTwister(seed);
 
   #dimensionless rates
-  mu = 1
+  mu     = 1.0
   lambda = mu*m
 
-  #loop over time
+  system = construct_system(N, p, mu, lambda, h, seed, initial="empty")
+
   T_total = T + T_therm;
-  time = 0
-  dt   = 0
-  Nact = 0
-  dtime      = 0;
-  dtime_sum  = 0;
-  dtime_step = 10;
-  N_meas     = 0;
-  avg_activity  = 0;
-  avg_activity2 = 0;
+  time= dt = dtime = 0.0;
+  dtime_step = 10.0;
+  N_active = N_meas = 0;
+  avg_activity = avg_activity2 = 0.0;
+
+  #TODO: think about abstract Gillespie: pass only system, rng, update(), external events as list
+  #Q?? Can we do something similar for Metropolis?
+
   while time < T_total
     # find next event (dt and time) to be updated
     if flag_fast
-      dt,n = Gillespie.next_event_fast(rate,R,rng)
+      dt,n = KineticMonteCarlo.next_event(system.rates,system.sum_rates,rng)
     else
-      dt,n = Gillespie.next_event(rate,rng)
+      dt,n = KineticMonteCarlo.next_event(system.rates,rng)
     end
+
     # measure observables in discrete time 
     # use values from last step because they were valid inbetween
     dtime += dt;
     while dtime > dtime_step
-      dtime_sum += dtime_step;
-      dtime     -= dtime_step;
+      dtime     -= dtime_step
+      #TODO: is this correct?
       if time > T_therm  
-        avg_activity  += Nact;
-        avg_activity2 += Nact*Nact;
-        N_meas        += 1;
+        avg_activity  += N_active
+        avg_activity2 += N_active*N_active
+        N_meas        += 1
       end
     end
-    # evolve time 
+    #TODO: what is correct? T=1e4 with dt=10 -> N=1000 or 1001? here 1001
+    
+    # only after measurement evolve real time
     time += dt;
-    # update neuron n, rate list, sum of rates R,
-    rate_n_old = rate[n];
-    dstate = 0;
-    if neuron[n]==0  
-      neuron[n] = 1;
-      rate[n] = mu;
-      dstate  = 1;
-    else  
-      neuron[n] = 0;
-      rate[n] = h + lambda*neuron_active_neighbors[n]/length(inneighbors(graph,n)) 
-      dstate  = -1;
-    end
-    #update number of active nodes
-    Nact += dstate;
-    #update rate list
-    R += (rate[n] - rate_n_old);
-    #update neighboring neurons
-    for nn in outneighbors(graph,n)
-      neuron_active_neighbors[nn] += dstate;
-      if neuron[nn]==0  
-        rate_nn_old = rate[nn];
-        rate[nn] = h + lambda*neuron_active_neighbors[nn]/length(inneighbors(graph,n)) 
-        R += (rate[nn] - rate_nn_old); 
-      end
-    end
+
+    N_active += update(system, n)
   end
 
   return avg_activity/N_meas, avg_activity2/N_meas, N_meas
+end
+
+
+# crucial here is type-stability achieved with F1 and F2!!!
+mutable struct ContactProcess{F1,F2}
+  network::SimpleDiGraph{Int64}
+  incoming_neighbors::F1
+  outgoing_neighbors::F2
+  neurons::Vector{Int8}
+  active_incoming_neighbors::Vector{Int8}
+  rates::Vector{Float64}
+  sum_rates::Float64
+  mu::Float64
+  lambda::Float64
+  h::Float64
+end
+
+#here one could select initial condition empty, full, equilibrium?
+function construct_system(N, p, mu, lambda, h, seed; initial="empty")::ContactProcess
+  # directed ER graph
+  network = LightGraphs.SimpleGraphs.erdos_renyi(N, p, is_directed=true, seed=seed)
+  incoming_neighbors(n) = inneighbors(network,n)
+  outgoing_neighbors(n) = outneighbors(network,n)
+  
+  #initial conditions 
+  neurons = []
+  active_incoming_neighbors = []
+  if initial=="empty"
+    #TODO: Bool?
+    neurons = zeros(Int8, N)
+    active_incoming_neighbors = zeros(Int8, N);
+    rates = ones(Float64,N).*h;
+  end
+  if initial=="full"
+    neurons = ones(Int8, N);
+    active_incoming_neighbors = ones(Int8, N);
+    rates = ones(Float64,N).*mu;
+  end
+  #as array to use immutable struct for faster performance?
+  sum_rates = sum(rates)
+
+  return ContactProcess(network,incoming_neighbors,outgoing_neighbors,neurons,active_incoming_neighbors,rates,sum_rates,mu,lambda,h)
+end
+
+#system has to include list_rates and sum_ratesand neuon_active_neighbors, graph, indegree function etc
+function update(system::ContactProcess, n::Int)::Int
+  rate_n_old = system.rates[n];
+  dstate     = 0;
+  if system.neurons[n] == 0  
+    system.neurons[n] = 1;
+    system.rates[n]   = system.mu;
+    dstate            = 1;
+  else  
+    system.neurons[n] = 0;
+    system.rates[n]   = rate_activate(system,n)
+    dstate            = -1;
+  end
+
+  #update rate list
+  system.sum_rates += (system.rates[n] - rate_n_old);
+  for nn in system.outgoing_neighbors(n)
+    system.active_incoming_neighbors[nn] += dstate;
+    if system.neurons[nn] == 0  
+      rate_nn_old       = system.rates[nn];
+      system.rates[nn]  = rate_activate(system,nn)
+      system.sum_rates += (system.rates[nn] - rate_nn_old); 
+    end
+  end
+
+  return dstate
+end
+
+@inline function rate_activate(system::ContactProcess,n::Int)::Float64
+  return system.h + system.lambda*system.active_incoming_neighbors[n]/length(system.incoming_neighbors(n)) 
 end
 
 ##############################run
