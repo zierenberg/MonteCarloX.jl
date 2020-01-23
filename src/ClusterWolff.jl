@@ -17,9 +17,11 @@ https://stanford.edu/~kurinsky/ClassWork/Physics271_Final_Paper.pdf
 
 consider BlumeCapel implementation
 
-todo: return dE?
+todo:
+return dE?
+how to specify function type for performance?
 """
-function update(spins::Array{Int32}, nearest_neighbors::Any, betaJ::Float64, rng::AbstractRNG)
+function update(spins::Vector{Int}, nearest_neighbors::Function, betaJ::Float64, rng::AbstractRNG)
   N = length(spins)
 
   # get random spin and flip it
@@ -41,20 +43,6 @@ function update(spins::Array{Int32}, nearest_neighbors::Any, betaJ::Float64, rng
       append!(proposed, nearest_neighbors(index_j))
     end
   end
-
-  # depth first search in neighborhood and check for all 
-  # connected neighbors j that s_j == s_i and update state with probability p = 1.0 - exp(-2*beta*J)
-  #visited = BitSet([index_i])
-  #proposed = copy(nearest_neighbors(index_i))
-  #while !isempty(proposed)
-  #  index_j = pop!(proposed)
-  #  println(index_j, " ", spins[index_j])
-  #  if !in(index_j, visited) && spins[index_j] == s_i && rand(rng) < p
-  #    spins[index_j] *= -1
-  #    append!(proposed, nearest_neighbors(index_j))
-  #  end
-  #  push!(visited, index_j)
-  #end
 end
 
 end

@@ -1,28 +1,14 @@
+"""
+# MonteCarloX.Reweighting
+Module for timeseries and histogram reweighting
+"""
 module Reweighting
 using Distributions
 
-include("Histogram.jl")
-#function add(hist::Dict, args; value=1)
-#  if args in keys(hist)
-#    hist[args] += value
-#  else
-#    hist[args]  = value
-#  end
-#end
+include("Utils.jl")
+include("Histograms.jl")
 
 #TODO: move to helper class
-"""
-logarithmic addition of type C = e^c = A+B = e^a + e^b
- c = ln(A+B) = a + ln(1+e^{b-a})
- with b-a < 1
-"""
-function log_sum(a,b)
-  if b < a
-    return a + log(1+exp(b-a)) 
-  else
-    return b + log(1+exp(a-b))
-  end
-end
 
 function normalize!(dist::Dict)
   norm = 0.0
@@ -98,7 +84,7 @@ function distribution_from_timeseries_log(log_P_target, log_P_source, list_args)
   end
   distribution=Dict{typeof(list_args[1]),Float64}() 
   for i in 1:N
-    add(distribution, list_args[i], value = exp(list_log_weight_ratio[i] - log_norm))
+    Histograms.add(distribution, list_args[i], increment = exp(list_log_weight_ratio[i] - log_norm))
   end
   normalize!(distribution)
   return distribution
@@ -118,7 +104,6 @@ can this be generalized to higher dimensions? nd histograms as dictionary?
 """
 function expectation_value_from_histogram_log(f_args::Function, log_P_target::Function, log_P_source::Function, hist::Dict)
   log_norm = log_normalization(log_P_target, log_P_source, hist)
-  println(log_norm)
   expectation_value = 0 
   for (args,H) in hist
     expectation_value += f_args(args)*H*exp(log_P_target(args...) - log_P_source(args...)-log_norm)
