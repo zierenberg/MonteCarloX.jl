@@ -1,9 +1,21 @@
-#Binary Search here
-#
+"""
+    binary_search(cumulated_sum::AbstractVector{T}, value::T)::Int where {T<:Real}
+
+Perfoms a binary search that returns the index i of an ordered array
+(cumulated_sum) such that cumulated_sum[i-1] < value <= cumulated_sum[i]
+
+# Examples
+```julia-repl
+julia> MonteCarloX.binary_search([[1.,2.,3.,4.],2.5)
+3
+julia> MonteCarloX.binary_search([[1,2,3,4],2)
+2
+```
+"""
 function binary_search(cumulated_sum::AbstractVector{T}, value::T)::Int where {T<:Real}
   #catch lower-bound case that cannot be reached by binary search
   id = 1
-  if value >= cumulated_sum[1] 
+  if value > cumulated_sum[1] 
     index_l = 1
     index_r = length(cumulated_sum)
     while index_l < index_r-1
