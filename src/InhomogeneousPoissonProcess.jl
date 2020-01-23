@@ -6,6 +6,7 @@ basic functions to evaluate (a coupled set of) inhomogeneous Poisson processes w
 module InhomogeneousPoissonProcess
 using Random
 using Distributions
+import FunctionWrappers: FunctionWrapper
 
 """
 next_event_time(rate::Function, max_rate::Float64, rng::AbstractRNG)::Float64
@@ -76,7 +77,7 @@ API - output
 * returns the next event time and its id ass tuple (dt, id)
 """
 #TODO: FunctionWrapper.jl ?
-function next_event(rates::Vector{Function}, max_rate::Float64, rng::AbstractRNG)::Tuple{Float64,Int}
+function next_event(rates::Function, max_rate::Float64, rng::AbstractRNG)::Tuple{Float64,Int}
   rate(t)=sum(rates(t))
   dt = next_event_time(rate, max_rate, rng)
 
