@@ -7,7 +7,7 @@ function glif_net(W::Array{Float64,2};
   tau::Float64=1.0, sigma::Float64=1.0, threshold::Float64=1.0,
   plotflag::Bool=false, nSamples::Int=10, rng::AbstractRNG=MersenneTwister(1000))
   
-  next_sample = InhomogeneousPoissonProcess.next_event_for_collection
+  next_sample = InhomogeneousPoissonProcess.next_event
 
   # LIF potential decreases exponentially from last
   # potential u0 at t0=0.0
