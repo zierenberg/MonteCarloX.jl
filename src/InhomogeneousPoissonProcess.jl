@@ -6,7 +6,6 @@ basic functions to evaluate (a coupled set of) inhomogeneous Poisson processes w
 module InhomogeneousPoissonProcess
 using Random
 using Distributions
-import FunctionWrappers: FunctionWrapper
 
 """
 next_event_time(rate::Function, max_rate::Float64, rng::AbstractRNG)::Float64
@@ -69,7 +68,7 @@ end
 Generate a new event from a collection of inhomogeneous poisson processes with
 rates Lambda(t).
 # Arguments
-- `rate`: rate(dt); Float -> [Float]
+- `rates`: rates(dt); Float -> [Float]
 - `max_rate`: maximal rate in near future (has to be evaluated externally)
 - `rng`: random number generator
 
