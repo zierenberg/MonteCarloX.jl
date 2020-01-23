@@ -33,9 +33,15 @@ function binary_search(cumulated_sum::AbstractVector{T}, value::T)::Int where {T
 end
 
 """
-logarithmic addition of type C = e^c = A+B = e^a + e^b
- c = ln(A+B) = a + ln(1+e^{b-a})
- with b-a < 1
+    log_sum(a,b)og_sum(a,b)
+
+Logarithmic addition of type c = ln(A+B) = a + ln(1+e^{|b-a|}) where C = e^c =
+A+B = e^a + e^b. 
+
+This is useful for sums that involve elements that span multiple orders of
+magnitude, e.g., the partition sum that is required as normalization factor
+during reweighting.
+ 
 """
 function log_sum(a,b)
   if b < a
