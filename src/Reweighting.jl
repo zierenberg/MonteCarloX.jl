@@ -42,7 +42,7 @@ function expectation_value_from_timeseries_log(log_P_target, log_P_source, list_
   
   log_norm = -Inf
   for i in 1:N
-    log_norm  = MonteCarloX.log_sum(log_norm, list_log_weight_ratio[i])
+    log_norm  = log_sum(log_norm, list_log_weight_ratio[i])
   end
   expectation_value = 0 
   for i in 1:N
@@ -80,7 +80,7 @@ function distribution_from_timeseries_log(log_P_target, log_P_source, list_args)
   
   log_norm = -Inf
   for i in 1:N
-    log_norm  = MonteCarloX.log_sum(log_norm, list_log_weight_ratio[i])
+    log_norm  = log_sum(log_norm, list_log_weight_ratio[i])
   end
   distribution=Dict{typeof(list_args[1]),Float64}() 
   for i in 1:N
@@ -124,7 +124,7 @@ end
 function log_normalization(log_P_target, log_P_source, hist::Dict)
   log_norm = -Inf
   for (args,H) in hist
-    log_norm  = MonteCarloX.log_sum(log_norm, log(H) + log_P_target(args...) - log_P_source(args...))
+    log_norm  = log_sum(log_norm, log(H) + log_P_target(args...) - log_P_source(args...))
   end
   return log_norm
 end
