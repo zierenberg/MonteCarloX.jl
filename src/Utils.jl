@@ -33,17 +33,25 @@ function binary_search(cumulated_sum::AbstractVector{T}, value::T)::Int where {T
 end
 
 """
-    log_sum(a,b)og_sum(a,b)
+    log_sum(a::T,b::T)
 
-Logarithmic addition of type c = ln(A+B) = a + ln(1+e^{|b-a|}) where C = e^c =
-A+B = e^a + e^b. 
+Logarithmic addition that returns c = ln(A+B) = a + ln(1+e^{|b-a|}) where C =
+e^c = A+B = e^a + e^b. 
 
 This is useful for sums that involve elements that span multiple orders of
 magnitude, e.g., the partition sum that is required as normalization factor
 during reweighting.
+
+# Examples
+```julia-repl
+julia> exp(MonteCarloX.log_sum(log(2.), log(3.)))
+5.000000000000001
+
+```
+
  
 """
-function log_sum(a,b)
+function log_sum(a::T,b::T)::T where T<:AbstractFloat
   if b < a
     return a + log(1+exp(b-a)) 
   else
