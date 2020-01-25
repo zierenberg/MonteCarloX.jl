@@ -25,11 +25,16 @@ function run(N::Int,p::Float64,m::Float64,h::Float64,T::Float64,T_therm::Float64
 
   #TODO: think about abstract Gillespie: pass only system, rng, update(), external events as list
   #Q?? Can we do something similar for Metropolis?
-
+  events_since_last_sum = 0
   while time < T_total
     # find next event (dt and time) to be updated
     if flag_fast
       dt,n = KineticMonteCarlo.next_event(system.rates,system.sum_rates,rng)
+      events_since_last_sum += 1 
+      if events_since_last_sum > 1000 
+        system.sum_rates = sum(system.rates)
+        events_since_last_sum = 0
+      end
     else
       dt,n = KineticMonteCarlo.next_event(system.rates,rng)
     end

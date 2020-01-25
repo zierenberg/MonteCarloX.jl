@@ -1,4 +1,7 @@
+"""
+"""
 module Histograms
+
 """
 create a histogram from a list of values
 

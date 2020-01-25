@@ -291,7 +291,7 @@ function initialize_BoltzmannDistribution(beta,log_dos)
   pdf = Dict{Int64,Float64}()
   cdf = Dict{Int64,Float64}()
 
-  log_cdf = 0
+  log_cdf = 0.0
   for (E,log_d) in log_dos
     log_pdf = log_d - beta*E - log_Z
     log_cdf = Reweighting.log_sum(log_cdf, log_pdf)

@@ -7,7 +7,6 @@ module KineticMonteCarlo
 using Random
 using Distributions
 
-#TOOD: why do I have to include this?
 include("Utils.jl")
 
 """
