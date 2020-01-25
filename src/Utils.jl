@@ -1,11 +1,11 @@
 """
     binary_search(cumulated_sum::AbstractVector{T}, value::T)::Int where {T<:Real}
 
-Perfoms a binary search that returns the index i of an ordered array
+Perfom a binary search to return the index i of an ordered array
 (cumulated_sum) such that cumulated_sum[i-1] < value <= cumulated_sum[i]
 
 # Examples
-```julia-repl
+```jldoctest
 julia> MonteCarloX.binary_search([[1.,2.,3.,4.],2.5)
 3
 julia> MonteCarloX.binary_search([[1,2,3,4],2)
@@ -35,15 +35,15 @@ end
 """
     log_sum(a::T,b::T)
 
-Logarithmic addition that returns c = ln(A+B) = a + ln(1+e^{|b-a|}) where C =
-e^c = A+B = e^a + e^b. 
+Return result of logarithmic sum ``c = ln(A+B) = a + ln(1+e^{|b-a|})`` where ``C =
+e^c = A+B = e^a + e^b``. 
 
 This is useful for sums that involve elements that span multiple orders of
 magnitude, e.g., the partition sum that is required as normalization factor
 during reweighting.
 
 # Examples
-```julia-repl
+```jldoctest
 julia> exp(MonteCarloX.log_sum(log(2.), log(3.)))
 5.000000000000001
 

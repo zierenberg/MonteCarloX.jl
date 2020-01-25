@@ -5,30 +5,29 @@ module MonteCarloX
 greet() = print("Loading MonteCarloX...")
 
 include("Utils.jl")
+include("Histograms.jl")
 
 #todo: sort code according to classic, canonical, ..? 
 #todo: implement function integration as test and prime example!!!
 
-#TODO: Metropolis.sweep (or MonteCarloX.sweep? I guess this is well suited there
+#Importance sampling
 include("Metropolis.jl")
-#TODO: Move this to SpinSystems.Updates
-include("ClusterWolff.jl")
 
-#TODO: Gillespie.advance(T)
-include("Gillespie.jl")
+#Non-equilibrium 
 include("KineticMonteCarlo.jl")
 include("InhomogeneousPoissonProcess.jl")
+include("Gillespie.jl")
 
-include("Histograms.jl")
 include("Reweighting.jl")
 
+#TODO: move to external SpinSystems.jl module
+include("ClusterWolff.jl")
 
-
-#TODO: how to sort these?
-#obviously in external modules
+#TODO: external modules obviously in external modules
 #("ContactProcess.jl")
 #("CellularAutomata.jl)
+#("Networks.jl)
+#("NeuralNetworks.jl)
 
-#TODO: NeuralNetworks.jl (including Networks.jl?)
 
 end # module
