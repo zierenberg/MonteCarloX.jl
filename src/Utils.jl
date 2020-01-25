@@ -8,6 +8,8 @@ Perfom a binary search to return the index i of an ordered array
 ```jldoctest
 julia> MonteCarloX.binary_search([[1.,2.,3.,4.],2.5)
 3
+```
+```jldoctest
 julia> MonteCarloX.binary_search([[1,2,3,4],2)
 2
 ```
