@@ -162,6 +162,9 @@ function test_unimodal_sweep(;verbose=false)
     samples = Int(1e5)
     list_x = zeros(samples)
 
+    if verbose
+      println("\nTesting sweep with multiple functions")
+    end
     system = System(x0)
     stats1 = Stats(0,0)
     stats2 = Stats(0,0)
@@ -197,6 +200,33 @@ function test_unimodal_sweep(;verbose=false)
       println("number calls to update2= $(num_update2) vs target = $(num_update2_target) [rel_diff = $(rel_diff_num_update2)]")
     end
     pass &= rel_diff_num_update2 < 0.01
+    ##########################################################################
+    # sort into binned histogram
+    # bin size/ 2*sigma ~  #elements per bin (~100)/ samples*0.6/
+    bin_x =  1e4*sqrt(var)*2/0.6/samples
+    P_meas = Histograms.distribution(list_x, bin_x, x0)
+    kld = abs(kldivergence(P_meas, x->exp(log_weight_sampling(x))))
+    if verbose
+      println("result kldivergence P_meas to P_true = $(kld)")
+    end
+    pass &= kld < 0.1
+    ###########################################################################
+    est_x0 = sum(list_x)/length(list_x)
+    diff_est_x0 = abs(est_x0 - x0)
+    if verbose
+      println("result estimate x0 = $(est_x0) vs x0 = $(x0) [diff = $(diff_est_x0)]")
+    end
+    pass &= diff_est_x0 < 0.1
+
+
+    if verbose
+      println("\nTesting sweep with single function")
+    end
+    update1() = update(log_weight_sampling, system, 0.1, rng)
+    for updates in 1:samples
+      Metropolis.sweep(update1, rng, number_updates=10)
+      list_x[updates] = system.x 
+    end
     ##########################################################################
     # sort into binned histogram
     # bin size/ 2*sigma ~  #elements per bin (~100)/ samples*0.6/
