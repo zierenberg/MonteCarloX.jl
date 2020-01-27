@@ -9,30 +9,17 @@ using Random
 # -> Tuple{T} ... where T<:derived from sth :)
 
 """
-Metropolis update probabilities of new and old states taking multiple arguments defined by model
+    accept(log_weight::Function, args_new::Tuple{Number, N}, args_old::Tuple{Number, N}, rng::AbstractRNG)::Bool where N
 
-this could also include the selection bias (Hastings)
+Evaluate acceptance probability according to Metropolis criterium for imporance sampling of ``P(E) \\propto e^{log\\_weight(E)}``.
 
 # Arguments
-- `log_weight(args)`: logarithmic ensemble weight function, e.g., canomical ensemble log_weight(E) = -\beta E
-- `args_new`: tuple of arguments that are required by log_weight function for new (proposed) state
-- `args_old`: tuple of arguments that are required by log_weight function for old state
+- `log_weight(args)`: logarithmic ensemble weight function, e.g., canomical ensemble ``log\\_weight(E) = -\\beta E``
+- `args_new`: arguments (can be Number or Tuple) for new (proposed) state
+- `args_old`: arguments (can be Number or Tuple) for old            state
 - `rng`: random number generator, e.g. MersenneTwister
 
 """
-#TODO type-stable function argument?
-function accept(log_weight::Function, args_new::Number, args_old::Number, rng::AbstractRNG)::Bool
-  difference = log_weight(args_new) - log_weight(args_old)
-  if difference > 0
-    return true
-  elseif rand(rng) < exp(difference)
-    return true
-  else
-    return false
-  end
-end
-
-#TODO: check if syntax corrext or if dims need to be passes with where
 function accept(log_weight::Function, args_new::Tuple{Number, N}, args_old::Tuple{Number, N}, rng::AbstractRNG)::Bool where N
   difference = log_weight(args_new...) - log_weight(args_old...)
   if difference > 0
@@ -44,76 +31,58 @@ function accept(log_weight::Function, args_new::Tuple{Number, N}, args_old::Tupl
   end
 end
 
+function accept(log_weight::Function, args_new::Number, args_old::Number, rng::AbstractRNG)::Bool
+  difference = log_weight(args_new) - log_weight(args_old)
+  if difference > 0
+    return true
+  elseif rand(rng) < exp(difference)
+    return true
+  else
+    return false
+  end
+end
 
-#USELESS with the new definition in terms of log_weights :)
-#"""
-#Metropolis update probabilities of new and old states taking multiple arguments defined by model
-#
-#PLEASE BE CAREFUL AND KNOW WHAT YOU DO
-#"""
-#function accept_diff(log_weight, args_new, args_old,rng)
-#  args_diff = args_new .- args_old
-#  if rand(rng) < exp(log_weigth(args_diff...))
-#    return true
-#  else
-#    return false
-#  end
-#end
-
-
+#TODO: FunctionWrapper.jl
 """
-sweep that randomly picks update from a list according to probability
+    sweep(list_updates::Vector{Function}, list_probabilities::Vector{AbstractFloat}, rng::AbstractRNG; number_updates::Int=1)
 
-any recording has to be done on function argument level
+Randomly pick und run update (has to check acceptance by itself!) from
+`list_updates` with probability specified in `list_probabilities` and repeat
+this `number_updates` times.
 """
-#TODO: work with cumulated_probabilities? -> should save time in random_element evaluation
-# make speed check for small lists!!!
-# FunctionWrapper.jl
-function sweep(list_updates, list_probabilities::Vector{Float64}, rng::AbstractRNG; number_updates::Int=1)
+function sweep(list_updates::Vector{Function}, list_probabilities::Vector{AbstractFloat}, rng::AbstractRNG; number_updates::Int=1)
   @assert length(list_updates) == length(list_probabilities)
-  @assert sum(list_probabilities) == 1
-#  @assert cumulated_probabilities[end] == 1
+  @assert (sum(list_probabilities) - 1.0) < 1e-6
 
   for i in 1:number_updates
     id = random_element(list_probabilities,rng)
-    #id = binary_search(cumulated_probabilities, rand(rng))
-    #calls metropolis itself
+    # update is requred to call Metropolis.accept() itself
     list_updates[id]()
   end
 end
 
-"""
-sweep that calls a single function
-
-TODO: Should we keep this functionality?
-"""
-function sweep(update, rng::AbstractRNG; number_updates::Int=1)
+#TODO: Should we keep this specialization?
+function sweep(update::Function, rng::AbstractRNG; number_updates::Int=1)
   for i in 1:number_updates
-    #calls metropolis itself
+    # update is requred to call Metropolis.accept() itself
     update()
   end
 end
 
 """
-generate events (id) with given probability
+    random_element(list_probabilities::Vector{Float64},rng::AbstractRNG)::Int
 
-for optiomal performance have a sorted list with highest probabilities first
-
-This should actually be a bit faster than binary search especially if stick to convention to start with high probabilities!!!
-
-TODO: find out why random element is actually slower after second call of
-function test_sweep_random_element(;verbose=false)
-(first call clearly faster than binary search)
-
+Pick an index from a list of probabilities.
 """
-function random_element(list_probs::Vector{Float64},rng::AbstractRNG)
+function random_element(list_probabilities::Vector{Float64},rng::AbstractRNG)::Int
+  @assert (sum(list_probabilities) - 1.0) < 1e-6
   theta = rand(rng)
 
   id = 1
-  cumulated_prob = list_probs[id]
+  cumulated_prob = list_probabilities[id]
   while cumulated_prob < theta
     id += 1
-    cumulated_prob += list_probs[id]
+    cumulated_prob += list_probabilities[id]
   end
 
   return id
