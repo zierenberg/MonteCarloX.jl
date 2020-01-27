@@ -1,5 +1,7 @@
 using Documenter, MonteCarloX
 
+DocMeta.setdocmeta!(MonteCarloX, :DocTestSetup, :(using MonteCarloX); recursive=true)
+
 makedocs(;
     modules=[MonteCarloX],
     format=Documenter.HTML(),
@@ -9,7 +11,6 @@ makedocs(;
     repo="https://github.com/zierenberg/MonteCarloX.jl/blob/{commit}{path}#L{line}",
     sitename="MonteCarloX.jl",
     authors="Johannes Zierenberg",
-    assets=String[],
 )
 
 deploydocs(;

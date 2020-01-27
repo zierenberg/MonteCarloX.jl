@@ -12,13 +12,13 @@ include("Histograms.jl")
 
 #Importance sampling
 include("Metropolis.jl")
+include("Reweighting.jl")
 
 #Non-equilibrium 
 include("KineticMonteCarlo.jl")
 include("InhomogeneousPoissonProcess.jl")
 include("Gillespie.jl")
 
-include("Reweighting.jl")
 
 #TODO: move to external SpinSystems.jl module
 include("ClusterWolff.jl")

@@ -1,14 +1,17 @@
 """
+    MonteCarloX.Histograms
+
+Module represents histograms/distributions as dictionaries and handles addition
 """
 module Histograms
 
+#TODO: make all this type stable (generalize to tuples? not sure how to properly but do this maybe in second realization?)
+#TODO: why do I need this x_ref version?
 """
 create a histogram from a list of values
 
 can this be formulated for list_args, dargs, args_ref
 """
-#TODO: make all this type stable (generalize to tuples? not sure how to properly but do this maybe in second realization?)
-#TODO: why do I need this x_ref version?
 function histogram(list_x::Vector{Tx}, dx::Tx, x_ref::Tx; increment::Tv=1)::Dict{Tx,Tv} where {Tx<:Real, Tv<:Real}
   hist = Dict{Tx,Tv}()
   for x in list_x
