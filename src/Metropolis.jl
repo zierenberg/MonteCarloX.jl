@@ -50,7 +50,7 @@ Randomly pick und run update (has to check acceptance by itself!) from
 `list_updates` with probability specified in `list_probabilities` and repeat
 this `number_updates` times.
 """
-function sweep(list_updates, list_probabilities::Vector{AbstractFloat}, rng::AbstractRNG; number_updates::Int=1)
+function sweep(list_updates, list_probabilities::Vector{T}, rng::AbstractRNG; number_updates::Int=1) where T<:AbstractFloat
   @assert length(list_updates) == length(list_probabilities)
   @assert (sum(list_probabilities) - 1.0) < 1e-6
 
@@ -74,7 +74,7 @@ end
 
 Pick an index from a list of probabilities.
 """
-function random_element(list_probabilities::Vector{Float64},rng::AbstractRNG)::Int
+function random_element(list_probabilities::Vector{T},rng::AbstractRNG)::Int where T<:AbstractFloat
   @assert (sum(list_probabilities) - 1.0) < 1e-6
   theta = rand(rng)
 
