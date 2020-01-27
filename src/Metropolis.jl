@@ -44,13 +44,13 @@ end
 
 #TODO: FunctionWrapper.jl
 """
-    sweep(list_updates::Vector{Function}, list_probabilities::Vector{AbstractFloat}, rng::AbstractRNG; number_updates::Int=1)
+    sweep(list_updates, list_probabilities::Vector{AbstractFloat}, rng::AbstractRNG; number_updates::Int=1)
 
 Randomly pick und run update (has to check acceptance by itself!) from
 `list_updates` with probability specified in `list_probabilities` and repeat
 this `number_updates` times.
 """
-function sweep(list_updates::Vector{Function}, list_probabilities::Vector{AbstractFloat}, rng::AbstractRNG; number_updates::Int=1)
+function sweep(list_updates, list_probabilities::Vector{AbstractFloat}, rng::AbstractRNG; number_updates::Int=1)
   @assert length(list_updates) == length(list_probabilities)
   @assert (sum(list_probabilities) - 1.0) < 1e-6
 
