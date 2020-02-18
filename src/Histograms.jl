@@ -1,6 +1,4 @@
 """
-    MonteCarloX.Histograms
-
 Module represents histograms/distributions as dictionaries and handles addition
 """
 module Histograms
@@ -30,6 +28,11 @@ function histogram(list_x::Vector{Tx}; increment::Tv=1)::Dict{Tx,Tv} where {Tx<:
   return hist
 end
 
+#function histogram{Tx,Tv}()::Dict{Tx,Tv} where {Tx<:Real, Tv<:Real}
+#  hist = Dict{Tx,Tv}()
+#  return hist
+#end
+
 """
 create a distribution (sum_args dist[args] = 1) from a list of values
 """
@@ -49,13 +52,24 @@ add a value to a histogram dictionary
 per default this adds 1 but can be used for distributions as well when value is set explicitly 
 """
 #TODO: make this typestable despite multidimensional args?
-function add(hist::Dict, args; increment=1)
+function add!(hist::Dict, args; increment=1)
   if args in keys(hist)
     hist[args] += increment
   else
     hist[args]  = increment
   end
 end
+
+function normalize!(dist::Dict)
+  norm = 0.0
+  for (args, P) in dist
+    norm += P
+  end
+  for (args, P) in dist
+    dist[args] = P/norm
+  end
+end
+
 
 end
 export Histograms

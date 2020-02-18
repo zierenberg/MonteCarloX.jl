@@ -1,70 +1,53 @@
 """
-# MonteCarloX.Reweighting
-Module for timeseries and histogram reweighting
+Module for timeseries and histogram reweighting of observables sampled in equilibrium
 """
 module Reweighting
 using Distributions
-
-include("Utils.jl")
-include("Histograms.jl")
-
-#TODO: move to helper class
-
-function normalize!(dist::Dict)
-  norm = 0.0
-  for (args, P) in dist
-    norm += P
-  end
-  for (args, P) in dist
-    dist[args] = P/norm
-  end
-end
+using ..MonteCarloX
 
 """
-timeseries reweighting 
+    expectation_value_from_timeseries_log(log_P_target::Function, log_P_source::Function, list_args, list_obs::Vector{Tin})::Tout where {Tin<:Number,Tout<:AbstractFloat}
 
-can be used with methods:
+Calculate the expectation value of an observable in `P_target` from a list of measured observables in `P_source`.
+
+This can be used for observables measured in equilibrium, e.g., from methods:
 - metropolis         (for each temperature separate)
 - parallel tempering (for each temperature separate)
 - multicanonical
-- population annealing?
+- population annealing 
 
-canonical
-<O> = sum O_i P_target(E_i)/P_source(E_i) / sum P_target(E_i)/P_source(args_i)
+# Background
+ 
+Definition of reweighting in general: 
 
-or in general
-<O> = sum O_i P_target(args_i)/P_source(args_i) / sum P_target(args_i)/P_source(args_i)
+``\\langle O\\rangle = \\sum O_i P_\\mathrm{target}(args_i)/P_\\mathrm{source}(args_i) / \\sum P_\\mathrm{target}(args_i)/P_\\mathrm{source}(args_i)``
+
+Definition of reweighting for the canonical ensemble:
+
+``\\langle O\\rangle = \\sum O_i e^{\\beta_\\mathrm{target} E_i - \\beta_\\mathrm{source} E_i} / \\sum e^{\\beta_\\mathrm{target} E_i - \\beta_\\mathrm{source} E_i}``
+
+# Remark
+So far, this may not be well implemented for type stability. However, it should not be the most timeconsuming part of the simulation so this problem is moved to later time.
 """
-function expectation_value_from_timeseries_log(log_P_target, log_P_source, list_args, list_obs)
+function expectation_value_from_timeseries(log_P_target::Function, log_P_source::Function, list_args, list_obs::Vector{Tin})::Float64 where {Tin<:Number}
   N = length(list_obs)
-  @assert length(list_obs)==length(list_args)
-  list_log_weight_ratio = [log_P_target(list_args[i]...)-log_P_source(list_args[i]...) for i in 1:N]
+  @assert N == length(list_args)
+  #function for difference between logarithmic weights instead of copying this
+  #into an extra array. Unclear if this is better. 
+  log_weight_diff(i) = log_P_target(list_args[i]...) - log_P_source(list_args[i]...)
   
   log_norm = -Inf
   for i in 1:N
-    log_norm  = log_sum(log_norm, list_log_weight_ratio[i])
+    log_norm  = MonteCarloX.log_sum(log_norm, log_weight_diff(i))
   end
+
   expectation_value = 0 
   for i in 1:N
-    expectation_value += list_obs[i]*exp(list_log_weight_ratio[i] - log_norm)
+    expectation_value += list_obs[i]*exp(log_weight_diff(i) - log_norm)
   end
   return expectation_value
 end
 
-
-"""
-timeseries reweighting 
-
-wrapper for timeseries rewighting with logarithmic distributions
-
-#Arguments
-- 
-"""
-function expectation_value_from_timeseries(P_target, P_source, list_args, list_obs)
-  log_P_target(args...) = log(P_target(args...))
-  log_P_source(args...) = log(P_source(args...))
-  return expectation_value_from_timeseries_log(log_P_target, log_P_source, list_args, list_obs)
-end
 
 """
 Estimate distribution from a list of (measured) arguments to an (n-dimensional) probability distribution
@@ -74,19 +57,19 @@ For higher dimensional distributions (e.g. P(E,M)) list_args needs to be a list 
 returns:
   - Dictionary
 """
-function distribution_from_timeseries_log(log_P_target, log_P_source, list_args)
+function distribution_from_timeseries(log_P_target, log_P_source, list_args)
   N = length(list_args)
   list_log_weight_ratio = [log_P_target(list_args[i]...)-log_P_source(list_args[i]...) for i in 1:N]
   
   log_norm = -Inf
   for i in 1:N
-    log_norm  = log_sum(log_norm, list_log_weight_ratio[i])
+    log_norm  = MonteCarloX.log_sum(log_norm, list_log_weight_ratio[i])
   end
   distribution=Dict{typeof(list_args[1]),Float64}() 
   for i in 1:N
     Histograms.add(distribution, list_args[i], increment = exp(list_log_weight_ratio[i] - log_norm))
   end
-  normalize!(distribution)
+  Histograms.normalize!(distribution)
   return distribution
 end
 
@@ -102,7 +85,7 @@ important: hist_obs(args) = sum O_i delta(args - args_i)
 hists are dictionaries?
 can this be generalized to higher dimensions? nd histograms as dictionary?
 """
-function expectation_value_from_histogram_log(f_args::Function, log_P_target::Function, log_P_source::Function, hist::Dict)
+function expectation_value_from_histogram(f_args::Function, log_P_target::Function, log_P_source::Function, hist::Dict)
   log_norm = log_normalization(log_P_target, log_P_source, hist)
   expectation_value = 0 
   for (args,H) in hist
@@ -112,7 +95,7 @@ function expectation_value_from_histogram_log(f_args::Function, log_P_target::Fu
 end
 
 
-function expectation_value_from_histogram_log(log_P_target::Function, log_P_source::Function, hist::Dict, hist_obs::Dict)
+function expectation_value_from_histogram(log_P_target::Function, log_P_source::Function, hist::Dict, hist_obs::Dict)
   log_norm = log_normalization(log_P_target, log_P_source, hist)
   expectation_value = 0 
   for (args,sum_obs) in hist_obs
@@ -124,7 +107,7 @@ end
 function log_normalization(log_P_target, log_P_source, hist::Dict)
   log_norm = -Inf
   for (args,H) in hist
-    log_norm  = log_sum(log_norm, log(H) + log_P_target(args...) - log_P_source(args...))
+    log_norm  = MonteCarloX.log_sum(log_norm, log(H) + log_P_target(args...) - log_P_source(args...))
   end
   return log_norm
 end
@@ -142,13 +125,6 @@ methods:
 <O> = sum O_i P_target(E_i)/P_source(E_i) / sum P_target(E_i)/P_source(args_i)
 
 """
-function canonical_timeseries(beta_target, beta_source, list_E, list_obs)
-  N = length(list_obs)
-  log_P_target(E) = -beta_target*E
-  log_P_source(E) = -beta_source*E
-  return timeseries_log(log_P_target,log_P_source, list_E, list_obs)
-end
 
 end
-
 export Reweighting

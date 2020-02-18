@@ -7,64 +7,87 @@ Uses kinetic Monte Carlo
 module Gillespie
 using Random
 using Distributions
+using DataStructures
+using ..KineticMonteCarlo
 
-function step(list_updates, list_rates, rng)
-  @assert length(list_updates) == length(list_rates)
-  dt, id = next_event_rate(list_rates, rng)
-  list_updates[id]()
-  return dt
-end
+#TODO: ditch at some point
+#abstract type AbstractSystem end
+#function update!(system::AbstractSystem, id::Int) end
+#function list_rates(system::AbstractSystem) end
+#function sum_rates(system::AbstractSystem) end
+
+using ..MonteCarloX
+using ..EventHandler
+
 
 """
-Advance the system by time T 
+    advance(T::Ttime, list_rates::Vector{Trates}, update::Function, rng::AbstractRNG)::Ttime where {Ttime<:AbstractFloat, Trates<:AbstractFloat} 
 
-The function generates new events as long as the total time increment does not
-go beyond the total time T. If the next event would advance the time too far,
-then this event is NOT performed. The system is thus in a state that it would
-have after time T. 
-
-Assuming Poisson rates, the function can be called again to advance from time T
-because generation of events is independent.
-(TODO: check)
+Draw as many events for a `system` with a list of reactions with different
+rates such that the time of the last event is larger than `total_time` and
+return time of last event.
 """
-function advance(T, list_updates, list_rates, rng)
-  @assert length(list_updates) == length(list_rates)
-  dT = 0
-  while dT < T
-    dt, id = next_event_rate(list_rates, rng)
-    if dT + dt < T
-      list_updates[id]()
-      dT += dt
-    else
-      return
+#function advance!(system::AbstractSystem, total_time::T, rng::AbstractRNG)::T where {T<:AbstractFloat}
+#  time::T = 0
+#  while time <= total_time
+#    dt, id = KineticMonteCarlo.next_event(list_rates(system), sum_rates(system), rng)
+#    time += dt
+#    update!(system,id)
+#  end
+#  return time 
+#end
+
+function advance!(event_handler::AbstractEventHandler, update!::Function, total_time::T, rng::AbstractRNG)::T where {T<:AbstractFloat}
+  time::T = 0
+  while time <= total_time
+    if num_events(event_handler) == 0
+      println("WARNING: no events left before total_time reached")
+      return time
     end
+    dt, event = KineticMonteCarlo.next_event(event_handler, rng)
+    time += dt
+    update!(event_handler, event)
   end
-  return 
+  return time 
 end
 
 
-#For convenience? (speed?)
-"""
-generate events (dt,id) from a list of rates such that their occurence corresponds with their rate
-"""
-function next_event_rate(list_rates::Array,rng::AbstractRNG)
-  return KineticMonteCarlo.next_event_rate(list_rates,rng)
-end
-
-"""
-fast implementation of next_event_rate if sum(list_rates) is known
-"""
-function next_event_rate(list_rates::Array,sum_rates::Float64,rng::AbstractRNG)
-  return KineticMonteCarlo.next_event_rate(list_rates, sum_rates, rng)
-end
-
-#TODO: Gillespie to "manage" list of events?
-# I imagine somehting like passing list of updates and list of rates and to then perform the particular one that is brought up by next_event
+###############################################################################
+###############################################################################
+###############################################################################
+#mutable struct EventQueue{T}<:AbstractEventHandler
+#  pq_event_rate::PriorityQueue{T,Float64} 
+#  noevent::T
+#  function EventQueue{T}(list_event::Vector{T}, list_time::Vector{Float64}, noevent::T) where T
+#    @assert length(list_event)==length(list_time)
+#    pq = PriorityQueue{T,Float64}()
+#    for i=1:length(list_event)
+#      enqueue!(pq,list_event[i]=>list_time[i])
+#    end
+#    new(pq, noevent)
+#  end
+#end
 #
-# potentially also in terms of having populations that all have the same rates (resort and keep updated) and where then only one of a couple of rates is drawn randomly
+#function num_events(event_handler::EventQueue{T}) where T
+#  return length(event_handler.pq_event_rate)
+#end
 #
-# In other case, also keep the list of rates updated? Then one would need a map, or a function that is called upon accepting a certain rate...
+#function set!(event_handler::EventQueue, event::T, time::Float64) where T
+#  event_handler.pq_event_rate[event] = time 
+#end
 #
+#function advance!(pq::PriorityQueue{T}, update!::Function, total_time::T, rng::AbstractRNG)::T where {T<:AbstractFloat}
+#  time::T = 0
+#  while time <= total_time
+#    if lengthj(event_handler) == 0
+#      println("WARNING: no events left before total_time reached")
+#      return time
+#    end
+#    event,time = dequeue_pair!(event_handler.pq_event_rate) 
+#    update!(event_handler, event)
+#  end
+#  return time 
+#end
 
 
 end

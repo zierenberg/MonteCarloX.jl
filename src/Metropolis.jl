@@ -1,13 +1,6 @@
 module Metropolis
 using Random
 
-#TODO: formulate Metropolis and everything in terms of logarithmic weights ... because it is also not directly P that we are passing (not normalized)
-#accpect(log_weight, ...)
-
-#TODO: Try general types (abstract) e.g. Number, Integer, float
-# -> rethink Union in this cas
-# -> Tuple{T} ... where T<:derived from sth :)
-
 """
     accept(log_weight::Function, args_new::Tuple{Number, N}, args_old::Tuple{Number, N}, rng::AbstractRNG)::Bool where N
 
@@ -44,7 +37,7 @@ end
 
 #TODO: FunctionWrapper.jl
 """
-    sweep(list_updates, list_probabilities::Vector{AbstractFloat}, rng::AbstractRNG; number_updates::Int=1)
+    sweep(list_updates, list_probabilities::Vector{T}, rng::AbstractRNG; number_updates::Int=1) where T<:AbstractFloat
 
 Randomly pick und run update (has to check acceptance by itself!) from
 `list_updates` with probability specified in `list_probabilities` and repeat
@@ -70,7 +63,7 @@ function sweep(update::Function, rng::AbstractRNG; number_updates::Int=1)
 end
 
 """
-    random_element(list_probabilities::Vector{Float64},rng::AbstractRNG)::Int
+    random_element(list_probabilities::Vector{T},rng::AbstractRNG)::Int where T<:AbstractFloat
 
 Pick an index from a list of probabilities.
 """
