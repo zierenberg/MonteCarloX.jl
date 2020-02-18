@@ -49,6 +49,17 @@ function remove!(event_handler::EventDict, event::T) where T
   event_handler.sum_rates -= rate_old 
 end
 
+function set!(event_handler::EventDict, index_event::T, rate::Float64) where T
+  rate_old = get(event_handler.dict_event_rate, event, 0.0)
+  event_handler.sum_rates -= rate_old 
+  if rate > event_handler.threshold_active
+    event_handler.dict_event_rate[event] = rate 
+    event_handler.sum_rates += rate
+  else
+    delete!(event_handler.dict_event_rate, event)
+  end
+end
+
 ###############################################################################
 ###############################################################################
 ###############################################################################
@@ -330,6 +341,7 @@ end
  
 export
   AbstractEventHandler,
+  AbstractEventHandlerRate,
   EventDict,
   ActiveEventList,
   ActiveEventListSorted,

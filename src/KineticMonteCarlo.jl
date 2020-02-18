@@ -38,7 +38,7 @@ end
 """
 fast(to be tested, depends on overhead of EventList) implementation of next_event_rate if defined by EventList object
 """
-function next_event(event_handler::AbstractEventHandler, rng::AbstractRNG)
+function next_event(event_handler::AbstractEventHandlerRate, rng::AbstractRNG)
   dt = next_event_time(event_handler.sum_rates, rng)
   id = next_event_id(event_handler, rng)
   return dt,id
