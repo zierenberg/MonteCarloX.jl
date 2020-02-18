@@ -4,8 +4,11 @@ module MonteCarloX
 
 greet() = print("Loading MonteCarloX...")
 
+#TODO: look at Distributions.jl -> one big namespace ... We should consider making less namespaces here, i.e., less modules
+
 include("Utils.jl")
 include("Histograms.jl")
+include("EventHandler.jl")
 
 #todo: sort code according to classic, canonical, ..? 
 #todo: implement function integration as test and prime example!!!
@@ -29,5 +32,7 @@ include("ClusterWolff.jl")
 #("Networks.jl)
 #("NeuralNetworks.jl)
 
-
+#TODO: exports
+  
+ 
 end # module

@@ -51,21 +51,14 @@ function test_ising_reweighting(;verbose=false)
       println("result analytic = $(E_ref)")
     end
     ###########################################################################
-    E_reweight_list1 = Reweighting.expectation_value_from_timeseries_log(log_P_target, log_P_source, list_energy, list_energy) 
+    E_reweight_list1 = Reweighting.expectation_value_from_timeseries(log_P_target, log_P_source, list_energy, list_energy) 
     E_reweight_list1_error = abs((E_reweight_list1 - E_ref)/E_ref)
     if verbose
       println("result expectation_value_from_timeseries_log: <E> = $(E_reweight_list1); difference from exact = $(E_reweight_list1_error)")
     end
     pass &= E_reweight_list1_error < 0.1
     ###########################################################################
-    E_reweight_list2 = Reweighting.expectation_value_from_timeseries(P_target, P_source, list_energy, list_energy) 
-    E_reweight_list2_error = abs(E_reweight_list1 - E_reweight_list2)
-    if verbose
-      println("result expectation_value_from_timeseries: <E> = $(E_reweight_list2); difference from ..._log = $(E_reweight_list2_error)")
-    end
-    pass &= E_reweight_list2_error < 0.1
-    ###########################################################################
-    P_reweight_list = Reweighting.distribution_from_timeseries_log(log_P_target, log_P_source, list_energy) 
+    P_reweight_list = Reweighting.distribution_from_timeseries(log_P_target, log_P_source, list_energy) 
     kld_source = kldivergence(P_reweight_list, P_ref_source)
     kld_target = kldivergence(P_reweight_list, P_ref_target)
     if verbose
@@ -74,7 +67,7 @@ function test_ising_reweighting(;verbose=false)
     #only compare reweighted distribution to target and source. There result is comparable.
     pass &= kld_target < kld_source
     ###########################################################################
-    E_reweight_hist1 = Reweighting.expectation_value_from_histogram_log(E->E, log_P_target, log_P_source, H_E) 
+    E_reweight_hist1 = Reweighting.expectation_value_from_histogram(E->E, log_P_target, log_P_source, H_E) 
     E_reweight_hist1_error = abs((E_reweight_hist1 - E_ref)/E_ref)
     if verbose
       println("result expectation_value_from_histogram_log-1: <E> = $(E_reweight_hist1); difference from exact = $(E_reweight_hist1_error)")
@@ -86,7 +79,7 @@ function test_ising_reweighting(;verbose=false)
     for (E,H) in H_E
       hist_obs[E] = E*H
     end
-    E_reweight_hist2 = Reweighting.expectation_value_from_histogram_log(log_P_target, log_P_source, H_E, hist_obs) 
+    E_reweight_hist2 = Reweighting.expectation_value_from_histogram(log_P_target, log_P_source, H_E, hist_obs) 
     E_reweight_hist2_error = abs(E_reweight_hist2 - E_reweight_list1)
     if verbose
       println("result expectation_value_from_histogram_log: <E> = $(E_reweight_hist2); difference from timeseries = $(E_reweight_hist2_error)")
@@ -285,7 +278,7 @@ function initialize_BoltzmannDistribution(beta,log_dos)
   #partition sum
   log_Z = -Inf
   for (E,log_d) in log_dos
-    log_Z = Reweighting.log_sum(log_Z, log_d - beta*E)
+    log_Z = MonteCarloX.log_sum(log_Z, log_d - beta*E)
   end
 
   pdf = Dict{Int64,Float64}()
@@ -294,7 +287,7 @@ function initialize_BoltzmannDistribution(beta,log_dos)
   log_cdf = 0.0
   for (E,log_d) in log_dos
     log_pdf = log_d - beta*E - log_Z
-    log_cdf = Reweighting.log_sum(log_cdf, log_pdf)
+    log_cdf = MonteCarloX.log_sum(log_cdf, log_pdf)
     pdf[E] = exp(log_pdf)
     cdf[E] = exp(log_cdf)
   end 
