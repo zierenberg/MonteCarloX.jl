@@ -37,18 +37,6 @@ function num_events(event_handler::EventDict{T}) where T
   return length(event_handler.dict_event_rate)
 end
 
-function set!(event_handler::EventDict, event::T, rate::Float64) where T
-  rate_old = get(event_handler.dict_event_rate, event, 0.0)
-  event_handler.dict_event_rate[event] = rate 
-  event_handler.sum_rates += rate - rate_old
-end
-
-function remove!(event_handler::EventDict, event::T) where T
-  rate_old = get(event_handler.dict_event_rate, event, 0) 
-  delete!(event_handler.dict_event_rate, event)
-  event_handler.sum_rates -= rate_old 
-end
-
 function set!(event_handler::EventDict, index_event::T, rate::Float64) where T
   rate_old = get(event_handler.dict_event_rate, event, 0.0)
   event_handler.sum_rates -= rate_old 

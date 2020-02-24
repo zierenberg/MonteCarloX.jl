@@ -67,7 +67,7 @@ function distribution_from_timeseries(log_P_target, log_P_source, list_args)
   end
   distribution=Dict{typeof(list_args[1]),Float64}() 
   for i in 1:N
-    Histograms.add(distribution, list_args[i], increment = exp(list_log_weight_ratio[i] - log_norm))
+    Histograms.add!(distribution, list_args[i], increment = exp(list_log_weight_ratio[i] - log_norm))
   end
   Histograms.normalize!(distribution)
   return distribution

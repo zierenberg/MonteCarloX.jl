@@ -15,7 +15,7 @@ function histogram(list_x::Vector{Tx}, dx::Tx, x_ref::Tx; increment::Tv=1)::Dict
   for x in list_x
     #this clamps x_bin to the lower bound of x0,x0+dx,...
     x_bin = x_ref + floor((x-x_ref)/dx)*dx
-    add(hist, x_bin, increment=increment)
+    add!(hist, x_bin, increment=increment)
   end
   return hist
 end
@@ -23,7 +23,7 @@ end
 function histogram(list_x::Vector{Tx}; increment::Tv=1)::Dict{Tx,Tv} where {Tx<:Real, Tv<:Real}
   hist = Dict{Tx,Tv}()
   for x in list_x
-    add(hist, x, increment=increment)
+    add!(hist, x, increment=increment)
   end
   return hist
 end
@@ -73,3 +73,5 @@ end
 
 end
 export Histograms
+export add!, normalize!
+#TODO: figure out how to properly do this stuff...
