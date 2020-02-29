@@ -7,7 +7,7 @@ import Distributions.cdf
 using StatsBase
 import StatsBase.kldivergence
 
-include("test_utils.jl")
+include("utils.jl")
 
 """ Testing reweighting on 2D Ising model"""
 function test_ising_reweighting(;verbose=false)

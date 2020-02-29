@@ -2,7 +2,7 @@ using LightGraphs
 using MonteCarloX
 using Random
 
-include("test_utils.jl")
+include("utils.jl")
 
 function test_sweep_random_element(;verbose=false)
   function test_random_element(list_prob::Vector{Float64})
