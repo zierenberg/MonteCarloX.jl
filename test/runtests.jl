@@ -8,6 +8,7 @@ import Distributions.cdf
 
 @testset "MonteCarloX.jl" begin
   # Write your own tests here.
+  #include("test_histograms.jl")
 
   include("test_equilibrium.jl")
   @test test_sweep_random_element()

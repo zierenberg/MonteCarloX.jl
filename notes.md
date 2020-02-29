@@ -1,14 +1,21 @@
 # Next things to do
 - sweep interface (think about how to add list of updates with probabilities - similar to non-equilibrium case, i.e., make a new function for this in a more general module?
 - how to call update with different number of arguments?
-- EventHandler module -> push, pop, get next event, get event probability
 
-- StatisticalMechanics.jl StatisticalPhysics.jl? ->SpinSystems.jl (for all the Ising stuff)
+#- StatisticalMechanics.jl StatisticalPhysics.jl? ->SpinSystems.jl (for all the Ising stuff!!!
+TODO: 
+- namespaces
+- modular structure on which level 
 
+
+# EventHandler 
+TOOD:
+- sort
+- test
+- documentation
 
 # API notes
-- work in log_P or log_weight scheme? do this for reweighting anyways...
-- order of arguments? 
+- reduce modules!!!
 
 # equilibrium part
 READY for advanced updates: pass energy new, energy old 
@@ -18,6 +25,8 @@ READY for advanced updates: pass energy new, energy old
 * population annealing also uses metropolis but additional resampling step
 
 # what I learned
+- create explicit arrays with test = [1 2 3; 4 5 6; 7 8 9]
+
 
 ## add dependencies
 -> cd(".julia/dev/MonteCarloX")

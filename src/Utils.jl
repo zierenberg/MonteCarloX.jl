@@ -60,3 +60,45 @@ function log_sum(a::T,b::T)::T where T<:AbstractFloat
     return b + log(1+exp(a-b))
   end
 end
+
+
+"""
+    random_element(list_probabilities::Vector{T},rng::AbstractRNG)::Int where T<:AbstractFloat
+
+    Pick an index with probability defined by `list_probability` (which needs to be normalized)
+
+# Examples
+```jldoctest
+julia> rng = MersenneTwister(1000)
+julia> MonteCarloX.random_element([0.1,0.2,0.3,0.4],rng)
+4
+julia> MonteCarloX.random_element([0.1,0.2,0.3,0.4],rng)
+4
+julia> MonteCarloX.random_element([0.1,0.2,0.3,0.4],rng)
+3
+julia> MonteCarloX.random_element([0.1,0.2,0.3,0.4],rng)
+4
+```
+"""
+function random_element(list_probabilities::Vector{Float64},rng::AbstractRNG)::Int 
+  theta = rand(rng)*sum(list_probabilities)
+
+  id = 1
+  cumulated_prob = list_probabilities[id]
+  while cumulated_prob < theta
+    id += 1
+    @inbounds cumulated_prob += list_probabilities[id]
+  end
+
+  return id
+end
+
+#TODO: iterate over n-dimensional StatsBase.Histogram
+#
+
+
+#TODO: n-dimensional version?
+function access1d(h::Histogram, arg)
+    x = searchsortedfirst(h.edges[1], arg)
+    h.weights[x]
+end

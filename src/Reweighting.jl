@@ -1,9 +1,5 @@
-"""
-Module for timeseries and histogram reweighting of observables sampled in equilibrium
-"""
-module Reweighting
-using Distributions
-using ..MonteCarloX
+#Reweighting functions
+#TODO: change names so that reweight is included because no longer namespace Reweighting
 
 """
     expectation_value_from_timeseries_log(log_P_target::Function, log_P_source::Function, list_args, list_obs::Vector{Tin})::Tout where {Tin<:Number,Tout<:AbstractFloat}
@@ -55,22 +51,28 @@ Estimate distribution from a list of (measured) arguments to an (n-dimensional) 
 For higher dimensional distributions (e.g. P(E,M)) list_args needs to be a list of tuples
 
 returns:
-  - Dictionary
+  - StatsBase.Histogram
+
 """
-function distribution_from_timeseries(log_P_target, log_P_source, list_args)
+#TODO: need control over bin size
+#TODO: need to figure out how to generate histogram objects with float
+function distribution_from_timeseries(log_P_target, log_P_source, list_args, range)
   N = length(list_args)
-  list_log_weight_ratio = [log_P_target(list_args[i]...)-log_P_source(list_args[i]...) for i in 1:N]
+  list_weights = Weights([log_P_target(list_args[i]...)-log_P_source(list_args[i]...) for i=1:N])
   
   log_norm = -Inf
   for i in 1:N
-    log_norm  = MonteCarloX.log_sum(log_norm, list_log_weight_ratio[i])
+    log_norm  = MonteCarloX.log_sum(log_norm, list_weights[i])
   end
-  distribution=Dict{typeof(list_args[1]),Float64}() 
-  for i in 1:N
-    Histograms.add!(distribution, list_args[i], increment = exp(list_log_weight_ratio[i] - log_norm))
-  end
-  Histograms.normalize!(distribution)
-  return distribution
+  list_weights .= exp.(list_weights .- log_norm)
+  hist = fit(Histogram, list_args, list_weights, range, closed=:left) 
+  return normalize(hist, mode=:pdf)
+  #Distribution=Dict{typeof(list_args[1]),Float64}() 
+  #for i in 1:N
+  #  add!(Distribution, list_args[i], increment = exp(list_log_weight_ratio[i] - log_norm))
+  #end
+  #normalize!(Distribution)
+  #return Distribution
 end
 
 
@@ -85,28 +87,29 @@ important: hist_obs(args) = sum O_i delta(args - args_i)
 hists are dictionaries?
 can this be generalized to higher dimensions? nd histograms as dictionary?
 """
-function expectation_value_from_histogram(f_args::Function, log_P_target::Function, log_P_source::Function, hist::Dict)
+function expectation_value_from_histogram(f_args::Function, log_P_target::Function, log_P_source::Function, hist::Histogram)
   log_norm = log_normalization(log_P_target, log_P_source, hist)
   expectation_value = 0 
-  for (args,H) in hist
+  for (args, H) in zip(hist.edges[1], hist.weights)
     expectation_value += f_args(args)*H*exp(log_P_target(args...) - log_P_source(args...)-log_norm)
   end
   return expectation_value
 end
 
-
-function expectation_value_from_histogram(log_P_target::Function, log_P_source::Function, hist::Dict, hist_obs::Dict)
+#TODO: this is only valid for 1D histograms!!
+# what is missing in StatsBase is an API to iterate over histogram edges and weights (multidimensional)
+function expectation_value_from_histogram(log_P_target::Function, log_P_source::Function, hist::Histogram, hist_obs::Histogram)
   log_norm = log_normalization(log_P_target, log_P_source, hist)
   expectation_value = 0 
-  for (args,sum_obs) in hist_obs
+  for (args, sum_obs) in zip(hist_obs.edges[1], hist_obs.weights)
     expectation_value += sum_obs*exp(log_P_target(args...) - log_P_source(args...) - log_norm)
   end
   return expectation_value
 end
 
-function log_normalization(log_P_target, log_P_source, hist::Dict)
+function log_normalization(log_P_target, log_P_source, hist::Histogram)
   log_norm = -Inf
-  for (args,H) in hist
+  for (args, H) in zip(hist.edges[1], hist.weights)
     log_norm  = MonteCarloX.log_sum(log_norm, log(H) + log_P_target(args...) - log_P_source(args...))
   end
   return log_norm
@@ -126,5 +129,3 @@ methods:
 
 """
 
-end
-export Reweighting
