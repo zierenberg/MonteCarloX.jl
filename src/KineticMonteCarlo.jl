@@ -1,8 +1,3 @@
-"""
-# MonteCarloX.KineticMonteCarlo
-
-Module that allows to implement (rejection-free) kinetic Monte Carlo algorithms in general
-"""
 module KineticMonteCarlo
 using Random
 using Distributions

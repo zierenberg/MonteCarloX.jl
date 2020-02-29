@@ -1,12 +1,8 @@
 using LightGraphs
 using MonteCarloX
 using Random
-using HypothesisTests
-using Distributions
-import Distributions.pdf
-import Distributions.cdf
-using StatsBase
-import StatsBase.kldivergence
+
+include("test_utils.jl")
 
 function test_sweep_random_element(;verbose=false)
   function test_random_element(list_prob::Vector{Float64})
@@ -14,7 +10,27 @@ function test_sweep_random_element(;verbose=false)
     N=10000000
     sum = 0.0
     for i in 1:N
-      id = Metropolis.random_element(list_prob,rng)
+      id = MonteCarloX.random_element(list_prob,rng)
+      sum += id/N
+    end
+    return sum
+  end
+  function test_random_element(list_prob::ProbabilityWeights)
+    rng = MersenneTwister(1000)
+    N=10000000
+    sum = 0.0
+    for i in 1:N
+      id = StatsBase.sample(rng, list_prob)
+      sum += id/N
+    end
+    return sum
+  end
+  function test_random_element(list_freq::FrequencyWeights)
+    rng = MersenneTwister(1000)
+    N=10000000
+    sum = 0.0
+    for i in 1:N
+      id = StatsBase.sample(rng, list_freq)
       sum += id/N
     end
     return sum
@@ -34,6 +50,7 @@ function test_sweep_random_element(;verbose=false)
 
   #list_prob = [0.1,0.1,0.4,0.2,0.2]
   list_prob = [0.4,0.2,0.2,0.1,0.1]
+  list_freq = [4,2,2,1,1]
   cum_prob  = cumsum(list_prob)
   #############################################################################
   expected_id = 0
@@ -45,12 +62,20 @@ function test_sweep_random_element(;verbose=false)
   end
   #############################################################################
   result_re = @time test_random_element(list_prob)
+  result_pb = @time test_random_element(ProbabilityWeights(list_prob))
+  result_fr = @time test_random_element(FrequencyWeights(list_freq))
   result_bs = @time test_binary_search(cum_prob)
-  diff = abs(result_re-result_bs)
+  diff1 = abs(result_re-result_bs)
+  diff2 = abs(result_pb-result_bs)
+  diff3 = abs(result_fr-result_bs)
   if verbose
-    println("result of loop over random element = $(result_re) vs loop over binary_search = $(result_bs) [abs diff = $(diff)]")
+    println("result of loop over random element (deprecated) = $(result_re) vs loop over binary_search = $(result_bs) [abs diff = $(diff)]")
+    println("result of loop over random element (prob) = $(result_pb) vs loop over binary_search = $(result_bs) [abs diff = $(diff)]")
+    println("result of loop over random element (freq) = $(result_fr) vs loop over binary_search = $(result_bs) [abs diff = $(diff)]")
   end
-  pass &= diff < 0.01
+  pass &= diff1 < 0.01
+  pass &= diff2 < 0.01
+  pass &= diff3 < 0.01
   #############################################################################
   return pass
 end
@@ -86,7 +111,8 @@ function test_unimodal_metropolis(;verbose=false)
     # sort into binned histogram
     # bin size/ 2*sigma ~  #elements per bin (~100)/ samples*0.6/
     bin_x =  1e4*sqrt(var)*2/0.6/samples
-    P_meas = Histograms.distribution(list_x, bin_x, x0)
+    P_meas = fit(Histogram, list_x, minimum(list_x):bin_x:maximum(list_x)+bin_x, closed=:left)
+    P_meas = normalize(P_meas)
     kld = abs(kldivergence(P_meas, x->exp(log_weight_sampling(x))))
     if verbose
       println("result kldivergence P_meas to P_true = $(kld)")
@@ -172,7 +198,7 @@ function test_unimodal_sweep(;verbose=false)
     list_updates = [()->update(log_weight_sampling, system, 0.1, rng, stats1),
                     ()->update(log_weight_sampling, system, 0.2, rng, stats2),
                     ()->update(log_weight_sampling, system, 0.1, rng)        ]
-    list_probabilities = [0.2,0.4,0.4]
+    list_probabilities = ProbabilityWeights([0.2,0.4,0.4])
 
     #perfrom 100 updates as thermalization
     Metropolis.sweep(list_updates, list_probabilities, rng, number_updates=100)
@@ -204,7 +230,8 @@ function test_unimodal_sweep(;verbose=false)
     # sort into binned histogram
     # bin size/ 2*sigma ~  #elements per bin (~100)/ samples*0.6/
     bin_x =  1e4*sqrt(var)*2/0.6/samples
-    P_meas = Histograms.distribution(list_x, bin_x, x0)
+    P_meas = fit(Histogram, list_x, minimum(list_x):bin_x:maximum(list_x)+bin_x, closed=:left)
+    P_meas = normalize(P_meas)
     kld = abs(kldivergence(P_meas, x->exp(log_weight_sampling(x))))
     if verbose
       println("result kldivergence P_meas to P_true = $(kld)")
@@ -231,7 +258,8 @@ function test_unimodal_sweep(;verbose=false)
     # sort into binned histogram
     # bin size/ 2*sigma ~  #elements per bin (~100)/ samples*0.6/
     bin_x =  1e4*sqrt(var)*2/0.6/samples
-    P_meas = Histograms.distribution(list_x, bin_x, x0)
+    P_meas = fit(Histogram, list_x, minimum(list_x):bin_x:maximum(list_x)+bin_x, closed=:left)
+    P_meas = normalize(P_meas)
     kld = abs(kldivergence(P_meas, x->exp(log_weight_sampling(x))))
     if verbose
       println("result kldivergence P_meas to P_true = $(kld)")
@@ -250,6 +278,7 @@ end
 
 
 """ Testing reweighting on unimodaL probability distribution"""
+#TODO: write
 function test_unimodal_reweighting()
 
   return pass
@@ -291,32 +320,3 @@ end
 function step(x,dx,rng)
   return x -dx + 2*dx*rand(rng)
 end
-
-#TODO: alot - histogram implementation (where to store x_bin, x_ref) arguments in simple way...
-function update(hist_x::Dict, args...)
-  update(args...)
-  hist_x.add(system.x)
-end
-
-
-
-
-"""
-Kullback-Leibler divergence between two distributions
-
-distributions are here considered to be dictionaries
-
-valid for n-dimensional dictionaries (args=Tuple or larger?)
-"""
-function kldivergence(P::Dict,Q::Function)
-    ##KL divergence sum P(args)logP(args)/Q(args) 
-    ## P=P_meas, Q=P_true s.t P(args)=0 simply ignored
-    #
-    kld = 0.0
-    for (args,p) in P
-      q = Q(args)
-      kld += p*log(p/q)
-    end
-    return kld
-end
-

@@ -1,5 +1,12 @@
+#TODO: rename to importance_sampling ?
+#      rename metropolis acceptance to metropolis
+#      add metropolis_hastings()? - diff is selection probability
+#      add heat_bath()? -> is this different from accept now 
+#      add wrappers for all this :) -> accept goes to general new name?
+
 module Metropolis
 using Random
+using StatsBase
 
 """
     accept(log_weight::Function, args_new::Tuple{Number, N}, args_old::Tuple{Number, N}, rng::AbstractRNG)::Bool where N
@@ -35,20 +42,18 @@ function accept(log_weight::Function, args_new::Number, args_old::Number, rng::A
   end
 end
 
-#TODO: FunctionWrapper.jl
 """
-    sweep(list_updates, list_probabilities::Vector{T}, rng::AbstractRNG; number_updates::Int=1) where T<:AbstractFloat
+    sweep(list_updates, list_weights::AbstractWeights, rng::AbstractRNG; number_updates::Int=1) where T<:AbstractFloat
 
 Randomly pick und run update (has to check acceptance by itself!) from
 `list_updates` with probability specified in `list_probabilities` and repeat
 this `number_updates` times.
 """
-function sweep(list_updates, list_probabilities::Vector{T}, rng::AbstractRNG; number_updates::Int=1) where T<:AbstractFloat
-  @assert length(list_updates) == length(list_probabilities)
-  @assert (sum(list_probabilities) - 1.0) < 1e-6
+function sweep(list_updates, list_weights::AbstractWeights, rng::AbstractRNG; number_updates::Int=1)
+  @assert length(list_updates) == length(list_weights)
 
   for i in 1:number_updates
-    id = random_element(list_probabilities,rng)
+    id = StatsBase.sample(rng, list_weights)
     # update is requred to call Metropolis.accept() itself
     list_updates[id]()
   end
@@ -60,25 +65,6 @@ function sweep(update::Function, rng::AbstractRNG; number_updates::Int=1)
     # update is requred to call Metropolis.accept() itself
     update()
   end
-end
-
-"""
-    random_element(list_probabilities::Vector{T},rng::AbstractRNG)::Int where T<:AbstractFloat
-
-Pick an index from a list of probabilities.
-"""
-function random_element(list_probabilities::Vector{T},rng::AbstractRNG)::Int where T<:AbstractFloat
-  @assert (sum(list_probabilities) - 1.0) < 1e-6
-  theta = rand(rng)
-
-  id = 1
-  cumulated_prob = list_probabilities[id]
-  while cumulated_prob < theta
-    id += 1
-    cumulated_prob += list_probabilities[id]
-  end
-
-  return id
 end
 
 

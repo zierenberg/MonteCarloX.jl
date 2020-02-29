@@ -1,12 +1,13 @@
 using LightGraphs
 using MonteCarloX
 using Random
-using HypothesisTests
 using Distributions
 import Distributions.pdf
 import Distributions.cdf
 using StatsBase
 import StatsBase.kldivergence
+
+include("test_utils.jl")
 
 """ Testing reweighting on 2D Ising model"""
 function test_ising_reweighting(;verbose=false)
@@ -34,8 +35,8 @@ function test_ising_reweighting(;verbose=false)
         list_energy[sweep-100] = E(system)
       end
     end
-    H_E    = countmap(list_energy)
-    P_meas = proportionmap(list_energy)
+    H_meas = fit(Histogram, list_energy, minimum(list_energy):4:maximum(list_energy)+4, closed=:left)
+    P_meas = normalize(H_meas, mode=:probability)
     # reweighting both with timeseries (list_energy) and histrogram
     beta_source = beta
     beta_target = beta+0.05
@@ -46,28 +47,28 @@ function test_ising_reweighting(;verbose=false)
     E_ref = analytic_expectation_value_E(beta_target,log_dos_beale_8x8) 
     P_ref_source = BoltzmannDistribution(beta_source,log_dos_beale_8x8).pdf
     P_ref_target = BoltzmannDistribution(beta_target,log_dos_beale_8x8).pdf
-    kld_ref = kldivergence(P_meas, P_ref_source)
+    kld_ref = kldivergence(P_meas, x->P_ref_source[x])
     if verbose
       println("result analytic = $(E_ref)")
     end
     ###########################################################################
-    E_reweight_list1 = Reweighting.expectation_value_from_timeseries(log_P_target, log_P_source, list_energy, list_energy) 
+    E_reweight_list1 = MonteCarloX.expectation_value_from_timeseries(log_P_target, log_P_source, list_energy, list_energy) 
     E_reweight_list1_error = abs((E_reweight_list1 - E_ref)/E_ref)
     if verbose
       println("result expectation_value_from_timeseries_log: <E> = $(E_reweight_list1); difference from exact = $(E_reweight_list1_error)")
     end
     pass &= E_reweight_list1_error < 0.1
     ###########################################################################
-    P_reweight_list = Reweighting.distribution_from_timeseries(log_P_target, log_P_source, list_energy) 
-    kld_source = kldivergence(P_reweight_list, P_ref_source)
-    kld_target = kldivergence(P_reweight_list, P_ref_target)
+    P_reweight_list = MonteCarloX.distribution_from_timeseries(log_P_target, log_P_source, list_energy, minimum(list_energy):4:maximum(list_energy)+4) 
+    kld_source = kldivergence(P_reweight_list, x->P_ref_source[x])
+    kld_target = kldivergence(P_reweight_list, x->P_ref_target[x])
     if verbose
       println("result distribution_from_timeseries_log: kld_target ($(kld_target)) !< kld_source ($(kld_source))")
     end
     #only compare reweighted distribution to target and source. There result is comparable.
     pass &= kld_target < kld_source
     ###########################################################################
-    E_reweight_hist1 = Reweighting.expectation_value_from_histogram(E->E, log_P_target, log_P_source, H_E) 
+    E_reweight_hist1 = MonteCarloX.expectation_value_from_histogram(E->E, log_P_target, log_P_source, H_meas) 
     E_reweight_hist1_error = abs((E_reweight_hist1 - E_ref)/E_ref)
     if verbose
       println("result expectation_value_from_histogram_log-1: <E> = $(E_reweight_hist1); difference from exact = $(E_reweight_hist1_error)")
@@ -75,11 +76,12 @@ function test_ising_reweighting(;verbose=false)
     end
     pass &= E_reweight_hist1_error < 0.1
     ###########################################################################
-    hist_obs = Dict()
-    for (E,H) in H_E
-      hist_obs[E] = E*H
+    hist_obs = zero(H_meas)
+    for E in list_energy
+      index = StatsBase.binindex(hist_obs, E)
+      hist_obs.weights[index] += E
     end
-    E_reweight_hist2 = Reweighting.expectation_value_from_histogram(log_P_target, log_P_source, H_E, hist_obs) 
+    E_reweight_hist2 = MonteCarloX.expectation_value_from_histogram(log_P_target, log_P_source, H_meas, hist_obs) 
     E_reweight_hist2_error = abs(E_reweight_hist2 - E_reweight_list1)
     if verbose
       println("result expectation_value_from_histogram_log: <E> = $(E_reweight_hist2); difference from timeseries = $(E_reweight_hist2_error)")
@@ -118,12 +120,12 @@ function test_ising_metropolis(;verbose=false)
         list_energy[sweep-100] = E(system)
       end
     end
-    H_E    = countmap(list_energy)
-    P_meas = proportionmap(list_energy)
+    P_meas = fit(Histogram, list_energy, minimum(list_energy):4:maximum(list_energy)+4, closed=:left)
+    P_meas = normalize(P_meas, mode=:probability)
     P_true = BoltzmannDistribution(beta,log_dos_beale_8x8).pdf
     #KL divergence sum P(E)logP(E)/Q(E) 
     # P=P_meas, Q=P_true s.t P(E)=0 simply ignored
-    kld = abs(kldivergence(P_meas, P_true))
+    kld = abs(kldivergence(P_meas, x->P_true[x]))
     if verbose
       println(beta, " ", kld, " ", length(keys(P_meas)))
     end
@@ -159,14 +161,16 @@ function test_ising_cluster(;verbose=false)
       end
     end
 
-    P_meas = Histograms.distribution(list_energy)
+    #
+    P_meas = fit(Histogram, list_energy, minimum(list_energy):4:maximum(list_energy)+4, closed=:left)
+    P_meas = normalize(P_meas, mode=:probability)
     P_true = BoltzmannDistribution(beta,log_dos_beale_8x8).pdf
 
-    kld = abs(kldivergence(P_meas, P_true))
+    kld = abs(kldivergence(P_meas, x->P_true[x]))
+    if verbose
+      println("result kldivergence P_meas to P_true = $(kld)")
+    end
     pass &= kld < 0.02
-    
-    #test = HypothesisTests.ExactOneSampleKSTest(list_energy, BoltzmannDistribution(beta,log_dos_beale_8x8))
-    #pass &= pvalue(test) > 0.05
   end
 
   return pass
@@ -177,25 +181,6 @@ end
 ###############################################################################
 ###############################################################################
 ### Details functions 
-
-"""
-Kullback-Leibler divergence between two distributions
-
-distributions are here considered to be dictionaries
-
-valid for n-dimensional dictionaries (args=Tuple or larger?)
-"""
-function kldivergence(P::Dict,Q::Function)::Float64
-    ##KL divergence sum P(args)logP(args)/Q(args) 
-    ## P=P_meas, Q=P_true s.t P(args)=0 simply ignored
-    kld = 0.0
-    for (E,p) in P
-      p = p
-      q = Q[E]
-      kld += p*log(p/q)
-    end
-    return kld
-end
 
  
 struct IsingSystem{F}
