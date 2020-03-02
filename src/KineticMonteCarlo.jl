@@ -1,204 +1,138 @@
-module KineticMonteCarlo
-using Random
-using Distributions
-
-using ..MonteCarloX
-using ..EventHandler
-
-###############################################################################
-###############################################################################
-###############################################################################
-
+# KineticMonteCarlo
+struct KineticMonteCarlo end
+#TODO: rethink API -> maybe something like next(alg::KineticMonteCarlo, ...) or advance() ?
 
 """
-generate events (dt,id) from a list of rates such that their occurence corresponds with their rate
+    next(rng::AbstractRNG, weights::AbstractWeights)::Tuple{Float64,Int}
+
+Next stochastic event (`\\Delta t`, index) drawn proportional to probability given in `weights`
 """
-function next_event(list_rates::Vector{T},rng::AbstractRNG)::Tuple{Float64,Int} where {T<:AbstractFloat}
-  cumulated_rates = cumsum(list_rates)
-  sum_rates = cumulated_rates[end]
-  dtime = next_event_time(sum_rates,rng)
-  index = next_event_index(cumulated_rates, rng)
+function next(alg::KineticMonteCarlo, rng::AbstractRNG, weights::AbstractWeights)::Tuple{Float64,Int}
+  dtime = next_time(rng, sum(weights))
+  index = next_event(rng, weights)
   return dtime, index
 end
 
 """
-fast implementation of next_event_rate if sum(list_rates) is known
-"""
-function next_event(list_rates::Vector{T}, sum_rates::T, rng::AbstractRNG)::Tuple{T,Int} where T<:AbstractFloat
-  dtime = next_event_time(sum_rates, rng)
-  index = next_event_index(list_rates, sum_rates, rng)
-  return dtime,index
-end
+    next(rng::AbstractRNG, event_handler::AbstractEventHandlerRate)
 
-"""
+Next stochastic event (`\\Delta t`, event type) organized by `event_handler`
 fast(to be tested, depends on overhead of EventList) implementation of next_event_rate if defined by EventList object
 """
-function next_event(event_handler::AbstractEventHandlerRate, rng::AbstractRNG)
-  dt = next_event_time(event_handler.sum_rates, rng)
-  id = next_event_id(event_handler, rng)
+function next(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractEventHandlerRate)
+  dt = next_time(rng, sum(event_handler.list_rate))
+  id = next_event(rng, event_handler)
   return dt,id
 end
 
 """
-next event time for Poisson process with given rate
+    next_time(rng::AbstractRNG, rate::Float64)::Float64
 
-# Arguments
+Next stochastic `\\Delta t` for Poisson process with `rate`
 """
-function next_event_time(rate::Float64, rng::AbstractRNG)::Float64
-  return rand(rng,Exponential(1.0/rate))
+function next_time(rng::AbstractRNG, rate::Float64)::Float64
+  return randexp(rng)/rate
 end
 
 """
- next event id for list of stochastic events describes by cumulated rates vector
+    next_event(rng::AbstractRNG, cumulated_rates::Vector{T})::Int where {T<:AbstractFloat}
+
+Select a single random index in `1:length(cumulated_rates)` with cumulated probability given in `cumulated_rates`.
+
+#Remarks
+Deprecated unless we find a good data structure for (dynamic) cumulated weights
 """
-function next_event_index(cumulated_rates::Vector{T},rng::AbstractRNG)::Int where {T<:AbstractFloat}
+function next_event(rng::AbstractRNG, cumulated_rates::Vector{T})::Int where {T<:AbstractFloat}
   theta = rand(rng)*cumulated_rates[end]
   index = MonteCarloX.binary_search(cumulated_rates,theta)
   return index
 end
 
 """
- next event index for list of stochastic events described by occurence rates and the sum over those
+    next_event(rng::AbstractRNG, weights::AbstractWeights)::Int 
+
+Select a single random index in `1:length(weights)` with probability proportional to the entry in `weights`.
+
+#Remarks
+This is on average twice as fast as StatsBase.sampling because it can iterate from either beginning or end of weights
 """
-function next_event_index(list_rates::Vector{T}, sum_rates::T,rng::AbstractRNG)::Int where {T<:AbstractFloat}
-  theta = rand(rng)*sum_rates
+function next_event(rng::AbstractRNG, weights::AbstractWeights)::Int 
+  theta = rand(rng)*weights.sum
+  N = length(weights)
 
-  if theta < 0.5*sum_rates
+  #this is for extra performance in case of large lists (factor of 2)
+  if theta < 0.5*weights.sum
     index = 1
-    cumulated_rates = list_rates[index]
-    while cumulated_rates < theta
+    cumulated_rates = weights[index]
+    while cumulated_rates < theta && index < N
       index += 1
-      cumulated_rates += list_rates[index]
+      @inbounds cumulated_rates += weights[index]
     end
-  else
-    index = length(list_rates);
-    cumulated_rates_lower = sum_rates - list_rates[index]
-    #cumulated_rates in this case belong to index-1
-    while cumulated_rates_lower > theta
-      index -= 1;
-      cumulated_rates_lower -= list_rates[index]
-    end
-  end
+    return index
 
-  return index
+  else
+    index = N
+    cumulated_rates_lower = weights.sum - weights[index]
+    #cumulated_rates in this case belong to index-1
+    while cumulated_rates_lower > theta && index > 1
+      index -= 1;
+      @inbounds cumulated_rates_lower -= weights[index]
+    end
+    return index
+
+  end
 end
 
+#relevent to write this as extra function this for performance issues (compared to keyword argument with preset value on GLOBAL_RNG)
+next_event(list_rates::AbstractWeights) = next_event(Random.GLOBAL_RNG, list_rates) 
+
+
 """
- next event id for list of stochastic events described by occurence rates and the sum over those
+    next_event(rng::AbstractRNG, event_handler::AbstractEventHandlerRate{T})::T where T
+
+Select a single random event with a given probability managed by `event_handler`.
+
+The `event_handler` also manages the case that no valid events are left (e.g.
+when all rates are equal to zero). This becomes relevant when working with the
+advance!(alg::Gillespie) wrapper to advance time for a longer period.
 """
-function next_event_id(event_handler::SimpleEventList{T}, rng::AbstractRNG)::T where {T}
-  if event_handler.sum_rates > event_handler.threshold_min_rate
-    index = next_event_index(event_handler.list_rate, event_handler.sum_rates, rng)
+function next_event(rng::AbstractRNG, event_handler::AbstractEventHandlerRate{T})::T where T
+  ne = num_events(event_handler)
+  if ne > 1 
+    theta::Float64 = rand(rng)*sum(event_handler.list_rate)
+
+    if theta < 0.5*sum(event_handler.list_rate)
+      index = first_event(event_handler)
+      cumulated_rates = event_handler.list_rate[index]
+      while cumulated_rates < theta
+        index = next_event(event_handler, index)
+        cumulated_rates += event_handler.list_rate[index]
+      end
+    else
+      index = last_event(event_handler) 
+      cumulated_rates_lower = sum(event_handler.list_rate) - event_handler.list_rate[index]
+      #cumulated_rates in this case belong to id-1
+      while cumulated_rates_lower > theta
+        index = previous_event(event_handler, index) 
+        cumulated_rates_lower -= event_handler.list_rate[index]
+      end
+    end
+    return index
+  elseif ne == 1
+    return index = next_event(event_handler, 0)
+  else
+    return event_handler.noevent 
+  end
+end
+
+function next_event(rng::AbstractRNG, event_handler::ListEventRateSimple{T})::T where T
+  if sum(event_handler.list_rate) > event_handler.threshold_min_rate
+    index = next_event(rng, event_handler.list_rate)
     return event_handler.list_event[index] 
   else
     return event_handler.noevent
   end
 end
 
-"""
-next event id for dictionary of events (type T) and corresponding rates
-TODO: this needs performance testing and should be identical to optimal versiob two with masked lists
-"""
-function next_event_id(event_handler::EventDict{T},rng::AbstractRNG)::T where {T}
-  ne = num_events(event_handler)
-  if ne > 1 
-    theta::Float64 = rand(rng)*event_handler.sum_rates
-    cumulated_rates = 0
-    for (id, rate) in event_handler.dict_event_rate
-      cumulated_rates += rate
-      if ! (cumulated_rates < theta)
-        return id
-      end
-    end
-  elseif ne == 1
-    return first(keys(event_handler.dict_event_rate))
-  else
-    return event_handler.noevent 
-  end
-end
-
-"""
- next event id for list of stochastic events described by occurence rates and the sum over those
- #TODO: needs unit test!!!
- #ALTERNATIVE: DROP THE INDEX LIST AND JUST DO THE BOOL LIST: simply jump over false arrays
-"""
-#TODO: Maybe this can be unified with function for MaskedEventList if index is obtained by some first, next... functions
-# this could be the default AbstractEventHandler solution
-function next_event_id(event_handler::ActiveEventListSorted,rng::AbstractRNG)::Int
-  ne = num_events(event_handler)
-  if ne > 1 
-    theta = rand(rng)*event_handler.sum_rates
-    if theta < 0.5*event_handler.sum_rates
-      i = 1
-      index = event_handler.list_sorted_active_index[i]
-      cumulated_rates = event_handler.list_rate[index]
-      while cumulated_rates < theta
-        i += 1
-        index = event_handler.list_sorted_active_index[i]
-        cumulated_rates += event_handler.list_rate[index]
-      end
-    else
-      i = length(event_handler.list_sorted_active_index);
-      index = event_handler.list_sorted_active_index[i]
-      cumulated_rates_lower = event_handler.sum_rates - event_handler.list_rate[index]
-      #cumulated_rates in this case belong to id-1
-      while cumulated_rates_lower > theta
-        i -= 1
-        index = event_handler.list_sorted_active_index[i]
-        cumulated_rates_lower -= event_handler.list_rate[index]
-      end
-    end
-    return index
-  elseif ne == 1
-    return event_handler.list_sorted_active_index[1]
-  else
-    return event_handler.noevent 
-  end
-end
-
-function next_event_id(event_handler::ActiveEventList,rng::AbstractRNG)::Int
-  ne = num_events(event_handler)
-  if ne > 1 
-    index = next_event_index(event_handler.list_rate, event_handler.sum_rates, rng)
-    return event_handler.list_rate_to_event[index]
-  elseif ne == 1
-    return event_handler.list_rate_to_event[1]
-  else
-    return event_handler.noevent 
-  end
-end
-
-function next_event_id(event_handler::MaskedEventList,rng::AbstractRNG)::Int
-  ne = num_events(event_handler)
-  if ne > 1 
-    theta::Float64 = rand(rng)*event_handler.sum_rates
-
-    if theta < 0.5*event_handler.sum_rates
-      index = first_active(event_handler)
-      cumulated_rates = event_handler.list_rate[index]
-      while cumulated_rates < theta
-        index = next_active(event_handler, index)
-        cumulated_rates += event_handler.list_rate[index]
-      end
-    else
-      index = last_active(event_handler) 
-      cumulated_rates_lower = event_handler.sum_rates - event_handler.list_rate[index]
-      #cumulated_rates in this case belong to id-1
-      while cumulated_rates_lower > theta
-        index = previous_active(event_handler, index) 
-        cumulated_rates_lower -= event_handler.list_rate[index]
-      end
-    end
-    return index
-  elseif ne == 1
-    return index = next_active(event_handler, 0)
-  else
-    return event_handler.noevent 
-  end
-end
 
 
-
-
-end
-export KineticMonteCarlo
