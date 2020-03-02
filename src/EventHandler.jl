@@ -1,19 +1,32 @@
 # EventHandler
+import Base.getindex
+import Base.setindex!
+import Base.length
 
 abstract type AbstractEventHandler{T} end
 abstract type AbstractEventHandlerTime{T} <: AbstractEventHandler{T} end
 abstract type AbstractEventHandlerRate{T} <: AbstractEventHandler{T} end
 
-###############################################################################
-###############################################################################
-###############################################################################
+function Base.getindex(event_handler::AbstractEventHandlerRate, index::Int64)
+  return event_handler.list_rate[index]
+end
 
-"""
-The simples event list that is completely static
+###############################################################################
+###############################################################################
+###############################################################################
+@doc"""
+    ListEventRateSimple{T}
+
+Simplest event manager for a list of events of type T with a static list of rates
+
+#API implemented:
+- length(event_handler)
+- getindex(event_handler, index)
+- setindex!(event_handler, value, index)
 """
 mutable struct ListEventRateSimple{T}<:AbstractEventHandlerRate{T}
-  list_event::Vector{T}          #static list of events
-  list_rate::ProbabilityWeights  #static list of rates
+  list_event::Vector{T}                   #static list of events
+  list_rate::ProbabilityWeights{Float64,Float64, Vector{Float64}}  #static list of rates
   threshold_min_rate::Float64
   noevent::T
 
@@ -23,27 +36,30 @@ mutable struct ListEventRateSimple{T}<:AbstractEventHandlerRate{T}
   end
 end
 
-function num_events(event_handler::ListEventRateSimple{T}) where T
-  if sum(event_handler.list_rate) < event_handler.threshold_min_rate
+function Base.length(event_handler::ListEventRateSimple)
+  if event_handler.list_rate.sum < event_handler.threshold_min_rate
     return 0
   else
     return length(event_handler.list_rate)
   end
 end
 
-function set!(event_handler::ListEventRateSimple{T}, index_event::Int, rate::Float64) where T
+function Base.setindex!(event_handler::ListEventRateSimple, rate::Float64, index::Int64)
   #this is of type ProbabilityWeights that automatically updates the sum over the list of rates
-  event_handler.list_rate[index_event] = rate
+  event_handler.list_rate[index] = rate
 end
 
+###############################################################################
+###############################################################################
+###############################################################################
+@doc"""
+    ListEventRateSimple{T}
 
-###############################################################################
-###############################################################################
-###############################################################################
-
+Simplest event manager for a list of events of type T with a static list of rates
+"""
 mutable struct ListEventRateActiveMask{T}<:AbstractEventHandlerRate{T}
-  list_event::Vector{T}           #static list of events
-  list_rate::ProbabilityWeights   #static list of rates (includes updates sum)
+  list_event::Vector{T}                                            #static list of events
+  list_rate::ProbabilityWeights{Float64,Float64, Vector{Float64}}  #static list of rates
   threshold_active::Float64
   list_active::Vector{Bool} 
   internal_num_active::Int
@@ -69,11 +85,17 @@ mutable struct ListEventRateActiveMask{T}<:AbstractEventHandlerRate{T}
       throw(UndefVarError(:initial))
     end
     new(list_event, list_rate, threshold_active, list_active, num_active, index_first_active, index_last_active, noevent)
-    #new(list_event, list_rate, threshold_active, list_active, num_active, index_first_active, index_last_active, noevent)
   end
 end
 
-function set!(event_handler::ListEventRateActiveMask, index::Int, rate::Float64)
+function Base.length(event_handler::ListEventRateActiveMask)
+  return event_handler.internal_num_active
+end
+
+"""
+    setindex!(event_handler::ListEventRateActiveMask, rate::Float64, index_event::Int64)
+"""
+function Base.setindex!(event_handler::ListEventRateActiveMask, rate::Float64, index::Int64)
   if event_handler.list_active[index]
     if rate > event_handler.threshold_active
       event_handler.list_rate[index] = rate 
@@ -91,9 +113,6 @@ function set!(event_handler::ListEventRateActiveMask, index::Int, rate::Float64)
   end
 end
 
-function num_events(event_handler::ListEventRateActiveMask)
-  return event_handler.internal_num_active
-end
 
 ####################################### for internal use only
 #

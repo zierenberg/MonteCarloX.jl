@@ -97,7 +97,7 @@ when all rates are equal to zero). This becomes relevant when working with the
 advance!(alg::Gillespie) wrapper to advance time for a longer period.
 """
 function next_event(rng::AbstractRNG, event_handler::AbstractEventHandlerRate{T})::T where T
-  ne = num_events(event_handler)
+  ne = length(event_handler)
   if ne > 1 
     theta::Float64 = rand(rng)*sum(event_handler.list_rate)
     index_last = last_index(event_handler) 
@@ -135,6 +135,3 @@ function next_event(rng::AbstractRNG, event_handler::ListEventRateSimple{T})::T 
     return event_handler.noevent
   end
 end
-
-
-
