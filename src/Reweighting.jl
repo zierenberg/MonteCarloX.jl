@@ -1,7 +1,78 @@
 #Reweighting functions
 #TODO: change names so that reweight is included because no longer namespace Reweighting
 
-"""
+#new API
+#function reweighting_weights(list_args, log_P_source, log_P_target)
+#  N = length(list_obs)
+#  log_weight_diff(i) = log_P_target(list_args[i]...) - log_P_source(list_args[i]...)
+#  for i in 1:N
+#    log_norm  = MonteCarloX.log_sum(log_norm, log_weight_diff(i))
+#  end
+#end
+#
+#function reweighting_weights!(list_args, log_P_source, log_P_target)
+#end
+#
+#function reweight_expectation_value(list_obs::Vector{T}, reweighting_weights::ProbabilityWeights)::T where T<:Real
+#  ev = zero(T)
+#  for (obs, weight) in zip(list_obs, reweighting_weights)
+#    ev += obs*weight
+#  end
+#  return ev
+#end
+#
+#function reweight_expectation_value(f_args::Function, list_args::Vector{NTuple{N,T}}, reweighting_weights::ProbabilityWeights)::T where T<:Real
+#  ev = zero(T)
+#  for (args, weight) in zip(list_args, reweighting_weights)
+#    ev += f_args(args)*weight
+#  end
+#  return ev
+#end
+#
+##todo: is this a "thing"?
+#function reweight_expectation_value(f_args::Function, reweighting_distribution::Histogram{T,N})::T where {T<:Real,N} 
+#  ev = zero(T)
+#  for args in CartesianIndices(reweighting_distribution.edges)
+#    ev += f_args(args)*reweighting_distribution[args]
+#  end
+#  return ev
+#end
+#
+#function reweight_expectation_value(hist_obs::Histogram{T,N}, reweighting_distribution::Histogram{T,N})::T where {T<:Real,N} 
+#  ev = zero(T)
+#  for args in CartesianIndices(reweighting_distribution.edges)
+#    ev += hist_obs[args]*reweighting_distribution[args]
+#  end
+#  return ev
+#end
+#
+##TODO: everywhere - get types semi-ok
+#function reweight_distribution(list_args::Vector{NTuple{N,T}}, reweighting_weights::ProbabilityWeights, range)::Histogram{T,N} where {T<:Real, N}
+#  hist = fit(Histogram, list_args, reweighting_weights, range, closed=:left) 
+#  return normalize(hist, mode=:pdf)
+#end
+#
+##TODO: everywhere - get types semi-ok
+#function reweighting_distribution(hist::Histogram, log_P_source::Function, log_P_target::Function)::Histogram
+#  reweighting_distribution = zero(hist)
+#  log_norm = log_normalization(log_P_target, log_P_source, hist)
+#  #TODO: do iteration correct with CartesianIndices
+#  for index in CartesianIndices(hist.edges)
+#    args = hist.edges[index]
+#    reweighting_distribution[args] = hist[args]*exp(log_P_target(args...) - log_P_source(args...)-log_norm)
+#  end
+#  return reweighting_distribution
+#end
+#
+#function reweighting_distribution!(hist::Histogram{T,N}, log_P_source::Function, log_P_target::Function)::Histogram{T,N} where {T<:Real, N}
+#  log_norm = log_normalization(log_P_target, log_P_source, hist)
+#  for index in CartesianIndices(hist.edges)
+#    args = hist.edges[index]
+#    hist.weights[index] *= exp(log_P_target(args...) - log_P_source(args...)-log_norm)
+#  end
+#end
+
+@doc """
     expectation_value_from_timeseries_log(log_P_target::Function, log_P_source::Function, list_args, list_obs::Vector{Tin})::Tout where {Tin<:Number,Tout<:AbstractFloat}
 
 Calculate the expectation value of an observable in `P_target` from a list of measured observables in `P_source`.

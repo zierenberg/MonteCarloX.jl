@@ -94,11 +94,20 @@ function random_element(list_probabilities::Vector{Float64},rng::AbstractRNG)::I
 end
 
 #TODO: iterate over n-dimensional StatsBase.Histogram
+#for start, CartesianIndices(hist.weights) can give you a way to iterate over
+#weights, and the cartesian index is your bin, if you want to convert the bin
+#number back to edge value, you just need to access the corresponding element
+#in hist.edges
 #
 
 
-#TODO: n-dimensional version?
-function access1d(h::Histogram, arg)
-    x = searchsortedfirst(h.edges[1], arg)
-    h.weights[x]
+getindex(h::AbstractHistogram{T,1}, x::Real) where {T} = getindex(h, (x,))
+
+function getindex(h::Histogram{T,N}, xs::NTuple{N,Real}) where {T,N}
+  idx = StatsBase.binindex(h, xs)
+  if checkbounds(Bool, h.weights, idx...)
+    return @inbounds h.weights[idx...]
+  else
+    return missing
+  end
 end
