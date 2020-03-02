@@ -100,26 +100,28 @@ function next_event(rng::AbstractRNG, event_handler::AbstractEventHandlerRate{T}
   ne = num_events(event_handler)
   if ne > 1 
     theta::Float64 = rand(rng)*sum(event_handler.list_rate)
+    index_last = last_index(event_handler) 
+    index_first = first_index(event_handler)
 
     if theta < 0.5*sum(event_handler.list_rate)
-      index = first_event(event_handler)
+      index = index_first 
       cumulated_rates = event_handler.list_rate[index]
-      while cumulated_rates < theta
-        index = next_event(event_handler, index)
-        cumulated_rates += event_handler.list_rate[index]
+      while cumulated_rates < theta && index < index_last
+        index = next_index(event_handler, index)
+        @inbounds cumulated_rates += event_handler.list_rate[index]
       end
     else
-      index = last_event(event_handler) 
+      index = index_last
       cumulated_rates_lower = sum(event_handler.list_rate) - event_handler.list_rate[index]
       #cumulated_rates in this case belong to id-1
-      while cumulated_rates_lower > theta
-        index = previous_event(event_handler, index) 
-        cumulated_rates_lower -= event_handler.list_rate[index]
+      while cumulated_rates_lower > theta && index > index_first
+        index = previous_index(event_handler, index) 
+        @inbounds cumulated_rates_lower -= event_handler.list_rate[index]
       end
     end
     return index
   elseif ne == 1
-    return index = next_event(event_handler, 0)
+    return index = first_index(event_handler)
   else
     return event_handler.noevent 
   end

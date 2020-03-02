@@ -97,15 +97,15 @@ end
 
 ####################################### for internal use only
 #
-function first_event(event_handler::ListEventRateActiveMask)
+function first_index(event_handler::ListEventRateActiveMask)
   return event_handler.index_first_active
 end
 
-function last_event(event_handler::ListEventRateActiveMask)
+function last_index(event_handler::ListEventRateActiveMask)
   return event_handler.index_last_active
 end
 
-function next_event(event_handler::ListEventRateActiveMask, index::Int)::Int
+function next_index(event_handler::ListEventRateActiveMask, index::Int)::Int
   while index < length(event_handler.list_rate) - 1
     index += 1
     if event_handler.list_active[index]
@@ -115,7 +115,7 @@ function next_event(event_handler::ListEventRateActiveMask, index::Int)::Int
   return length(event_handler.list_active)+1
 end
 
-function previous_event(event_handler::ListEventRateActiveMask, index::Int)::Int
+function previous_index(event_handler::ListEventRateActiveMask, index::Int)::Int
   while index > 2
     index -= 1
     if event_handler.list_active[index]
@@ -140,10 +140,10 @@ function deactivate!(event_handler::ListEventRateActiveMask, index::Int)
   event_handler.list_active[index] = false
   event_handler.internal_num_active -= 1
   if index == event_handler.index_first_active
-    event_handler.index_first_active = next_event(event_handler, index)
+    event_handler.index_first_active = next_index(event_handler, index)
   end
   if index == event_handler.index_last_active
-    event_handler.index_last_active = previous_event(event_handler, index)
+    event_handler.index_last_active = previous_index(event_handler, index)
   end
 end
 
