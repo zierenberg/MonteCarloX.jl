@@ -12,7 +12,7 @@ function advance!(alg::Gillespie, rng::AbstractRNG, event_handler::AbstractEvent
   alg = KineticMonteCarlo()
   time::T = 0
   while time <= total_time
-    if num_events(event_handler) == 0
+    if length(event_handler) == 0
       println("WARNING: no events left before total_time reached")
       return time
     end
