@@ -146,6 +146,8 @@ function test_ising_cluster(;verbose=false)
   system = constructIsing([8,8], rng)
   nearest_neighbors(index) = outneighbors(system.lattice, index)
   N = length(system.spins)
+
+  cluster_algorithm = MonteCarloX.ClusterWolff()
   
   for beta in list_beta
     samples = Int(1e4)
@@ -154,7 +156,7 @@ function test_ising_cluster(;verbose=false)
     # thermalization 100 sweeps
     for sweep in 1:samples+100
       for i in 1:5
-        ClusterWolff.update(system.spins, nearest_neighbors, beta, rng)
+        MonteCarloX.update(cluster_algorithm, system.spins, nearest_neighbors, beta, rng)
       end
       if sweep > 100
         list_energy[sweep-100] = E(system)
@@ -236,7 +238,7 @@ function update_spin_flip(system::IsingSystem, beta::Float64, rng::AbstractRNG):
 
   index = rand(rng,1:length(system.spins))
   dE    = -2*E_local(system, index)
-  if Metropolis.accept(log_weight,dE,0,rng)
+  if accept(rng,log_weight,dE,0)
     system.spins[index] *= -1
   else
     dE = 0
@@ -263,7 +265,7 @@ function initialize_BoltzmannDistribution(beta,log_dos)
   #partition sum
   log_Z = -Inf
   for (E,log_d) in log_dos
-    log_Z = MonteCarloX.log_sum(log_Z, log_d - beta*E)
+    log_Z = log_sum(log_Z, log_d - beta*E)
   end
 
   pdf = Dict{Int64,Float64}()
@@ -272,7 +274,7 @@ function initialize_BoltzmannDistribution(beta,log_dos)
   log_cdf = 0.0
   for (E,log_d) in log_dos
     log_pdf = log_d - beta*E - log_Z
-    log_cdf = MonteCarloX.log_sum(log_cdf, log_pdf)
+    log_cdf = log_sum(log_cdf, log_pdf)
     pdf[E] = exp(log_pdf)
     cdf[E] = exp(log_cdf)
   end 

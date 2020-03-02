@@ -101,7 +101,7 @@ function test_unimodal_metropolis(;verbose=false)
     for update in 1:samples+100
       #Metropolis:
       x_new = step(x,dx,rng)
-      if Metropolis.accept(log_weight_sampling, x_new, x,rng)
+      if accept(rng, log_weight_sampling, x_new, x)
         x = x_new
       end
       if update > 100
@@ -151,7 +151,7 @@ function test_2D_unimodal_metropolis(;verbose=false)
       #Metropolis:
       x_new = x -dx + 2.0*dx*rand(rng)
       y_new = y -dy + 2.0*dy*rand(rng)
-      if Metropolis.accept(log_weight_sampling, (x_new,y_new), (x,y),rng)
+      if accept(rng, log_weight_sampling, (x_new,y_new), (x,y))
         x = x_new
         y = y_new
       end
@@ -201,11 +201,11 @@ function test_unimodal_sweep(;verbose=false)
     list_probabilities = ProbabilityWeights([0.2,0.4,0.4])
 
     #perfrom 100 updates as thermalization
-    Metropolis.sweep(list_updates, list_probabilities, rng, number_updates=100)
+    sweep(list_updates, list_probabilities, rng, number_updates=100)
 
     stats2 = Stats(0,0)
     for updates in 1:samples
-      Metropolis.sweep(list_updates, list_probabilities, rng, number_updates=10)
+      sweep(list_updates, list_probabilities, rng, number_updates=10)
       list_x[updates] = system.x 
     end
 
@@ -251,7 +251,7 @@ function test_unimodal_sweep(;verbose=false)
     end
     update1() = update(log_weight_sampling, system, 0.1, rng)
     for updates in 1:samples
-      Metropolis.sweep(update1, rng, number_updates=10)
+      sweep(update1, rng, number_updates=10)
       list_x[updates] = system.x 
     end
     ##########################################################################
@@ -301,7 +301,7 @@ end
 
 function update(log_weight_sampling, system::System, dx, rng::AbstractRNG)
   x_new = step(system.x,dx,rng)
-  if Metropolis.accept(log_weight_sampling, x_new, system.x,rng)
+  if accept(rng, log_weight_sampling, x_new, system.x)
     system.x = x_new
   end
 end
@@ -309,7 +309,7 @@ end
 #TODO: test second version with statistics could this be implemented in update w/o speed loss? -> could write a macro like @assert
 function update(log_weight_sampling, system::System, dx, rng::AbstractRNG, stats::Stats)
   x_new = step(system.x,dx,rng)
-  if Metropolis.accept(log_weight_sampling, x_new, system.x,rng)
+  if accept(rng, log_weight_sampling, x_new, system.x)
     system.x = x_new
     stats.accept += 1
   else 
