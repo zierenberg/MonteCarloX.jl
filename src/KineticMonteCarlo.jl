@@ -1,6 +1,5 @@
 # KineticMonteCarlo
 struct KineticMonteCarlo end
-#TODO: rethink API -> maybe something like next(alg::KineticMonteCarlo, ...) or advance() ?
 
 """
     next(rng::AbstractRNG, weights::AbstractWeights)::Tuple{Float64,Int}

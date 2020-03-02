@@ -28,15 +28,11 @@ function run(N::Int,p::Float64,m::Float64,h::Float64,T::Float64,T_therm::Float64
   events_since_last_sum = 0
   while time < T_total
     # find next event (dt and time) to be updated
-    if flag_fast
-      dt,n = KineticMonteCarlo.next_event(system.rates,system.sum_rates,rng)
-      events_since_last_sum += 1 
-      if events_since_last_sum > 1000 
-        system.sum_rates = sum(system.rates)
-        events_since_last_sum = 0
-      end
-    else
-      dt,n = KineticMonteCarlo.next_event(system.rates,rng)
+    dt,n = next(system.rates,system.sum_rates,rng)
+    events_since_last_sum += 1 
+    if events_since_last_sum > 1000 
+      system.sum_rates = sum(system.rates)
+      events_since_last_sum = 0
     end
 
     # measure observables in discrete time 
@@ -70,8 +66,7 @@ mutable struct ContactProcess{F1,F2}
   outgoing_neighbors::F2
   neurons::Vector{Int8}
   active_incoming_neighbors::Vector{Int8}
-  rates::Vector{Float64}
-  sum_rates::Float64
+  rates::ProbabilityWeights{Float64,Float64, Vector{Float64}}  #static list of rates
   mu::Float64
   lambda::Float64
   h::Float64
@@ -88,20 +83,17 @@ function construct_system(N, p, mu, lambda, h, seed; initial="empty")::ContactPr
   neurons = []
   active_incoming_neighbors = []
   if initial=="empty"
-    #TODO: Bool?
     neurons = zeros(Int8, N)
     active_incoming_neighbors = zeros(Int8, N);
-    rates = ones(Float64,N).*h;
+    rates = ProbabilityWeights(ones(Float64,N).*h);
   end
   if initial=="full"
     neurons = ones(Int8, N);
     active_incoming_neighbors = ones(Int8, N);
-    rates = ones(Float64,N).*mu;
+    rates = ProbabilityWeights(ones(Float64,N).*mu);
   end
-  #as array to use immutable struct for faster performance?
-  sum_rates = sum(rates)
 
-  return ContactProcess(network,incoming_neighbors,outgoing_neighbors,neurons,active_incoming_neighbors,rates,sum_rates,mu,lambda,h)
+  return ContactProcess(network,incoming_neighbors,outgoing_neighbors,neurons,active_incoming_neighbors,rates,mu,lambda,h)
 end
 
 #system has to include list_rates and sum_ratesand neuon_active_neighbors, graph, indegree function etc
