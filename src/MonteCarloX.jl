@@ -1,43 +1,57 @@
 module MonteCarloX
 #dependencies
 using Random
-#do we need this? use sampling instead of own random_element... if we also can use Distributions than it may be worth while
 using StatsBase
 using LinearAlgebra
-
 #exports that are relevant to run simulations in MonteCarloX
-export Random
+#using Reexports
+#@reexport using Random
+#@reexport using StatsBase
 
+include("utils.jl")
+include("event_handler.jl")
+include("reweighting.jl")
 
-#TODO: look at Distributions.jl -> one big namespace ... We should consider making less namespaces here, i.e., less modules
-#TODO: look at Distances.jl -> concept of singletons
-
-include("Utils.jl")
-#include("Histograms.jl")
-include("EventHandler.jl")
-
-#Importance sampling
-include("Metropolis.jl")
-include("Reweighting.jl")
+#Equilibrium
+include("importance_sampling.jl")
 
 #Non-equilibrium 
-include("KineticMonteCarlo.jl")
-include("InhomogeneousPoissonProcess.jl")
-include("Gillespie.jl")
+include("kinetic_monte_carlo.jl")
+include("poisson_process.jl")
+include("gillespie.jl")
 
 
-#TODO: move to external SpinSystems.jl module
-include("ClusterWolff.jl")
+#TODO: move to external SpinSystems.jl package
+include("cluster_wolff.jl")
 
-#reexport Random, StatsBase
-export Random, 
-       StatsBase
+#algorithms
+export  Metropolis,
+        Gillespie,
+        KineticMonteCarlo,
+        InhomogeneousPoisson,
+        InhomogeneousPoissonPiecewiseDecreasing
 
-export  add!
-#export what I want API to be 
+#functions
+export  # equilibrium
+        accept,
+        sweep,
+        #update -> will be moved to test/utils.jl for now and later to SpinSystems.jl
+        # non-equilibrium
+        next_time,
+        next,
+        advance!
+
+#helper
+export  log_sum,
+        #event handler
+        AbstractEventHandlerRate,
+        ListEventRateSimple,
+        ListEventRateActiveMask
+        
+        
+
 
 # Check georges 2nd workshop notebook on github
-
 #    i::Int = StatsBase.binindex(d.h, x) -> remember this for custom things similar to EmpiricalDistributions.jl (not well documented though)
 
  

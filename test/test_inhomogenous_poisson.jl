@@ -11,15 +11,17 @@ function test_poisson_single()
   LambdaMaxs = [10.0, 20.0] # testing for two different max-sample-rates
   Lambda(t) = 10.0
   pass = true
+
   
   # Regular sampler
+  alg = InhomogeneousPoisson()
   for LambdaMax in LambdaMaxs
     rng = MersenneTwister(1000)
     nSamples = 1000
     samples = zeros(nSamples)
 
     for i in 1:nSamples
-      t0 = InhomogeneousPoissonProcess.next_event_time(Lambda, LambdaMax, rng)
+      t0 = next_time(alg, rng, Lambda, LambdaMax)
       samples[i] = t0
     end
 
@@ -28,12 +30,13 @@ function test_poisson_single()
   end
 
   # Decreasing sampler
+  alg = InhomogeneousPoissonPiecewiseDecreasing()
   rng = MersenneTwister(1000)
   nSamples = 1000
   samples = zeros(nSamples)
 
   for i in 1:nSamples
-    t0 = InhomogeneousPoissonProcess.next_event_time_for_piece_wise_decreasing_rate(Lambda, rng)
+    t0 = next_time(alg, rng, Lambda)
     samples[i] = t0
   end
 
@@ -49,6 +52,7 @@ function test_poisson_constant()
   Lambda(t) = 1.0
   pass = true
   
+  alg = InhomogeneousPoisson()
   for LambdaMax in LambdaMaxs
     rng = MersenneTwister(1000)
     nSamples = 1000
@@ -56,7 +60,7 @@ function test_poisson_constant()
 
     t0 = 0    
     for i in 1:nSamples
-      t0 += InhomogeneousPoissonProcess.next_event_time(t -> Lambda(t + t0), LambdaMax, rng)
+      t0 += next_time(alg, rng, t -> Lambda(t + t0), LambdaMax)
       samples[i] = t0 % 1
     end
 
@@ -73,6 +77,7 @@ function test_poisson_sin_wave()
   Lambda(t) = sin(t) + 1.0
   pass = true
 
+  alg = InhomogeneousPoisson()
   for LambdaMax in LambdaMaxs
     rng = MersenneTwister(1000)
     nSamples = 1000
@@ -80,7 +85,7 @@ function test_poisson_sin_wave()
 
     t0 = 0    
     for i in 1:nSamples
-      t0 += InhomogeneousPoissonProcess.next_event_time(t -> Lambda(t + t0), LambdaMax, rng)
+      t0 += next_time(alg, rng, t -> Lambda(t + t0), LambdaMax)
       samples[i] = t0 % (2 * pi)
     end
 
