@@ -22,7 +22,7 @@ import Distributions.cdf
   @test test_poisson_sin_wave()
 
   include("test_gillespie.jl")
-  @test test_gillespie_fast()
+  #@test test_gillespie()
 
   include("test_ising.jl")
   @test test_ising_reweighting()

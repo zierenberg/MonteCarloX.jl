@@ -1,7 +1,4 @@
 # EventHandler
-import Base.getindex
-import Base.setindex!
-import Base.length
 
 abstract type AbstractEventHandler{T} end
 abstract type AbstractEventHandlerTime{T} <: AbstractEventHandler{T} end
@@ -14,7 +11,7 @@ end
 ###############################################################################
 ###############################################################################
 ###############################################################################
-@doc"""
+@doc """
     ListEventRateSimple{T}
 
 Simplest event manager for a list of events of type T with a static list of rates
@@ -25,7 +22,7 @@ Simplest event manager for a list of events of type T with a static list of rate
 - setindex!(event_handler, value, index)
 """
 mutable struct ListEventRateSimple{T}<:AbstractEventHandlerRate{T}
-  list_event::Vector{T}                   #static list of events
+  list_event::Vector{T}                                            #static list of events
   list_rate::ProbabilityWeights{Float64,Float64, Vector{Float64}}  #static list of rates
   threshold_min_rate::Float64
   noevent::T
@@ -52,7 +49,7 @@ end
 ###############################################################################
 ###############################################################################
 ###############################################################################
-@doc"""
+@doc """
     ListEventRateSimple{T}
 
 Simplest event manager for a list of events of type T with a static list of rates
