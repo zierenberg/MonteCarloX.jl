@@ -110,3 +110,15 @@ function Base.getindex(h::Histogram{T,N}, xs::NTuple{N,Real}) where {T,N}
     return missing
   end
 end
+
+Base.setindex!(h::AbstractHistogram{T,1}, value::Real, x::Real) where {T} = setindex!(h, value, (x,))
+
+function Base.setindex!(h::Histogram{T,N}, value::Real, xs::NTuple{N,Real}) where {T,N}
+  h.isdensity && error("Density histogram must have float-type weights")
+  idx = StatsBase.binindex(h, xs)
+  if checkbounds(Bool, h.weights, idx...)
+    @inbounds h.weights[idx...] = value
+  else
+    return missing
+  end
+end

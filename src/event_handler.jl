@@ -24,24 +24,32 @@ Simplest event manager for a list of events of type T with a static list of rate
 mutable struct ListEventRateSimple{T}<:AbstractEventHandlerRate{T}
   list_event::Vector{T}                                            #static list of events
   list_rate::ProbabilityWeights{Float64,Float64, Vector{Float64}}  #static list of rates
-  threshold_min_rate::Float64
+  threshold_active::Float64
+  num_active::Int
   noevent::T
 
-  function ListEventRateSimple{T}(list_event::Vector{T}, list_rate_::Vector{Float64}, threshold_min_rate::Float64, noevent::T) where T
+  function ListEventRateSimple{T}(list_event::Vector{T}, list_rate_::Vector{Float64}, threshold_active::Float64, noevent::T) where T
     list_rate = ProbabilityWeights(list_rate_)
-    new(list_event, list_rate, threshold_min_rate, noevent)
+    num_active = count(x->x>threshold_active, list_rate)
+    new(list_event, list_rate, threshold_active, num_active, noevent)
   end
 end
 
 function Base.length(event_handler::ListEventRateSimple)
-  if event_handler.list_rate.sum < event_handler.threshold_min_rate
-    return 0
-  else
-    return length(event_handler.list_rate)
-  end
+  return event_handler.num_active
 end
 
 function Base.setindex!(event_handler::ListEventRateSimple, rate::Float64, index::Int64)
+  if rate > event_handler.threshold_active 
+    if !(event_handler.list_rate[index] > event_handler.threshold_active)
+      event_handler.num_active += 1
+    end
+  else
+    if event_handler.list_rate[index] > event_handler.threshold_active
+      event_handler.num_active -= 1
+    end
+  end
+
   #this is of type ProbabilityWeights that automatically updates the sum over the list of rates
   event_handler.list_rate[index] = rate
 end
@@ -50,16 +58,15 @@ end
 ###############################################################################
 ###############################################################################
 @doc """
-    ListEventRateSimple{T}
+    ListEventRateActiveMask{T}
 
-Simplest event manager for a list of events of type T with a static list of rates
 """
 mutable struct ListEventRateActiveMask{T}<:AbstractEventHandlerRate{T}
   list_event::Vector{T}                                            #static list of events
   list_rate::ProbabilityWeights{Float64,Float64, Vector{Float64}}  #static list of rates
   threshold_active::Float64
   list_active::Vector{Bool} 
-  internal_num_active::Int
+  num_active::Int
   index_first_active::Int
   index_last_active::Int
   noevent::T
@@ -86,7 +93,7 @@ mutable struct ListEventRateActiveMask{T}<:AbstractEventHandlerRate{T}
 end
 
 function Base.length(event_handler::ListEventRateActiveMask)
-  return event_handler.internal_num_active
+  return event_handler.num_active
 end
 
 """
@@ -143,7 +150,7 @@ end
 
 function activate!(event_handler::ListEventRateActiveMask, index::Int)
   event_handler.list_active[index] = true
-  event_handler.internal_num_active += 1
+  event_handler.num_active += 1
   if index < event_handler.index_first_active
     event_handler.index_first_active = index
   end
@@ -154,7 +161,7 @@ end
 
 function deactivate!(event_handler::ListEventRateActiveMask, index::Int)
   event_handler.list_active[index] = false
-  event_handler.internal_num_active -= 1
+  event_handler.num_active -= 1
   if index == event_handler.index_first_active
     event_handler.index_first_active = next_index(event_handler, index)
   end

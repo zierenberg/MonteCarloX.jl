@@ -127,7 +127,7 @@ function next_event(rng::AbstractRNG, event_handler::AbstractEventHandlerRate{T}
 end
 
 function next_event(rng::AbstractRNG, event_handler::ListEventRateSimple{T})::T where T
-  if sum(event_handler.list_rate) > event_handler.threshold_min_rate
+  if length(event_handler) > 0
     index = next_event(rng, event_handler.list_rate)
     return event_handler.list_event[index] 
   else
