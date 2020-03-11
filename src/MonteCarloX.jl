@@ -1,33 +1,64 @@
 module MonteCarloX
-#Maybe embedd this into StatisticalPhysics.jl the including SpinSystems.jl PolymerSystems.jl etc ;)
-#
+# dependencies
+using Random
+using StatsBase
+using LinearAlgebra
+# exports that are relevant to run simulations in MonteCarloX
+# using Reexports
+# @reexport using Random
+# @reexport using StatsBase
 
-greet() = print("Loading MonteCarloX...")
+include("utils.jl")
+include("event_handler.jl")
+include("reweighting.jl")
 
-include("Utils.jl")
-include("Histograms.jl")
+# Equilibrium
+include("importance_sampling.jl")
 
-#todo: sort code according to classic, canonical, ..? 
-#todo: implement function integration as test and prime example!!!
-
-#Importance sampling
-include("Metropolis.jl")
-include("Reweighting.jl")
-
-#Non-equilibrium 
-include("KineticMonteCarlo.jl")
-include("InhomogeneousPoissonProcess.jl")
-include("Gillespie.jl")
-
-
-#TODO: move to external SpinSystems.jl module
-include("ClusterWolff.jl")
-
-#TODO: external modules obviously in external modules
-#("ContactProcess.jl")
-#("CellularAutomata.jl)
-#("Networks.jl)
-#("NeuralNetworks.jl)
+# Non-equilibrium 
+include("kinetic_monte_carlo.jl")
+include("poisson_process.jl")
+include("gillespie.jl")
 
 
+# TODO: move to external SpinSystems.jl package
+include("cluster_wolff.jl")
+
+# algorithms
+export  Metropolis,
+        Gillespie,
+        KineticMonteCarlo,
+        InhomogeneousPoisson,
+        InhomogeneousPoissonPiecewiseDecreasing
+
+# functions
+export  # equilibrium
+        accept,
+        sweep,
+        # update -> will be moved to test/utils.jl for now and later to SpinSystems.jl
+        # non-equilibrium
+        next_time,
+        next,
+        advance!
+
+# helper
+export  log_sum,
+        # event handler
+        AbstractEventHandlerRate,
+        ListEventRateSimple,
+        ListEventRateActiveMask
+        
+        
+
+
+# Check georges 2nd workshop notebook on github
+#    i::Int = StatsBase.binindex(d.h, x) -> remember this for custom things similar to EmpiricalDistributions.jl (not well documented though)
+
+ 
 end # module
+
+# Maybe embedd this into StatisticalPhysics.jl the including SpinSystems.jl PolymerSystems.jl etc ;)
+# TODO: external modules obviously in external modules
+# ("DirectedPercolation.jl") [inlcuding ContactProcess, CellularAutomatoa, etc but not as modules but as models]
+# ("NeuralNetworks.jl) -> maybe NeuralSystems.jl?
+# ("ComplexNetworks.jl)
