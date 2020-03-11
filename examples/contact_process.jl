@@ -2,6 +2,7 @@ using LightGraphs
 using Distributions
 using MonteCarloX
 using Random
+using StatsBase
 
 
 # this runs 5s for run(1000,0.1,1.0,1e-3,1e5,1/1e-3,1000) as does my C code... :P
