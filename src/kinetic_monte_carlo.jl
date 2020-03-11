@@ -20,7 +20,7 @@ next(alg::KineticMonteCarlo, rates::AbstractWeights) = next(alg, Random.GLOBAL_R
 Next stochastic event (`\\Delta t`, event type) organized by `event_handler`
 fast(to be tested, depends on overhead of EventList) implementation of next_event_rate if defined by EventList object
 """
-function next(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractEventHandlerRate)
+function next(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractEventHandlerRate)::Tuple{Float64,Int}
     dt = next_time(rng, sum(event_handler.list_rate))
     id = next_event(rng, event_handler)
     return dt, id
@@ -168,5 +168,5 @@ function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::Abstr
 end
 
 function advance!(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat} 
-  advance!(KineticMonteCarlo, Random.GLOBAL_RNG, event_handler, update!, total_time)
+  advance!(alg, Random.GLOBAL_RNG, event_handler, update!, total_time)
 end
