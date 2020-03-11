@@ -7,7 +7,7 @@ function glif_net(W::Array{Float64,2};
     tau::Float64 = 1.0, sigma::Float64 = 1.0, threshold::Float64 = 1.0,
     plotflag::Bool = false, nSamples::Int = 10, rng::AbstractRNG = MersenneTwister(1000))
     
-    next_sample = InhomogeneousPoissonProcess.next_event
+    alg = InhomogeneousPoisson()
 
     # LIF potential decreases exponentially from last
     # potential u0 at t0=0.0
@@ -29,7 +29,7 @@ function glif_net(W::Array{Float64,2};
         # we can therefore choose max rate from sum of current single rates
         max_rate = sum(map(l->max(l, min_rate), lambdas(0.0)))
         
-        (dt, ind) = next_sample(lambdas, max_rate, rng)
+        (dt, ind) = next(alg, rng, lambdas, max_rate)
         
         t0 += dt
         # get prespike potentials
@@ -69,3 +69,7 @@ function glif_net(W::Array{Float64,2};
 end
 
 
+using Plots
+using LinearAlgebra
+W = randn(10,10) - Matrix{Float64}(I,10,10)*3
+glif_net(W,plotflag=true)

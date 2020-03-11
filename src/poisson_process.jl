@@ -61,7 +61,7 @@ function next_time(alg::InhomogeneousPoissonPiecewiseDecreasing, rng::AbstractRN
 end
 
 """
-Generate a new event from a collection of inhomogeneous poisson processes with
+Generate a new event id from a collection of inhomogeneous poisson processes with
 rates Lambda(t).
 # Arguments
 - `rates`: rates(dt); Float -> [Float]
@@ -69,14 +69,11 @@ rates Lambda(t).
 - `rng`: random number generator
 
 API - output
-* returns the next event time and its id ass tuple (dt, id)
+* returns the next event id
 """
-function next_event(alg::InhomogeneousPoisson, rng::AbstractRNG, rates::Function, max_rate::Float64)::Tuple{Float64,Int}
-    rate(t) = sum(rates(t))
-    dt = next_time(alg, rng, rate, max_rate)
-
+function next_event(alg::InhomogeneousPoisson, rng::AbstractRNG, rates::Array{Float64}, max_rate::Float64)::Int
     next_index = 1
-    cumulated_rates = cumsum(rates(dt))
+    cumulated_rates = cumsum(rates)
     sum_rate = cumulated_rates[end]
 
     theta = rand(rng) * sum_rate
@@ -98,5 +95,23 @@ function next_event(alg::InhomogeneousPoisson, rng::AbstractRNG, rates::Function
         id = index_r
     end
 
+    return id
+end
+
+"""
+Generate a new event from a collection of inhomogeneous poisson processes with
+rates Lambda(t).
+# Arguments
+- `rates`: rates(dt); Float -> [Float]
+- `max_rate`: maximal rate in near future (has to be evaluated externally)
+- `rng`: random number generator
+
+API - output
+* returns the next event time and event id as tuple (dt, id)
+"""
+function next(alg::InhomogeneousPoisson, rng::AbstractRNG, rates::Function, max_rate::Float64)::Tuple{Float64,Int}
+    rate(t) = sum(rates(t))
+    dt = next_time(alg, rng, rate, max_rate)
+    id = next_event(alg, rng, rates(dt), max_rate)
     return dt, id
 end
