@@ -1,49 +1,49 @@
 module MonteCarloX
-#dependencies
+# dependencies
 using Random
 using StatsBase
 using LinearAlgebra
-#exports that are relevant to run simulations in MonteCarloX
-#using Reexports
-#@reexport using Random
-#@reexport using StatsBase
+# exports that are relevant to run simulations in MonteCarloX
+# using Reexports
+# @reexport using Random
+# @reexport using StatsBase
 
 include("utils.jl")
 include("event_handler.jl")
 include("reweighting.jl")
 
-#Equilibrium
+# Equilibrium
 include("importance_sampling.jl")
 
-#Non-equilibrium 
+# Non-equilibrium 
 include("kinetic_monte_carlo.jl")
 include("poisson_process.jl")
 include("gillespie.jl")
 
 
-#TODO: move to external SpinSystems.jl package
+# TODO: move to external SpinSystems.jl package
 include("cluster_wolff.jl")
 
-#algorithms
+# algorithms
 export  Metropolis,
         Gillespie,
         KineticMonteCarlo,
         InhomogeneousPoisson,
         InhomogeneousPoissonPiecewiseDecreasing
 
-#functions
+# functions
 export  # equilibrium
         accept,
         sweep,
-        #update -> will be moved to test/utils.jl for now and later to SpinSystems.jl
+        # update -> will be moved to test/utils.jl for now and later to SpinSystems.jl
         # non-equilibrium
         next_time,
         next,
         advance!
 
-#helper
+# helper
 export  log_sum,
-        #event handler
+        # event handler
         AbstractEventHandlerRate,
         ListEventRateSimple,
         ListEventRateActiveMask
@@ -57,8 +57,8 @@ export  log_sum,
  
 end # module
 
-#Maybe embedd this into StatisticalPhysics.jl the including SpinSystems.jl PolymerSystems.jl etc ;)
-#TODO: external modules obviously in external modules
-#("DirectedPercolation.jl") [inlcuding ContactProcess, CellularAutomatoa, etc but not as modules but as models]
-#("NeuralNetworks.jl) -> maybe NeuralSystems.jl?
-#("ComplexNetworks.jl)
+# Maybe embedd this into StatisticalPhysics.jl the including SpinSystems.jl PolymerSystems.jl etc ;)
+# TODO: external modules obviously in external modules
+# ("DirectedPercolation.jl") [inlcuding ContactProcess, CellularAutomatoa, etc but not as modules but as models]
+# ("NeuralNetworks.jl) -> maybe NeuralSystems.jl?
+# ("ComplexNetworks.jl)

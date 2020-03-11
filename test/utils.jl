@@ -13,14 +13,14 @@ function kldivergence(P::Histogram, Q::Function)
     ##KL divergence sum P(args)logP(args)/Q(args) 
     ## P=P_meas, Q=P_true s.t P(args)=0 simply ignored
     kld = 0.0
-    for (i,x) in enumerate(P.edges[1])
-      if i <= length(P.weights)
-        @inbounds p = P.weights[i]
-        if p > 0
-          q = Q(x)
-          kld += p*log(p/q)
+    for (i, x) in enumerate(P.edges[1])
+        if i <= length(P.weights)
+            @inbounds p = P.weights[i]
+            if p > 0
+                q = Q(x)
+                kld += p * log(p / q)
+            end
         end
-      end
     end
     return kld
 end
