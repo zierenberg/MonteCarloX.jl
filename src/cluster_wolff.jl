@@ -20,25 +20,25 @@ return dE?
 how to specify function type for performance?
 """
 function update(alg::ClusterWolff, spins::Vector{Int}, nearest_neighbors::Function, betaJ::Float64, rng::AbstractRNG)
-  N = length(spins)
+    N = length(spins)
 
-  # get random spin and flip it
-  index_i = rand(rng, 1:N)
-  s_i = spins[index_i]
-  spins[index_i] *= -1
+    # get random spin and flip it
+    index_i = rand(rng, 1:N)
+    s_i = spins[index_i]
+    spins[index_i] *= -1
 
-  # probability (per bond!)
-  p = 1.0 - exp(-2.0*betaJ)
+    # probability (per bond!)
+    p = 1.0 - exp(-2.0 * betaJ)
 
-  # check all bonds and already flip cluster
-  proposed = copy(nearest_neighbors(index_i))
-  while !isempty(proposed)
-    # check proposed sites for alignment with base spin s_i and add to cluster with probability p
-    index_j = pop!(proposed)
-    # no need to check if site is already in cluster, because spin flip disqualifies it already
-    if spins[index_j] == s_i && rand(rng) < p
-      spins[index_j] *= -1
-      append!(proposed, nearest_neighbors(index_j))
+    # check all bonds and already flip cluster
+    proposed = copy(nearest_neighbors(index_i))
+    while !isempty(proposed)
+        # check proposed sites for alignment with base spin s_i and add to cluster with probability p
+        index_j = pop!(proposed)
+        # no need to check if site is already in cluster, because spin flip disqualifies it already
+        if spins[index_j] == s_i && rand(rng) < p
+            spins[index_j] *= -1
+            append!(proposed, nearest_neighbors(index_j))
+        end
     end
-  end
 end
