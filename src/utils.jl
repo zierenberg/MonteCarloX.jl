@@ -65,11 +65,17 @@ end
 """
     random_element(list_probabilities::Vector{T},rng::AbstractRNG)::Int where T<:AbstractFloat
 
-    Pick an index with probability defined by `list_probability` (which needs to be normalized)
+Pick an index with probability defined by `list_probability` (which needs to be normalized). 
+
+#Remark
+Deprecated for use of StatsBase.sample
 
 # Examples
 ```jldoctest
-julia> rng = MersenneTwister(1000)
+julia> using Random
+
+julia> rng = MersenneTwister(1000);
+
 julia> MonteCarloX.random_element([0.1,0.2,0.3,0.4],rng)
 4
 julia> MonteCarloX.random_element([0.1,0.2,0.3,0.4],rng)

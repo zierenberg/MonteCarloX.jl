@@ -44,7 +44,7 @@ next_time(rate::Float64) = next_time(Random.GLOBAL_RNG, rate)
 
 Select a single random index in `1:length(cumulated_rates)` with cumulated probability given in `cumulated_rates`.
 
-#Remarks
+# Remarks
 Deprecated unless we find a good data structure for (dynamic) cumulated rates
 """
 function next_event(rng::AbstractRNG, cumulated_rates::Vector{T})::Int where {T <: AbstractFloat}
@@ -58,7 +58,7 @@ end
 
 Select a single random index in `1:length(rates)` with probability proportional to the entry in `rates`.
 
-#Remarks
+# Remarks
 This is on average twice as fast as StatsBase.sampling because it can iterate from either beginning or end of rates
 """
 function next_event(rng::AbstractRNG, rates::AbstractWeights)::Int 
@@ -98,8 +98,10 @@ next_event(list_rates::AbstractWeights) = next_event(Random.GLOBAL_RNG, list_rat
 Select a single random event with a given probability managed by `event_handler`.
 
 The `event_handler` also manages the case that no valid events are left (e.g.
-when all rates are equal to zero). This becomes relevant when using [`advance!'](@ref)
-to advance time over some period.
+when all rates are equal to zero). This becomes relevant when using [`advance!`](@ref)
+to advance for some time.
+
+See also: [`advance!`](@ref)
 """
 function next_event(rng::AbstractRNG, event_handler::AbstractEventHandlerRate{T})::T where T
     ne = length(event_handler)
@@ -147,11 +149,9 @@ end
 next_event(event_handler::ListEventRateSimple) = next_event(Random.GLOBAL_RNG, event_handler) 
 
 """
-    advance!(alg::KineticMonteCarlo, [rng::AbstractRNG], event_handler::AbstractEventHandlerRate, update!::Function, totol_time::T)::T where {T<:Real} 
+    advance!(alg::KineticMonteCarlo, [rng::AbstractRNG], event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T<:Real} 
 
-Draw as many events for a `system` with a list of reactions with different
-rates such that the time of the last event is larger than `total_time` and
-return time of last event.
+Draw events from `event_handler` and update `event_handler` with `update!` until `total_time` has passed. Return time of last event.
 """
 function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat}
     time::T = 0
