@@ -6,13 +6,16 @@ makedocs(;
     modules = [MonteCarloX],
     format = Documenter.HTML(),
     pages = [
-        "Home" => "index.md",
+        "Getting Started" => "index.md",
+        "Equilibrium Tools" => "equilibrium.md",
+        "Non-Equilibrium Tools" => "non_equilibrium.md",
+        "Helper" => "helper.md",
     ],
-    repo = "https://github.com/zierenberg/MonteCarloX.jl/blob/{commit}{path}#L{line}",
-    sitename = "MonteCarloX.jl",
+    sitename = "MonteCarloX",
     authors = "Johannes Zierenberg",)
 
 deploydocs(;
     deps = Deps.pip("pygments", "mkdocs", "python-markdown-math"),
     repo = "github.com/zierenberg/MonteCarloX.jl",
+    target="build"
 )
