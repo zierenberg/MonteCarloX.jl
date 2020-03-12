@@ -37,12 +37,15 @@ export  # equilibrium
         sweep,
         # update -> will be moved to test/utils.jl for now and later to SpinSystems.jl
         # non-equilibrium
+        next_event,
         next_time,
         next,
         advance!
 
 # helper
 export  log_sum,
+        binary_search,
+        random_element,
         # event handler
         AbstractEventHandlerRate,
         ListEventRateSimple,
