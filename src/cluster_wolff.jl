@@ -19,7 +19,7 @@ todo:
 return dE?
 how to specify function type for performance?
 """
-function update(alg::ClusterWolff, spins::Vector{Int}, nearest_neighbors::Function, betaJ::Float64, rng::AbstractRNG)
+function update(alg::ClusterWolff, rng::AbstractRNG, spins::Vector{Int}, nearest_neighbors::Function, betaJ::Float64)
     N = length(spins)
 
     # get random spin and flip it

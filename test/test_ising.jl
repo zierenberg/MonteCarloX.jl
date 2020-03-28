@@ -156,7 +156,7 @@ function test_ising_cluster(;verbose = false)
         # thermalization 100 sweeps
         for sweep in 1:samples + 100
             for i in 1:5
-                MonteCarloX.update(cluster_algorithm, system.spins, nearest_neighbors, beta, rng)
+                MonteCarloX.update(cluster_algorithm, rng, system.spins, nearest_neighbors, beta)
             end
             if sweep > 100
                 list_energy[sweep - 100] = E(system)
