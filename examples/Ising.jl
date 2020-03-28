@@ -72,7 +72,7 @@ function run(system::IsingSystem, beta::Float64, n_meas::Int64, n_therm::Int64, 
             current_E += dE
         end
         # Cluster update
-        ClusterWolff.update(system.spins, system.nearest_neighbors, beta, rng)
+        MonteCarloX.update(MonteCarloX.ClusterWolff(), rng, system.spins, system.nearest_neighbors, beta)
         current_E = E(system)
         if sweep > n_therm
             current_M = M(system)
@@ -86,12 +86,9 @@ function run(system::IsingSystem, beta::Float64, n_meas::Int64, n_therm::Int64, 
 end
 
 function update_spin_flip(system::IsingSystem, beta::Float64, rng::AbstractRNG)::Int
-    # define weight function via energy change and simply pass 0 as second argument
-    log_weight(dE::Int)::Float64 = -beta * dE
-
     index = rand(rng, 1:length(system.spins))
     dE    = -2 * E_local(system, index)
-    if Metropolis.accept(log_weight, dE, 0, rng)
+    if accept(Metropolis(), rng, beta, dE)
         system.spins[index] *= -1
     else
         dE = 0
@@ -114,6 +111,8 @@ end
 
 """
 main program that implements full example simulation of 2D Ising model and compares to the Beale solution
+call this from within julia -O3
+@time main(flag_plot=false) should run O(4s) comparable with C code from Martin?!
 """
 function main(;flag_plot::Bool = true)
     println("Initialize system (8x8)")
