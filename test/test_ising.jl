@@ -249,9 +249,9 @@ end
 # """ Definition of the Boltzmann distribution for hypothesis testing."""
 struct BoltzmannDistribution <: ContinuousUnivariateDistribution
     pdf::Dict{Any,Float64}
-    cdf::Dict{Any,Float64}
+    #cdf::Dict{Any,Float64}
 
-    BoltzmannDistribution(beta, log_dos) = new(initialize_BoltzmannDistribution(beta, log_dos)...)
+    BoltzmannDistribution(beta, log_dos) = new(initialize_BoltzmannDistribution(beta, log_dos))
     # BoltzmannDistribution(beta, log_dos, log_Z) = new(Float64(beta), Dict{Any,Float64}(log_dos), Float64(log_Z))
 end
 
@@ -259,7 +259,7 @@ end
 pdf(d::BoltzmannDistribution, E::Real) = d.pdf[E]
 
 # cumulated probability distribution
-cdf(d::BoltzmannDistribution, E::Real) = d.cdf[E]
+#cdf(d::BoltzmannDistribution, E::Real) = d.cdf[E]
 
 function initialize_BoltzmannDistribution(beta, log_dos)
     # partition sum
@@ -278,7 +278,8 @@ function initialize_BoltzmannDistribution(beta, log_dos)
         pdf[E] = exp(log_pdf)
         cdf[E] = exp(log_cdf)
     end 
-    return pdf, cdf
+    #return pdf, cdf
+    return pdf
 end
 
 
