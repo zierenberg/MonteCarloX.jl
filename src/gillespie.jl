@@ -5,6 +5,8 @@ struct Gillespie end
 #Remarks
 We could think about a generalization of this to pass also custom events, threhold, etc. But then this exactly becomes the event_handler function ... So I would keep this as a specialization.
 
+We should however move events to the function argument! Because this is relevant for the update function
+
 #See also direct construction of event handlers
 [`ListEventRateSimple`](@ref), [`ListEventRateActiveMask`](@ref)
 """
