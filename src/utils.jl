@@ -105,7 +105,7 @@ end
 # number back to edge value, you just need to access the corresponding element
 # in hist.edges
 
-# does this need performance boost? - maybe this is faseter then explicit for 1D
+# does this need performance boost? - maybe this is faseter when explicit for 1D
 Base.getindex(h::AbstractHistogram{T,1}, x::Real) where {T} = getindex(h, (x,))
 
 function Base.getindex(h::Histogram{T,N}, xs::NTuple{N,Real}) where {T,N}

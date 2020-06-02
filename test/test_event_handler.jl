@@ -61,5 +61,33 @@ function test_event_handler_rate(event_handler_type::String; verbose = false)
     end
     pass &= abs(sum(event_handler.list_rate) - sum_expected) < 1e-10
 
+    # test changes in rate effecting the automatic update of sum(rates)
+    if verbose
+        println("... automatic update of sum(rates)")
+    end
+    for i = 1:10
+        valid_sum = true
+        for j = 1:1e7
+            event_handler[rand(rng, 1:N)] = rand(rng)
+        end
+        sum_rates = 0.0
+        for n=1:N
+            sum_rates += event_handler[n]
+        end
+        if abs(sum(event_handler.list_rate) - sum_rates) < 1e-11
+            valid_sum = true
+        else
+            valid_sum = false
+        end
+        if verbose
+            if valid_sum 
+                println("... ... correct sum(rates): $(sum(event_handler.list_rate)) == $(sum_rates)")
+            else
+                println("... ... incorrect sum(rates): $(sum(event_handler.list_rate)) == $(sum_rates)")
+            end
+        end
+        pass &= valid_sum
+    end
+
     return pass
 end
