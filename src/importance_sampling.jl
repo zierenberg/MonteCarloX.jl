@@ -6,6 +6,26 @@ struct HeatBath end # todo
 struct Glauber end # todo
 
 @doc """
+    MCMC_step(alg::Metropolis, ...)
+"""
+function MCMC_step(alg::Metropolis, rng::AbstractRNG, update::Function, log_weight::Function, args_new::NTuple{N,T}, args_old::NTuple{N,T})::Bool
+    log_difference = log_weight(args_new...) - log_weight(args_old...)
+    return _evaluate(rng, log_difference)
+end
+# do we need to specify ::Function for function arguments?
+# in general too many type specifications?
+# undo moves
+
+@doc """
+    MCMC_step(alg::Heatbath, ...)
+"""
+# to be adapted ...
+function MCMC_step(alg::Heatbath, rng::AbstractRNG, update::Function, log_weight::Function, args_new::NTuple{N,T}, args_old::NTuple{N,T})::Bool
+    log_difference = log_weight(args_new...) - log_weight(args_old...)
+    return _evaluate(rng, log_difference)
+end
+
+@doc """
     accept(log_weight::Function, args_new::Tuple{Number, N}, args_old::Tuple{Number, N}, rng::AbstractRNG)::Bool where N
 
 Evaluate most general acceptance probability for imporance sampling of ``P(x) \\propto e^{log\\_weight(x)}``.
