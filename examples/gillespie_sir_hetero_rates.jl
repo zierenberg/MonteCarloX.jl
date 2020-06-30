@@ -2,16 +2,55 @@ using MonteCarloX
 using Random
 using Distributions
 using StatsBase
+using Printf
+using ProgressMeter
+using LinearAlgebra
+using DelimitedFiles
 
-function example_sir_hetero_rates()
+function example_dist_sir_hetero_rates(path)
     # define default values (some specific initial conditions, I0=100)
+    list_N  = Int[1e4]
+    list_I0 = Int[10,100]
     
+    epsilon=1e-3
+    mu=1.0
+    lambda_0 = 1.0
+    sigma    = 0.2
+    seeds = collect(Int, 1:1e4);
+    time_meas = 20
+    num_bins_max = 100
+    lambda_1 = 0.1
+
     # generate distribution of trajectories for different distributions but same mean_lambda
-    # A: delta_peak
-    # B: Gaussian
-    # C: Gamma
-     
-    # plot different distributions over time
+    P_Delta = Normal(lambda_0, 0.0)
+    P_Gaussian = Normal(lambda_0, 0.1)
+    P_Gamma = Gamma(lambda_0, 1) #check that mean=a*theta is lambda_0
+    P_Bimodal = MixtureModel(Normal[Normal(lambda_1,0.01), Normal(2*lambda_0-lambda_1,0.01)])
+    list_P = [P_Delta, P_Gaussian, P_Gamma, P_Bimodal]
+    list_P_name = ["Delta", "Gaussian", "Gamma", "Bimodal"]
+    for N in list_N
+        for I0 in list_I0
+            R0 = 0
+            S0 = N-I0
+            for (P,P_name) in zip(list_P, list_P_name)
+                println(N, " ", I0, " ", P_name)
+                list_time, list_dist = distribution(num_bins_max, P, S0, I0, R0, time_meas, seeds, mu=mu, epsilon=epsilon); 
+                filename_base =  @sprintf("%s/distribution_%s_lambda%.2d_mu%.2e_epsilon%.2e_N%.2e_I0%.2e",
+                                     path, P_name, lambda_0, mu, epsilon, N, I0)
+                write_distributions(list_time, list_dist, filename_base)
+            end
+        end
+    end
+end
+
+function write_distributions(list_time, list_dist, filename_base)
+    for (time,dist) in zip(list_time, list_dist)
+        filename = @sprintf("%s_T%.2e.dat",filename_base,time)
+        open(filename; write=true) do f 
+            write(f, "#I\t P(I)\n")
+            writedlm(f, zip(collect(dist.edges[1]),dist.weights)) 
+        end
+    end
 end
 
 function sir_hetero_rates(P_lambda::D, S0, I0, R0, time_meas, seed,
@@ -27,6 +66,39 @@ function sir_hetero_rates(P_lambda::D, S0, I0, R0, time_meas, seed,
 
     return list_T, list_S, list_I, list_R, system
 end
+
+function distribution(num_bins_max::Int, P_lambda::D, S0, I0, R0, time_meas, seeds;
+                      mu=1.0, epsilon=1e-3, dT=1) where D
+
+    list_T = collect(range(0, time_meas, step=dT))
+    trajectories_S = [zeros(Int,length(list_T)) for i=1:length(seeds)]
+    trajectories_I = [zeros(Int,length(list_T)) for i=1:length(seeds)]
+    trajectories_R = [zeros(Int,length(list_T)) for i=1:length(seeds)]
+    @showprogress 1 for (i,seed) in enumerate(seeds)
+        rng = MersenneTwister(seed);
+        system = SIR{D}(rng, P_lambda, epsilon, mu, S0, I0, R0)
+        trajectory!(rng, list_T, trajectories_S[i], trajectories_I[i], trajectories_R[i], system)
+    end
+    #index [time,trajectory] -> a way to make this [trajectory,time] to use later trajectories[:,t]
+    trajectories_S = hcat(trajectories_S...); 
+    trajectories_I = hcat(trajectories_I...); 
+    trajectories_R = hcat(trajectories_R...); 
+    
+    # then fit distributions (for now only I) 
+    # TODO: generalize (function for this) to all cases
+    list_dist = []
+    for t=1:size(trajectories_I,1)
+        min_I = minimum(trajectories_I[t,:])-10
+        max_I = maximum(trajectories_I[t,:])+10
+        step = ceil((max_I-min_I)/num_bins_max)
+        hist = fit(Histogram, trajectories_I[t,:], min_I:step:max_I)
+        dist = normalize!(float(hist))
+        push!(list_dist, dist)
+    end
+
+    return list_T, list_dist
+end
+
 
 """
 # generate a stochastic trajectory
