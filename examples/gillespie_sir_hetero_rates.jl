@@ -206,5 +206,5 @@ evaluate current rates of SIR system
 function current_rates(system::SIR)
     rate_recovery = system.mu * system.I
     rate_infection = system.sum_current_lambda* system.S/system.N + system.epsilon
-    return SVector{2,Float64}(rate_recovery, rate_infection)
+    return MVector{2,Float64}(rate_recovery, rate_infection)
 end
