@@ -88,6 +88,20 @@ function next_event(rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVect
     end
 end
 
+"""
+    next_event([rng::AbstractRNG,] rates::SVector{2,T})::Int where {T <: AbstractFloat}
+
+Select next event for special case of two events only.
+"""
+
+function next_event(rng::AbstractRNG, rates::MVector{2,T})::Int where {T <: AbstractFloat}
+    if rand(rng) * (rates[1] + rates[2]) < rates[1]
+        return 1
+    else
+        return 2
+    end
+end
+
 # relevent to write this as extra function this for performance issues (compared to keyword argument with preset value on GLOBAL_RNG)
 next_event(list_rates::AbstractWeights) = next_event(Random.GLOBAL_RNG, list_rates) 
 

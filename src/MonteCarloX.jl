@@ -3,6 +3,7 @@ module MonteCarloX
 using Random
 using StatsBase
 using LinearAlgebra
+using StaticArrays
 # exports that are relevant to run simulations in MonteCarloX
 # using Reexports
 # @reexport using Random
