@@ -6,6 +6,7 @@ using Printf
 using ProgressMeter
 using LinearAlgebra
 using DelimitedFiles
+using StaticArrays
 
 function example_dist_sir_hetero_rates(path)
     # define default values (some specific initial conditions, I0=100)
@@ -17,7 +18,7 @@ function example_dist_sir_hetero_rates(path)
     lambda_0 = 1.0
     sigma    = 0.2
     seeds = collect(Int, 1:1e4);
-    time_meas = 20
+    time_meas = 200
     num_bins_max = 100
     lambda_1 = 0.1
 
@@ -205,5 +206,5 @@ evaluate current rates of SIR system
 function current_rates(system::SIR)
     rate_recovery = system.mu * system.I
     rate_infection = system.sum_current_lambda* system.S/system.N + system.epsilon
-    return [rate_recovery, rate_infection]
+    return MVector{2,Float64}(rate_recovery, rate_infection)
 end
