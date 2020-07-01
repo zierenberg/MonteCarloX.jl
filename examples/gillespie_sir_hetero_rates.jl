@@ -165,11 +165,11 @@ function update!(rates::AbstractVector, index::Int, system::SIR, rng::AbstractRN
     system.measure_R = system.R
     if index == 1 # recovery
         random_I = rand(rng, 1:system.I)
-        delete_from_system(system, random_I)
+        delete_from_system!(system, random_I)
         system.I -= 1
         system.R += 1
     elseif index == 2 # infection
-        add_to_system(system, rand(rng, system.P_lambda))
+        add_to_system!(system, rand(rng, system.P_lambda))
         system.S -= 1
         system.I += 1
         @assert length(system.current_lambda) == system.I
@@ -180,17 +180,17 @@ function update!(rates::AbstractVector, index::Int, system::SIR, rng::AbstractRN
     rates .= current_rates(system)
 end
 
-function delete_from_system(system, index)
-    update_sum(system, -system.current_lambda[index])
+function delete_from_system!(system, index)
+    update_sum!(system, -system.current_lambda[index])
     deleteat!(system.current_lambda, index)
 end
 
-function add_to_system(system, lambda)
+function add_to_system!(system, lambda)
     push!(system.current_lambda, lambda)
     update_sum(system, lambda)
 end
 
-function update_sum(system, change) 
+function update_sum!(system, change) 
     system.sum_current_lambda += change 
     system.update_current_lambda += 1
     if system.update_current_lambda > 1e5
