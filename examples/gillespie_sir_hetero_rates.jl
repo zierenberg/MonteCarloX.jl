@@ -8,25 +8,31 @@ using LinearAlgebra
 using DelimitedFiles
 using StaticArrays
 
-function example_dist_sir_hetero_rates(path)
+function example_dist_sir_hetero_rates(lambda_0, path)
     # define default values (some specific initial conditions, I0=100)
-    list_N  = Int[1e4]
-    list_I0 = Int[10,100]
+    list_N  = Int[1e5]
+    list_I0 = Int[1,10,100]
     
-    epsilon=1e-3
-    mu=1.0
-    lambda_0 = 1.0
-    sigma    = 0.2
-    seeds = collect(Int, 1:1e4);
-    time_meas = 200
+    epsilon = 1e-3
+    mu = 1.0
+    sigma = 0.2
+    seeds = collect(Int, 1:1e5);
+    time_meas = 20
     num_bins_max = 100
-    lambda_1 = 0.1
 
-    # generate distribution of trajectories for different distributions but same mean_lambda
+    # generate distribution of trajectories for different distributions but
+    # same mean_lambda
     P_Delta = Normal(lambda_0, 0.0)
     P_Gaussian = Normal(lambda_0, 0.1)
-    P_Gamma = Gamma(lambda_0, 1) #check that mean=a*theta is lambda_0
-    P_Bimodal = MixtureModel(Normal[Normal(lambda_1,0.01), Normal(2*lambda_0-lambda_1,0.01)])
+    P_Gamma = Gamma(lambda_0, 1) 
+    # mean(lambda) = lambda_1*prior_1 + lambda_2*prior_2 = lambda_0
+    # prior_1 + prior_2 = 1
+    lambda_1 = 0.0
+    lambda_2 = 10.0
+    prior_1 = (lambda_0 - lambda_2)/(lambda_1 - lambda_2)
+    prior_2 = 1 - prior_1
+    sigma_1 = sigma_2 = 0.00 # has to ensure that distribution around lambda_1 does not cross zero
+    P_Bimodal = MixtureModel(Normal[Normal(lambda_1, sigma_1), Normal(lambda_2, sigma_2)], [prior_1, prior_2])
     list_P = [P_Delta, P_Gaussian, P_Gamma, P_Bimodal]
     list_P_name = ["Delta", "Gaussian", "Gamma", "Bimodal"]
     for N in list_N
@@ -131,7 +137,6 @@ function trajectory!(rng, list_T, list_S, list_I, list_R, system)
 end
 
 
-# D hopefully works as distribution template ;)
 mutable struct SIR{D}
     epsilon::Float64
     mu::Float64
