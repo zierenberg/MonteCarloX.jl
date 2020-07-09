@@ -7,7 +7,11 @@ struct KineticMonteCarlo end
 Next stochastic event (`\\Delta t`, index) drawn proportional to probability given in `rates`
 """
 function next(alg::KineticMonteCarlo, rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVector})::Tuple{Float64,Int}
-    dtime = next_time(rng, sum(rates))
+    sum_rates = sum(rates)
+    if !(sum_rates > 0)
+        return Inf, 0
+    end
+    dtime = next_time(rng, sum_rates)
     index = next_event(rng, rates)
     return dtime, index
 end
@@ -19,8 +23,13 @@ next(alg::KineticMonteCarlo, rates::AbstractWeights) = next(alg, Random.GLOBAL_R
 
 Next stochastic event (`\\Delta t`, event type) organized by `event_handler`
 fast(to be tested, depends on overhead of EventList) implementation of next_event_rate if defined by EventList object
+
+TOOD: write this as wrapper around above..
 """
 function next(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractEventHandlerRate)::Tuple{Float64,Int}
+    if !(sum(event_handler.list_rate) > 0)
+        return Inf, 0
+    end
     dt = next_time(rng, sum(event_handler.list_rate))
     id = next_event(rng, event_handler)
     return dt, id
@@ -190,14 +199,11 @@ end
     advance!(alg::KineticMonteCarlo, [rng::AbstractRNG], rates::AbstractVector, update!::Function, total_time::T)::T where {T<:Real} 
 
 Draw events from `event_handler` and update `event_handler` with `update!` until `total_time` has passed. Return time of last event.
+#TODO: Discuss with Martin what a suitable API is here
 """
 function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, rates::AbstractVector, update!::Function, total_time::T)::T where {T <: AbstractFloat}
     time::T = 0
     while time <= total_time
-        if sum(rates) == 0
-            println("WARNING: no events left before total_time reached")
-            return time
-        end
         dt, index = next(alg, rng, rates)
         time += dt
         update!(rates, index)
