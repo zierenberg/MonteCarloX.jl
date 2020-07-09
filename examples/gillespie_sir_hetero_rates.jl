@@ -8,44 +8,73 @@ using LinearAlgebra
 using DelimitedFiles
 using StaticArrays
 
-function example_dist_sir_hetero_rates(lambda_0, path)
+function example_dist_sir_hetero_rates(path; 
+                                      ratio_lambda_mu=1.0)
     # define default values (some specific initial conditions, I0=100)
-    list_N  = Int[1e5]
+    N = Int(1e5)
     list_I0 = Int[1,10,100]
+    seeds = collect(Int, 1:1e6);
     
-    epsilon = 1e-3
-    mu = 1.0
-    sigma = 0.2
-    seeds = collect(Int, 1:1e5);
-    time_meas = 20
-    num_bins_max = 100
+    # motivated by COVID-19 parameters [cf. Dehning et al, Science (2020)]
+    mu = 1/8. # avg. infectious time of 5+3 days  
+    lambda_0 = ratio_lambda_mu*mu # focus on the "critical point" of sustained activity
+    sigma = mu/10
+    time_meas = 21 # 1 week observation of effect of initial perturbation
+    list_k = [1,1e-1,1e-2]
+    list_alpha = [1.5,2,3] # mean only defined for alpha > 1
 
-    # generate distribution of trajectories for different distributions but
-    # same mean_lambda
+    # Different distributions with same mean speading rate lambda_0
+    list_P = []
+    list_P_name = []
+    # Compared to [Lloyd-Smith et al., Science (2020)] delta-distribution for
+    # differential-equation model corresponds already to an exponential
+    # distribution of R_0 i.e. a geometric offspring distribution (k=1)
     P_Delta = Normal(lambda_0, 0.0)
-    P_Gaussian = Normal(lambda_0, 0.1)
-    P_Gamma = Gamma(lambda_0, 1) 
+    push!(list_P, P_Delta)
+    push!(list_P_name, "Delta")
+    P_Gaussian = Normal(lambda_0, sigma)
+    push!(list_P, P_Gaussian)
+    push!(list_P_name, "Gaussian")
+    # We cannot fully reproduce the negative-binomial offspring distribution by
+    # a Gamma-Poisson mixture because we have no generation based model here.
+    # Still, we should approximate the same behavior by choosing a Gamma
+    # distribution of spreading rates with the same mean
+    # https://en.wikipedia.org/wiki/Gamma_distribution
+    #   mean(Gamma) = k*theta = lambda_0 i.e. theta = lambda_0/k
+    for k in list_k
+        P_Gamma = Gamma(k, lambda_0/k) 
+        push!(list_P, P_Gamma)
+        push!(list_P_name, @sprintf("Gamma_k%.2e",k))
+    end
+    # Pareto distribution for scale-free spreading rates (motivated from
+    # scale-free-ness of social networks)
+    # P_Pareto(x_m, alpha) = GeneralizedPareto(x_m, x_m/alpha, 1/alpha)
+    # for Pareto to give mean=lambda_0 : x_m(lambda_0,alpha) = (alpha-1)lambda_0/alpha
+    for alpha in list_alpha
+        x_m = (alpha-1)*lambda_0/alpha
+        P_Pareto = GeneralizedPareto(x_m, x_m/alpha, 1/alpha)
+        push!(list_P, P_Pareto)
+        push!(list_P_name, @sprintf("Pareto_alpha%.2e",alpha))
+    end
     # mean(lambda) = lambda_1*prior_1 + lambda_2*prior_2 = lambda_0
     # prior_1 + prior_2 = 1
-    lambda_1 = 0.0
+    lambda_1 =  0.0
     lambda_2 = 10.0
     prior_1 = (lambda_0 - lambda_2)/(lambda_1 - lambda_2)
     prior_2 = 1 - prior_1
-    sigma_1 = sigma_2 = 0.00 # has to ensure that distribution around lambda_1 does not cross zero
-    P_Bimodal = MixtureModel(Normal[Normal(lambda_1, sigma_1), Normal(lambda_2, sigma_2)], [prior_1, prior_2])
-    list_P = [P_Delta, P_Gaussian, P_Gamma, P_Bimodal]
-    list_P_name = ["Delta", "Gaussian", "Gamma", "Bimodal"]
-    for N in list_N
-        for I0 in list_I0
-            R0 = 0
-            S0 = N-I0
-            for (P,P_name) in zip(list_P, list_P_name)
-                println(N, " ", I0, " ", P_name)
-                list_time, list_dist = distribution(num_bins_max, P, S0, I0, R0, time_meas, seeds, mu=mu, epsilon=epsilon); 
-                filename_base =  @sprintf("%s/distribution_%s_lambda%.2d_mu%.2e_epsilon%.2e_N%.2e_I0%.2e",
-                                     path, P_name, lambda_0, mu, epsilon, N, I0)
-                write_distributions(list_time, list_dist, filename_base)
-            end
+    P_Bimodal = MixtureModel(Normal[Normal(lambda_1, 0), Normal(lambda_2, 0)], [prior_1, prior_2])
+    push!(list_P, P_Bimodal)
+    push!(list_P_name, @sprintf("Bimodal_left%.2e_right%.2e",lambda_1, lambda_2))
+    # simulations
+    for I0 in list_I0
+        R0 = 0
+        S0 = N-I0
+        for (P,P_name) in zip(list_P, list_P_name)
+            println(N, " ", I0, " ", P_name)
+            list_time, list_dist = distribution(P, S0, I0, R0, time_meas, seeds, mu=mu); 
+            filename_base =  @sprintf("%s/distribution_%s_lambda%.2e_mu%.2e_N%.2e_I0%.2e",
+                                 path, P_name, lambda_0, mu, N, I0)
+            write_distributions(list_time, list_dist, filename_base)
         end
     end
 end
@@ -60,8 +89,8 @@ function write_distributions(list_time, list_dist, filename_base)
     end
 end
 
-function sir_hetero_rates(P_lambda::D, S0, I0, R0, time_meas, seed,
-                          mu=1.0, epsilon=1e-3, dT=1) where D
+function sir_hetero_rates(P_lambda::D, S0, I0, R0, time_meas, seed;
+                          mu=1.0, epsilon=0.0, dT=1) where D
     rng = MersenneTwister(seed);
     system = SIR{D}(rng, P_lambda, epsilon, mu, S0, I0, R0)
 
@@ -74,8 +103,11 @@ function sir_hetero_rates(P_lambda::D, S0, I0, R0, time_meas, seed,
     return list_T, list_S, list_I, list_R, system
 end
 
-function distribution(num_bins_max::Int, P_lambda::D, S0, I0, R0, time_meas, seeds;
-                      mu=1.0, epsilon=1e-3, dT=1) where D
+# memory-wise this is not the most efficient solution
+# Alternative is to have one trajectory readout and directly add to
+# distribution (which requires some a priori size though)
+function distribution(P_lambda::D, S0, I0, R0, time_meas, seeds;
+                      mu=1.0, epsilon=0, dT=1) where D
 
     list_T = collect(range(0, time_meas, step=dT))
     trajectories_S = [zeros(Int,length(list_T)) for i=1:length(seeds)]
@@ -95,9 +127,9 @@ function distribution(num_bins_max::Int, P_lambda::D, S0, I0, R0, time_meas, see
     # TODO: generalize (function for this) to all cases
     list_dist = []
     for t=1:size(trajectories_I,1)
-        min_I = minimum(trajectories_I[t,:])-10
-        max_I = maximum(trajectories_I[t,:])+10
-        step = ceil((max_I-min_I)/num_bins_max)
+        min_I = 0
+        max_I = maximum(trajectories_I[t,:])+2
+        step = 1
         hist = fit(Histogram, trajectories_I[t,:], min_I:step:max_I)
         dist = normalize!(float(hist))
         push!(list_dist, dist)
@@ -124,15 +156,16 @@ function trajectory!(rng, list_T, list_S, list_I, list_R, system)
     list_S[1] = system.measure_S
     list_I[1] = system.measure_I
     list_R[1] = system.measure_R
-    dT_correction = 0.0
+    time_simulation = Float64(list_T[1])
     for i in 2:length(list_T)
-      dT = list_T[i]-list_T[i-1] - dT_correction
-      dT_true = advance!(KineticMonteCarlo(), rng, rates, pass_update!, dT)
-      dT_correction = dT_true - dT
-      # Gillespie advance goes until time > list_T[i]
-      list_S[i] = system.measure_S
-      list_I[i] = system.measure_I
-      list_R[i] = system.measure_R
+        if time_simulation < list_T[i]
+            dT = list_T[i] - time_simulation
+            dT_sim = advance!(KineticMonteCarlo(), rng, rates, pass_update!, dT)
+            time_simulation += dT_sim
+        end
+        list_S[i] = system.measure_S
+        list_I[i] = system.measure_I
+        list_R[i] = system.measure_R
     end
 end
 
@@ -179,6 +212,10 @@ function update!(rates::AbstractVector, index::Int, system::SIR, rng::AbstractRN
         system.S -= 1
         system.I += 1
         @assert length(system.current_lambda) == system.I
+    elseif index == 0 # absorbing state of zero infected
+        system.measure_S = system.S
+        system.measure_I = system.I
+        system.measure_R = system.R
     else
         throw(UndefVarError(:index))
     end
