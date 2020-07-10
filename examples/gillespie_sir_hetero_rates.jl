@@ -8,8 +8,95 @@ using LinearAlgebra
 using DelimitedFiles
 using StaticArrays
 
+"""
+Reproduce results similar to Fig.2 of Lloyed-Smith et al., Nature (2005) on the 
+the probability of exctinction (here after 3 weeks for mu=1/8) and the
+occurrance of the first outbreak (here first day with >50 cases per trajectory).
+"""
+function reproduce_lloyed_smith_nature_2005_fig2(path)
+    list_ratio_lambda_mu = collect(0.5:0.1:3)
+    list_k = [10, 1, 1e-1, 1e-2]
+    list_a = [3, 5, 10]
+    N = Int(1e5)
+    I0 = 1
+    R0 = 0
+    S0 = N - I0
+    epsilon=0
+    range_seed = 1:Int(1e6);
+    
+
+    # motivated by COVID-19 parameters [cf. Dehning et al, Science (2020)]
+    mu = 1/8. # avg. infectious time of 5+3 days  
+    time_meas = 50 # days of simulation
+    dT = 1
+
+    for ratio_lambda_mu in list_ratio_lambda_mu
+        lambda_0 = ratio_lambda_mu*mu
+        list_P = []
+        list_P_name = []
+        for k in list_k
+            P_Gamma = Gamma(k, lambda_0/k) 
+            push!(list_P, P_Gamma)
+            push!(list_P_name, @sprintf("Gamma_k%.2e",k))
+        end
+        for a in list_a
+            lambda_1 = mu/a
+            lambda_2 = mu*a
+            prior_1 = (lambda_0 - lambda_2)/(lambda_1 - lambda_2)
+            prior_2 = 1 - prior_1
+            if lambda_2 >= lambda_0
+                P_Bimodal = MixtureModel(Normal[Normal(lambda_1, 0), Normal(lambda_2, 0)], [prior_1, prior_2])
+                push!(list_P, P_Bimodal)
+                push!(list_P_name, @sprintf("Bimodal_a%.2e",a))
+            end
+        end
+
+        # simulations
+        for (P,P_name) in zip(list_P, list_P_name)
+            println("R=", ratio_lambda_mu, " P=", P_name)
+
+            list_time = collect(range(0, time_meas, step=dT))
+            trajectory_S = zeros(Int,length(list_time))
+            trajectory_I = zeros(Int,length(list_time))
+            trajectory_R = zeros(Int,length(list_time))
+
+            # observables
+            probability_exctinction_per_day = zeros(length(list_time)) 
+            probability_first_day_more_than_50 = zeros(length(list_time)) 
+
+            #generate and analyse trajectories
+            @showprogress 1 for seed in range_seed
+                rng = MersenneTwister(seed);
+                system = SIR{typeof(P)}(rng, P, epsilon, mu, S0, I0, R0)
+                trajectory!(rng, list_time, trajectory_S, trajectory_I, trajectory_R, system)
+                 
+                first_index_more_than_50 = findfirst(x->x>50, trajectory_I)
+                if !(typeof(first_index_more_than_50) == Nothing)
+                    probability_first_day_more_than_50[first_index_more_than_50] += 1
+                end
+                
+                probability_exctinction_per_day[trajectory_I .== 0] .+= 1
+            end
+
+            probability_exctinction_per_day ./= length(range_seed)
+            probability_first_day_more_than_50 ./= length(range_seed)
+
+            #write out
+            filename =  @sprintf("%s/reproduce_lloyed_smith_nature_2005_fig2_%s_R%.2e_mu%.2e_N%.2e_I0%.2e.dat",
+                                 path, P_name, ratio_lambda_mu, mu, N, I0)
+            
+            open(filename; write=true) do f 
+                write(f, "#P_ext(t) - probability of trajectory to be extinct at this day\n")
+                write(f, "#P_50(t)  - probability that trajectory has more than 50 infections for the first time on this day\n")
+                write(f, "#t\t P_ext(t)\t N_50\n")
+                writedlm(f, [list_time  probability_exctinction_per_day probability_first_day_more_than_50]) 
+            end
+        end
+    end
+end
+
 function example_dist_sir_hetero_rates(path; 
-                                      ratio_lambda_mu=1.0)
+                                       ratio_lambda_mu=1.0)
     # define default values (some specific initial conditions, I0=100)
     N = Int(1e5)
     list_I0 = Int[1,10,100]
@@ -59,7 +146,7 @@ function example_dist_sir_hetero_rates(path;
     # mean(lambda) = lambda_1*prior_1 + lambda_2*prior_2 = lambda_0
     # prior_1 + prior_2 = 1
     lambda_1 =  0.0
-    lambda_2 = 10.0
+    lambda_2 = 10.0*mu
     prior_1 = (lambda_0 - lambda_2)/(lambda_1 - lambda_2)
     prior_2 = 1 - prior_1
     P_Bimodal = MixtureModel(Normal[Normal(lambda_1, 0), Normal(lambda_2, 0)], [prior_1, prior_2])
@@ -230,7 +317,7 @@ end
 
 function add_to_system!(system, lambda)
     push!(system.current_lambda, lambda)
-    update_sum(system, lambda)
+    update_sum!(system, lambda)
 end
 
 function update_sum!(system, change) 
