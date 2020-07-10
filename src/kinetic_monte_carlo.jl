@@ -112,7 +112,7 @@ function next_event(rng::AbstractRNG, rates::MVector{2,T})::Int where {T <: Abst
         return 2
     end
 end
-next_event(rates::MVector{2,T}) = next_event(Random.GLOBAL_RNG, rates) 
+next_event(rates::MVector{2,T}) where T = next_event(Random.GLOBAL_RNG, rates) 
 
 
 
