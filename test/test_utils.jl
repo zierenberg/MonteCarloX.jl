@@ -5,9 +5,12 @@ using StatsBase
 function test_histogram_set_get(;verbose = false)
     pass = true
 
-    list_ints = [i for i = 1:100]
-    hist = fit(Histogram, list_ints, 1:10:101)
+    # bin uniform values into histogram (each bin has 10 elements)
+    list_vals = [i for i = 1:100]
+    hist = fit(Histogram, list_vals, 1:10:101)
 
+    # reset the size of the histogram bins (accessing each bin via random
+    # elements that are included in the bin)
     target = [i for i = 1:10]
     hist[1] = target[1]
     hist[12] = target[2]
@@ -20,6 +23,7 @@ function test_histogram_set_get(;verbose = false)
     hist[89] = target[9]
     hist[100] = target[10]
 
+    # check that the histgram entries correspond to the target values
     for i = 1:100
         if verbose
             println("... $(hist[i]) == $(target[1 + floor(Int, (i - 1) / 10)])")

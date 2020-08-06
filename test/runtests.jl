@@ -15,14 +15,13 @@ import Distributions.cdf
     @test test_event_handler_rate("ListEventRateSimple")
     @test test_event_handler_rate("ListEventRateActiveMask")
 
-
     # equilibrium
     include("test_equilibrium.jl")
     @test test_sweep_random_element()
     @test test_unimodal_metropolis()
     @test test_2D_unimodal_metropolis()
     @test test_unimodal_sweep()
-
+b
     include("test_ising.jl")
     @test test_ising_reweighting()
     @test test_ising_metropolis()
