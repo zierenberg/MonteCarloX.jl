@@ -1,3 +1,8 @@
+# 2020/04/23
+
+- Metropolis and such updates in 2 flavors, one with flag that update is already performed, then do undo function :)
+- last question is about heatbath like updates ...
+
 # Next things to do
 - sweep interface (think about how to add list of updates with probabilities - similar to non-equilibrium case, i.e., make a new function for this in a more general module?
 - how to call update with different number of arguments?
