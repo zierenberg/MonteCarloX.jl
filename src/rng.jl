@@ -60,12 +60,21 @@ mutable struct MutableRandomNumbers <: AbstractRNG
     end
 end
 
-MutableRandomNumbers(size::Int) = MutableRandomNumbers(Random.GLOBAL_RNG, size)
+MutableRandomNumbers(rng_base::AbstractRNG; mode=:static) = MutableRandomNumbers(rng_base, 1, mode=mode)
+MutableRandomNumbers(size::Int; mode=:static) = MutableRandomNumbers(Random.GLOBAL_RNG, size, mode=mode)
+MutableRandomNumbers(; mode=:static) = MutableRandomNumbers(Random.GLOBAL_RNG, 1, mode=mode)
 
-# reset the RNG to the pre-initial index (0)
-function reset(r::MutableRandomNumbers)
-    r.index_current = 0
+"""
+    reset(rng::MutableRandomNumbers, [index::Int=0])
+
+Reset the state of a MutableRandomNumbers object `rng` to `index`. Default
+resets the RNG object to the pre-initial index (0) 
+"""
+function reset(r::MutableRandomNumbers, index::Int)
+    r.index_current = index
 end
+
+reset(r::MutableRandomNumbers) = reset(r,0)
 
 # easy access overloads
 Base.length(r::MutableRandomNumbers) = Base.length(r.random_numbers)
