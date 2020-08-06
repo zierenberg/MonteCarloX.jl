@@ -4,6 +4,23 @@ struct Metropolis end
 struct MetropolisHastings end # todo
 struct HeatBath end # todo
 struct Glauber end # todo
+struct RealMicrocanonical end # todo
+
+
+#TODO: generalize in the following way
+#eval(log_difference::Float64)::Bool
+#@inline Base.@propagate_inbounds function _evaluate(d::UnionMetrics, a::Union{Array, ArraySlice}, b::Union{Array, ArraySlice})
+#@inline function _evaluate(d::UnionMetrics, a::AbstractArray, b::AbstractArray)
+
+@inline function _evaluate(rng::AbstractRNG, log_difference::Float64)::Bool
+    if log_difference > 0
+        return true
+    elseif rand(rng) < exp(log_difference)
+        return true
+    else
+        return false
+    end
+end
 
 @doc """
     accept(log_weight::Function, args_new::Tuple{Number, N}, args_old::Tuple{Number, N}, rng::AbstractRNG)::Bool where N
@@ -20,25 +37,13 @@ Evaluate most general acceptance probability for imporance sampling of ``P(x) \\
 - accept(alg::Metropolis(), rng::AbstractRNG, x_new::T, x_old::T) where T (@ref)
 """
 function accept(rng::AbstractRNG, log_weight::Function, args_new::NTuple{N,T}, args_old::NTuple{N,T})::Bool where {N,T}
-    difference = log_weight(args_new...) - log_weight(args_old...)
-    if difference > 0
-        return true
-    elseif rand(rng) < exp(difference)
-        return true
-    else
-        return false
-    end
+    log_difference = log_weight(args_new...) - log_weight(args_old...)
+    return _evaluate(rng, log_difference)
 end
 
 function accept(rng::AbstractRNG, log_weight::Function, args_new::T, args_old::T)::Bool where T
-    difference = log_weight(args_new) - log_weight(args_old)
-    if difference > 0
-        return true
-    elseif rand(rng) < exp(difference)
-        return true
-    else
-        return false
-    end
+    log_difference = log_weight(args_new) - log_weight(args_old)
+    return _evaluate(rng, log_difference)
 end
 
 @doc """
@@ -74,6 +79,9 @@ end
 Randomly pick und run update (has to check acceptance by itself!) from
 `list_updates` with probability specified in `list_probabilities` and repeat
 this `number_updates` times.
+
+# Remarks
+* Walker's alias method?
 """
 function sweep(list_updates, list_weights::AbstractWeights, rng::AbstractRNG; number_updates::Int = 1)
     @assert length(list_updates) == length(list_weights)

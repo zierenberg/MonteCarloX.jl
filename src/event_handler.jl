@@ -8,6 +8,14 @@ function Base.getindex(event_handler::AbstractEventHandlerRate, index::Int64)
     return event_handler.list_rate[index]
 end
 
+
+function reset_sum_rate(event_handler::AbstractEventHandlerRate)
+    event_handler.list_rate.sum = 0.0
+    for i = 1:length(event_handler.list_rate)
+        @inbounds event_handler.list_rate.sum += event_handler.list_rate[i]
+    end
+end
+
 ###############################################################################
 ###############################################################################
 ###############################################################################
@@ -27,11 +35,12 @@ mutable struct ListEventRateSimple{T} <: AbstractEventHandlerRate{T}
     threshold_active::Float64
     num_active::Int
     noevent::T
+    check_sum::Int64
 
     function ListEventRateSimple{T}(list_event::Vector{T}, list_rate_::Vector{Float64}, threshold_active::Float64, noevent::T) where T
         list_rate = ProbabilityWeights(list_rate_)
         num_active = count(x->x > threshold_active, list_rate)
-        new(list_event, list_rate, threshold_active, num_active, noevent)
+        new(list_event, list_rate, threshold_active, num_active, noevent, 0)
     end
 end
 
@@ -52,6 +61,13 @@ function Base.setindex!(event_handler::ListEventRateSimple, rate::Float64, index
 
     # this is of type ProbabilityWeights that automatically updates the sum over the list of rates
     event_handler.list_rate[index] = rate
+
+    # update sum(rates) every 1e6 (heuristic) changes in rates
+    event_handler.check_sum += 1
+    if event_handler.check_sum > 1e6
+        reset_sum_rate(event_handler)
+        event_handler.check_sum = 0
+    end
 end
 
 ###############################################################################
@@ -70,6 +86,7 @@ mutable struct ListEventRateActiveMask{T} <: AbstractEventHandlerRate{T}
     index_first_active::Int
     index_last_active::Int
     noevent::T
+    check_sum::Int64
 
     function ListEventRateActiveMask{T}(list_event::Vector{T}, list_rate_::Vector{Float64}, threshold_active::Float64, noevent::T; initial::String = "all_active") where T
         list_rate = ProbabilityWeights(list_rate_)
@@ -88,7 +105,7 @@ mutable struct ListEventRateActiveMask{T} <: AbstractEventHandlerRate{T}
         else 
             throw(UndefVarError(:initial))
         end
-        new(list_event, list_rate, threshold_active, list_active, num_active, index_first_active, index_last_active, noevent)
+        new(list_event, list_rate, threshold_active, list_active, num_active, index_first_active, index_last_active, noevent, 0)
     end
 end
 
@@ -114,6 +131,13 @@ function Base.setindex!(event_handler::ListEventRateActiveMask, rate::Float64, i
         else
             event_handler.list_rate[index] = 0 
         end
+    end
+
+    # update sum(rates) every 1e6 (heuristic) changes in rates
+    event_handler.check_sum += 1
+    if event_handler.check_sum > 1e6
+        reset_sum_rate(event_handler)
+        event_handler.check_sum = 0
     end
 end
 
