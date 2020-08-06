@@ -31,7 +31,7 @@ export  Metropolis,
         Gillespie,
         KineticMonteCarlo,
         InhomogeneousPoisson,
-        InhomogeneousPoissonPiecewiseDecreasing,
+        InhomogeneousPoissonPiecewiseDecreasing
 
 # functions
 export  # base

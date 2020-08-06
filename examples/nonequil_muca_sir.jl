@@ -15,15 +15,14 @@ function test_mutable_trajectories(num_updates;
     rng_mc = MersenneTwister(seed_mc);
     rng_dyn = MutableRandomNumbers(MersenneTwister(seed_dyn), mode=:dynamic)
 
-    I0 = 1
-    S0 = 0
+    I0 = 10
+    S0 = Int(1e5)
     R0 = 0
     epsilon = 0
     mu = 1/8.
     lambda = mu 
-    k = 0.02
+    k = 10
     P_lambda = Gamma(k,lambda/k)
-    system = SIR{typeof(P_lambda)}(rng_dyn, P_lambda, epsilon, mu, S0, I0, R0)
 
     time_meas = 14
     dT = 1
@@ -31,7 +30,9 @@ function test_mutable_trajectories(num_updates;
     array_I = zeros(length(list_T), num_updates)
     list_S = zeros(length(list_T));
     list_R = zeros(length(list_T));
+    list_I = zeros(length(list_T));
     @showprogress 1 for i in 1:num_updates
+        println(length(rng_dyn))
         # update (only updates, need to accept at some point)
         index = rand(rng_mc, 1:length(rng_dyn))
         old_rng = rng_dyn[index]
@@ -41,7 +42,9 @@ function test_mutable_trajectories(num_updates;
         #"reevaluate the simulation from the index case on -> requires storing
         #ALL events! In system?)
         MonteCarloX.reset(rng_dyn)
-        trajectory!(rng_dyn, list_T, list_S, array_I[:,i], list_R, system)
+        system = SIR{typeof(P_lambda)}(rng_dyn, P_lambda, epsilon, mu, S0, I0, R0)
+        trajectory!(rng_dyn, list_T, list_S, list_I, list_R, system)
+        array_I[:,i] .= list_I
     end
 
     return list_T, array_I
@@ -101,7 +104,9 @@ function update!(rates::AbstractVector, index::Int, system::SIR, rng::AbstractRN
     system.measure_I = system.I
     system.measure_R = system.R
     if index == 1 # recovery
-        random_I = rand(rng, 1:system.I)
+        #TODO: this does currently not work with ranges
+        #random_I = rand(rng, 1:system.I)
+        random_I = ceil(Int, rand(rng))
         delete_from_system!(system, random_I)
         system.I -= 1
         system.R += 1
