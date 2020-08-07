@@ -9,14 +9,194 @@ using Printf
 using DelimitedFiles
 using ProgressMeter
 
+#TODO: make advance take integer number ... ?
+#
+function ref_distribution(num_trajectories;
+                          seed = 1000)
+    I0 = 1 
+    S0 = Int(1e5) - I0
+    R0 = 0
+    epsilon = 0
+    mu = 1/8.
+    lambda = mu 
+    k = 0.02
+    P_lambda = Gamma(k,lambda/k)
+
+    time_meas = 14.0
+    dT = 1
+
+    range_I = 0:500
+    hist_I = Histogram(range_I)
+
+    @showprogress 1 for i in 1:num_trajectories
+        rng = MersenneTwister(1000+i);
+        system = SIR{typeof(P_lambda)}(rng, P_lambda, epsilon, mu, S0, I0, R0)
+        # evolution
+        rates = current_rates(system)
+        pass_update!(rates, index) = update!(rates, index, system, rng)
+        dT_sim = advance!(KineticMonteCarlo(), rng, rates, pass_update!, time_meas)
+        hist_I[system.measure_I] += 1
+    end
+    dist = normalize!(float(hist_I))
+    return dist
+end
+
+
+function test_muca_distribution(num_iterations, num_updates;
+                              seed_mc = 1000, seed_dynamics = 2000, seed_update = 3000)
+    rng_mc = MersenneTwister(seed_mc);
+    rng_dynamics = MutableRandomNumbers(MersenneTwister(seed_dynamics), mode=:dynamic)
+    rng_update   = MutableRandomNumbers(MersenneTwister(seed_update), mode=:dynamic)
+
+    I0 = 1 
+    S0 = Int(1e5) - I0
+    R0 = 0
+    epsilon = 0
+    mu = 1/8.
+    lambda = mu 
+    k = 0.02
+    P_lambda = Gamma(k,lambda/k)
+
+    time_meas = 14.0
+    dT = 1
+
+    range_I = 0:100
+    hist_I = Histogram(range_I)
+    logW   = Histogram(range_I, Float64)
+
+    #display(plot())
+    current_I = I0
+    for iteration in 1:num_iterations
+        hist_I.weights .= 0
+        println("iteration ", iteration)
+        @showprogress 1 for i in 1:num_updates
+            MonteCarloX.reset(rng_dynamics)
+            MonteCarloX.reset(rng_update)
+
+            # update 
+            rand_rng = rand(rng_mc, 1:2)
+            if rand_rng == 1 
+                rand_index = rand(rng_mc, 1:length(rng_dynamics))
+                old_rng = rng_dynamics[rand_index]
+                rng_dynamics[rand_index] = rand(rng_mc)
+            else
+                rand_index = rand(rng_mc, 1:length(rng_update))
+                old_rng = rng_update[rand_index]
+                rng_update[rand_index] = rand(rng_mc)
+            end
+            
+            #think about how to implement the trajectory function to only
+            #"reevaluate the simulation from the index case on -> requires storing
+            #ALL events! In system?)
+            system = SIR{typeof(P_lambda)}(rng_dynamics, P_lambda, epsilon, mu, S0, I0, R0)
+            # evolution
+            rates = current_rates(system)
+            pass_update!(rates, index) = update!(rates, index, system, rng_update)
+        
+            dT_sim = advance!(KineticMonteCarlo(), rng_dynamics, rates, pass_update!, time_meas)
+            new_I = system.measure_I
+
+            # acceptance
+            if new_I in range_I[1:end-1]
+                if rand(rng_mc) < exp(logW[new_I]-logW[current_I])
+                    #accept
+                    current_I = new_I
+                else #reject
+                    if rand_rng == 1
+                        rng_dynamics[rand_index] = old_rng
+                    else
+                        rng_update[rand_index] = old_rng
+                    end
+                end
+            end
+            hist_I[current_I] += 1
+        end
+        # update logW with simple rule
+        for I in range_I[1:end-1]
+            if hist_I[I] > 0
+                logW[I] = logW[I] - log(hist_I[I])
+            end
+        end
+        #display(plot(hist_I))
+    end
+
+    return hist_I, logW
+end
+
+function test_MC_distribution(num_updates;
+                              seed_mc = 1000, seed_dynamics = 2000, seed_update = 3000)
+    rng_mc = MersenneTwister(seed_mc);
+    rng_dynamics = MutableRandomNumbers(MersenneTwister(seed_dynamics), mode=:dynamic)
+    rng_update   = MutableRandomNumbers(MersenneTwister(seed_update), mode=:dynamic)
+
+    I0 = 1 
+    S0 = Int(1e5) - I0
+    R0 = 0
+    epsilon = 0
+    mu = 1/8.
+    lambda = mu 
+    k = 0.02
+    P_lambda = Gamma(k,lambda/k)
+
+    time_meas = 14.0
+    dT = 1
+
+    range_I = 0:500
+    hist_I = Histogram(range_I)
+    logW   = Histogram(range_I, Float64)
+
+    current_I = I0
+    @showprogress 1 for i in 1:num_updates
+        MonteCarloX.reset(rng_dynamics)
+        MonteCarloX.reset(rng_update)
+
+        # update 
+        rand_rng = rand(rng_mc, 1:2)
+        if rand_rng == 1 
+            rand_index = rand(rng_mc, 1:length(rng_dynamics))
+            old_rng = rng_dynamics[rand_index]
+            rng_dynamics[rand_index] = rand(rng_mc)
+        else
+            rand_index = rand(rng_mc, 1:length(rng_update))
+            old_rng = rng_update[rand_index]
+            rng_update[rand_index] = rand(rng_mc)
+        end
+        
+        #think about how to implement the trajectory function to only
+        #"reevaluate the simulation from the index case on -> requires storing
+        #ALL events! In system?)
+        system = SIR{typeof(P_lambda)}(rng_dynamics, P_lambda, epsilon, mu, S0, I0, R0)
+        # evolution
+        rates = current_rates(system)
+        pass_update!(rates, index) = update!(rates, index, system, rng_update)
+    
+        dT_sim = advance!(KineticMonteCarlo(), rng_dynamics, rates, pass_update!, time_meas)
+        new_I = system.measure_I
+
+        # acceptance
+        if rand(rng_mc) < exp(logW[new_I]-logW[current_I])
+            #accept
+            current_I = new_I
+        else #reject
+            if rand_rng == 1
+                rng_dynamics[rand_index] = old_rng
+            else
+                rng_update[rand_index] = old_rng
+            end
+        end
+        hist_I[current_I] += 1
+    end
+
+    return hist_I, logW
+end
 
 function test_mutable_trajectories(num_updates;
                                    seed_mc = 1000, seed_dyn = 1001)
     rng_mc = MersenneTwister(seed_mc);
     rng_dyn = MutableRandomNumbers(MersenneTwister(seed_dyn), mode=:dynamic)
 
-    I0 = 10
-    S0 = Int(1e5)
+    I0 = 10 
+    S0 = Int(1e5) - I0
     R0 = 0
     epsilon = 0
     mu = 1/8.
