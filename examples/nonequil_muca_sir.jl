@@ -9,7 +9,10 @@ using Printf
 using DelimitedFiles
 using ProgressMeter
 
-#TODO: make advance take integer number ... ?
+#TODO: 
+# * make simulation only as update (pivot like)
+# * make local random number updates?     
+# * sort arrays for sensible updates?
 #
 function ref_distribution(num_trajectories;
                           seed = 1000)
@@ -43,6 +46,7 @@ end
 
 
 function test_muca_distribution(num_iterations, num_updates;
+                                updates_therm::Int = Int(1e3),
                               seed_mc = 1000, seed_dynamics = 2000, seed_update = 3000)
     rng_mc = MersenneTwister(seed_mc);
     rng_dynamics = MutableRandomNumbers(MersenneTwister(seed_dynamics), mode=:dynamic)
@@ -60,16 +64,20 @@ function test_muca_distribution(num_iterations, num_updates;
     time_meas = 14.0
     dT = 1
 
-    range_I = 0:100
+    I_max = 300
+    range_I = 0:(I_max+1)
     hist_I = Histogram(range_I)
     logW   = Histogram(range_I, Float64)
 
-    #display(plot())
+    #de bug
+    display(plot())
+
+
     current_I = I0
     for iteration in 1:num_iterations
         hist_I.weights .= 0
         println("iteration ", iteration)
-        @showprogress 1 for i in 1:num_updates
+        @showprogress 1 for i in 1:(updates_therm + num_updates)
             MonteCarloX.reset(rng_dynamics)
             MonteCarloX.reset(rng_update)
 
@@ -97,27 +105,40 @@ function test_muca_distribution(num_iterations, num_updates;
             new_I = system.measure_I
 
             # acceptance
+            accept = false
             if new_I in range_I[1:end-1]
                 if rand(rng_mc) < exp(logW[new_I]-logW[current_I])
                     #accept
                     current_I = new_I
-                else #reject
-                    if rand_rng == 1
-                        rng_dynamics[rand_index] = old_rng
-                    else
-                        rng_update[rand_index] = old_rng
-                    end
+                    accept = true
                 end
             end
-            hist_I[current_I] += 1
+            if !accept
+                if rand_rng == 1
+                    rng_dynamics[rand_index] = old_rng
+                else
+                    rng_update[rand_index] = old_rng
+                end
+            end
+            if i > updates_therm
+                hist_I[current_I] += 1
+            end
         end
-        # update logW with simple rule
-        for I in range_I[1:end-1]
-            if hist_I[I] > 0
+
+        # update logW with simple rule -> convergence is bad because algorithm
+        # runs to right side immediately... maybe because updates are always
+        # new random number instead of increasing or decreasing random number?
+        for I in 0:50
+            if hist_I[I] > 10
                 logW[I] = logW[I] - log(hist_I[I])
             end
         end
-        #display(plot(hist_I))
+        for I in 51:I_max
+            logW[I] = logW[I-1]
+        end
+
+        # debug
+        display(plot!(log.(hist_I.weights), xlims=(0,100)))
     end
 
     return hist_I, logW
