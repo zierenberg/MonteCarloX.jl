@@ -233,12 +233,9 @@ function E_local(system::IsingSystem, index::Int)::Int
 end
 
 function update_spin_flip(system::IsingSystem, beta::Float64, rng::AbstractRNG)::Int
-    # define weight function via energy change and simply pass 0 as second argument
-    log_weight(dE::Int)::Float64 = -beta * dE
-
     index = rand(rng, 1:length(system.spins))
     dE        = -2 * E_local(system, index)
-    if accept(rng, log_weight, dE, 0)
+    if accept(Metropolis(), rng, beta, dE)
         system.spins[index] *= -1
     else
         dE = 0

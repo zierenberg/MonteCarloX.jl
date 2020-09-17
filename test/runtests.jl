@@ -21,7 +21,7 @@ import Distributions.cdf
     @test test_unimodal_metropolis()
     @test test_2D_unimodal_metropolis()
     @test test_unimodal_sweep()
-b
+ 
     include("test_ising.jl")
     @test test_ising_reweighting()
     @test test_ising_metropolis()
