@@ -38,7 +38,7 @@ function generate_data(path_out::String;
 
     # total time of evaluation on my machine: 0:02:01
     if do_muca
-        display(plot())
+        #display(plot())
         # iteration with histograms & weights written to file
         for iteration in 1:num_iterations
             println("iteration ", iteration)
@@ -50,7 +50,7 @@ function generate_data(path_out::String;
             # store histogram and weights
             list_hist[:,iteration] .= hist.weights
 
-            display(plot!(log.(hist.weights), xlims=(0,120)))
+            #display(plot!(log.(hist.weights), xlims=(0,120)))
             # update weights
             if iteration != num_iterations
                 muca_update!(logW, hist, I_bound)
