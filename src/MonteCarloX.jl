@@ -9,6 +9,7 @@ using LinkedLists # event_handler
 # using Reexports
 # @reexport using Random
 # @reexport using StatsBase
+import Base: popfirst!
 
 include("utils.jl")
 include("event_handler.jl")

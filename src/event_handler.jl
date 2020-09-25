@@ -197,10 +197,6 @@ end
 ###############################################################################
 ###############################################################################
 ###############################################################################
- mutable struct EventQueue <:AbstractEventHandlerTime
-# TODO: needs proper implementation of pointer list that allows insertion; develop here...
-# end
-#
 @doc """
     EventQueue{T}
 
@@ -228,9 +224,9 @@ end
 
 function Base.getindex(event_handler::EventQueue, index::Int64)
     if 0 < index <= length(event_handler.sorted_list)
-        return event_handler.sorted_list[positiontoindex(index, list)]
+        return event_handler.sorted_list[positiontoindex(index, event_handler.sorted_list)]
     else
-        return missing
+        return nothing
     end
 end
 
@@ -242,7 +238,25 @@ function popfirst!(event_handler::EventQueue)
     return popfirst!(event_handler.sorted_list)
 end
 
+
+function Base.getindex(list::LinkedLists.LinkedList{Tuple{Float64,Int}}, index::Int)
+    if 0 < index <= length(list)
+        return first(list[positiontoindex(index, list)])
+    else
+        return nothing
+    end
+end
+
 function add!(event_handler::EventQueue, time::Float64, event::T) where T
-    #TODO: bisection
-    
+    if length(event_handler) == 0
+        push!(event_handler.sorted_list, (time, event))
+    elseif time <= first(event_handler[1])
+        pushfirst!(event_handler.sorted_list, (time, event))
+    elseif time >= first(event_handler[length(event_handler)])
+        push!(event_handler.sorted_list, (time, event))
+    else
+        # find position in sorted list (if multiple same times, insert before first)
+        position = binary_search(event_handler.sorted_list, time)
+        insert!(event_handler.sorted_list, positiontoindex(position, event_handler.sorted_list), (time, event))
+    end
 end
