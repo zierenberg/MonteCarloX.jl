@@ -11,7 +11,7 @@ containing floating-point random_numbers initially generated with `rng_base`. Ra
 numbers are then generated sequentially from this vector. The RNG object can be
 initialized in two modes: 
 * :static - then there is an exception thrown once all random numbers are used
-* :dynamic - then there are new random numbers generated on the flow from the (copied) rng
+* :dynamic - then there are new random numbers generated on the fly from the (copied) rng
 
 # Examples
 ```jldoctest
