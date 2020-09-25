@@ -15,7 +15,6 @@ function next(alg::KineticMonteCarlo, rng::AbstractRNG, rates::Union{AbstractWei
     event = next_event(rng, rates)
     return dtime, event
 end
-
 next(alg::KineticMonteCarlo, rates::AbstractWeights) = next(alg, Random.GLOBAL_RNG, rates)
 
 """
