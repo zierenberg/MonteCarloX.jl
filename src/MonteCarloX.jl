@@ -12,6 +12,7 @@ using StaticArrays
 include("utils.jl")
 include("event_handler.jl")
 include("reweighting.jl")
+include("rng.jl")
 
 # Equilibrium
 include("importance_sampling.jl")
@@ -33,7 +34,8 @@ export  Metropolis,
         InhomogeneousPoissonPiecewiseDecreasing
 
 # functions
-export  # equilibrium
+export  # base
+        # equilibrium
         accept,
         sweep,
         # update -> will be moved to test/utils.jl for now and later to SpinSystems.jl
@@ -50,7 +52,9 @@ export  log_sum,
         # event handler
         AbstractEventHandlerRate,
         ListEventRateSimple,
-        ListEventRateActiveMask
+        ListEventRateActiveMask,
+        # rng 
+        MutableRandomNumbers
         
         
 

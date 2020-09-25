@@ -12,8 +12,8 @@ function next(alg::KineticMonteCarlo, rng::AbstractRNG, rates::Union{AbstractWei
         return Inf, 0
     end
     dtime = next_time(rng, sum_rates)
-    index = next_event(rng, rates)
-    return dtime, index
+    event = next_event(rng, rates)
+    return dtime, event
 end
 
 next(alg::KineticMonteCarlo, rates::AbstractWeights) = next(alg, Random.GLOBAL_RNG, rates)
@@ -30,9 +30,9 @@ function next(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractE
     if !(sum(event_handler.list_rate) > 0)
         return Inf, 0
     end
-    dt = next_time(rng, sum(event_handler.list_rate))
-    id = next_event(rng, event_handler)
-    return dt, id
+    dtime = next_time(rng, sum(event_handler.list_rate))
+    event = next_event(rng, event_handler)
+    return dtime, event
 end
 
 next(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate) = next(alg, Random.GLOBAL_RNG, event_handler)
@@ -204,9 +204,9 @@ Draw events from `event_handler` and update `event_handler` with `update!` until
 function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, rates::AbstractVector, update!::Function, total_time::T)::T where {T <: AbstractFloat}
     time::T = 0
     while time <= total_time
-        dt, index = next(alg, rng, rates)
+        dt, event = next(alg, rng, rates)
         time += dt
-        update!(rates, index)
+        update!(rates, event)
     end
     return time 
 end
