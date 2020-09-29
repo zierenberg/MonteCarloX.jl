@@ -29,10 +29,6 @@ function next(alg::Gillespie, rng::AbstractRNG, event_handler::AbstractEventHand
   next(KineticMonteCarlo(), rng, event_handler)
 end
 
-function advance!(alg::Gillespie, rng::AbstractRNG, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat}
-  advance!(KineticMonteCarlo(), rng, event_handler, update!, total_time)
-end
-
-function advance!(alg::Gillespie, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat} 
-  advance!(alg, Random.GLOBAL_RNG, event_handler, update!, total_time)
+function advance!(alg::Gillespie, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T, rng::AbstractRNG = Random.GLOBAL_RNG)::T where {T <: AbstractFloat}
+  advance!(KineticMonteCarlo(), event_handler, update!, total_time, rng)
 end
