@@ -28,7 +28,7 @@ TOOD: write this as wrapper around above..
 """
 function next(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractEventHandlerRate)::Tuple{Float64,Int}
     if !(sum(event_handler.list_rate) > 0)
-        return Inf, 0
+        return Inf, event_handler.noevent
     end
     dtime = next_time(rng, sum(event_handler.list_rate))
     event = next_event(rng, event_handler)
@@ -114,8 +114,6 @@ function next_event(rng::AbstractRNG, rates::MVector{2,T})::Int where {T <: Abst
 end
 next_event(rates::MVector{2,T}) where T = next_event(Random.GLOBAL_RNG, rates) 
 
-
-
 """
     next_event([rng::AbstractRNG,] event_handler::AbstractEventHandlerRate{T})::T where T
 
@@ -191,7 +189,20 @@ function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::Abstr
     return time 
 end
 
-function advance!(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat} 
+"""
+General version of function
+"""
+function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractEventHandler, update!::Function, total_time::T)::T where {T <: AbstractFloat}
+    time::T = 0
+    while time <= total_time
+        dt, event = next(alg, event_handler)
+        time += dt
+        update!(event_handler, event)
+    end
+    return time 
+end
+
+function advance!(alg::KineticMonteCarlo, event_handler::AbstractEventHandler, update!::Function, total_time::T)::T where {T <: AbstractFloat} 
   advance!(alg, Random.GLOBAL_RNG, event_handler, update!, total_time)
 end
 
