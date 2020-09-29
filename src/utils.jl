@@ -14,24 +14,29 @@ julia> MonteCarloX.binary_search([1,2,3,4],2)
 2
 ```
 """
-function binary_search(sorted::AbstractVector{T}, value::T)::Int where {T <: Real}
-    # catch lower-bound case that cannot be reached by binary search
-    id = 1
-    if value > sorted[1] 
-        index_l = 1
-        index_r = length(sorted)
-        while index_l < index_r - 1
-            # this should be fine because build for integers!
-            index_m = fld(index_l + index_r, 2)
-            if sorted[index_m] < value
-                index_l = index_m
-            else
-                index_r = index_m
+#function binary_search(sorted::AbstractVector{T}, value::T)::Int where {T <: Real}
+function binary_search(sorted, value)
+    if length(sorted) < 1
+        return nothing
+    else
+        # catch lower-bound case that cannot be reached by binary search
+        id = 1
+        if value > sorted[1] 
+            index_l = 1
+            index_r = length(sorted)
+            while index_l < index_r - 1
+                # this should be fine because build for integers!
+                index_m = fld(index_l + index_r, 2)
+                if sorted[index_m] < value
+                    index_l = index_m
+                else
+                    index_r = index_m
+                end
             end
+            id = index_r
         end
-        id = index_r
+        return id
     end
-    return id
 end
 
 """

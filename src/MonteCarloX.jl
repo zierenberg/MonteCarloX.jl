@@ -4,10 +4,12 @@ using Random
 using StatsBase
 using LinearAlgebra
 using StaticArrays
+using LinkedLists # event_handler
 # exports that are relevant to run simulations in MonteCarloX
 # using Reexports
 # @reexport using Random
 # @reexport using StatsBase
+import Base: popfirst!
 
 include("utils.jl")
 include("event_handler.jl")

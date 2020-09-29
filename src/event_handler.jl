@@ -197,6 +197,66 @@ end
 ###############################################################################
 ###############################################################################
 ###############################################################################
-# mutable struct EventQueue <:AbstractEventHandlerTime
-# TODO: needs proper implementation of pointer list that allows insertion; develop here...
-# end
+@doc """
+    EventQueue{T}
+
+    Flexible event queue that stores an ordered list of (time, event) tuples event manager for a list of events of type T with a static list of rates
+
+#API implemented:
+- length(event_handler) 
+- getindex(event_handler, index)
+- popfirst!(event_handler)
+- add!(event_handler, time, event)
+"""
+mutable struct EventQueue{T} <: AbstractEventHandlerTime{T}
+    sorted_list::LinkedList{Tuple{Float64,T}}
+    noevent::T
+
+    function EventQueue{T}(noevent::T) where T
+        sorted_list = LinkedList{Tuple{Float64,T}}()
+        new(sorted_list, noevent)
+    end
+end
+
+function Base.length(event_handler::EventQueue)
+    return length(event_handler.sorted_list)
+end
+
+function Base.getindex(event_handler::EventQueue, index::Int64)
+    if 0 < index <= length(event_handler.sorted_list)
+        return event_handler.sorted_list[positiontoindex(index, event_handler.sorted_list)]
+    else
+        return nothing
+    end
+end
+
+function Base.setindex!(event_handler::EventQueue, tuple_time_event::Tuple{Float64, T}, index::Int64) where T
+    setindex!(event_handler.sorted_list, positiontoindex(event_handler.sorted_list, index), tuple_time_event)
+end
+
+function popfirst!(event_handler::EventQueue)
+    return popfirst!(event_handler.sorted_list)
+end
+
+
+function Base.getindex(list::LinkedLists.LinkedList{Tuple{Float64,Int}}, index::Int)
+    if 0 < index <= length(list)
+        return first(list[positiontoindex(index, list)])
+    else
+        return nothing
+    end
+end
+
+function add!(event_handler::EventQueue, time::Float64, event::T) where T
+    if length(event_handler) == 0
+        push!(event_handler.sorted_list, (time, event))
+    elseif time <= first(event_handler[1])
+        pushfirst!(event_handler.sorted_list, (time, event))
+    elseif time >= first(event_handler[length(event_handler)])
+        push!(event_handler.sorted_list, (time, event))
+    else
+        # find position in sorted list (if multiple same times, insert before first)
+        position = binary_search(event_handler.sorted_list, time)
+        insert!(event_handler.sorted_list, positiontoindex(position, event_handler.sorted_list), (time, event))
+    end
+end
