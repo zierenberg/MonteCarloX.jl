@@ -230,7 +230,7 @@ function Base.getindex(event_handler::EventQueue, index::Int64)
     end
 end
 
-function Base.setindex!(event_handler::EventQueue, tuple_time_event::Tuple{Float64, T}, index::Int64) where T
+function Base.setindex!(event_handler::EventQueue, tuple_time_event::Tuple{Float64,T}, index::Int64) where T
     setindex!(event_handler.sorted_list, positiontoindex(event_handler.sorted_list, index), tuple_time_event)
 end
 
@@ -239,7 +239,7 @@ function popfirst!(event_handler::EventQueue)
 end
 
 
-function Base.getindex(list::LinkedLists.LinkedList{Tuple{Float64,Int}}, index::Int)
+function Base.getindex(list::LinkedLists.LinkedList{Tuple{Float64,T}}, index::Int) where T
     if 0 < index <= length(list)
         return first(list[positiontoindex(index, list)])
     else
