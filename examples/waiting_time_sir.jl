@@ -68,13 +68,13 @@ function update!(event_handler::AbstractEventHandlerTime{Tuple{Int64,Float64}}, 
         system.I -= 1
         system.R += 1
     elseif event == 2 # infection
-        new_event_time = time - (1/system.lambda)*log(fabs(rand(rng)))
+        new_event_time = time - (1/system.lambda)*log(rand(rng))
         recovery_time = second(event)
         if new_event_time < recovery_time
             add!(event_handler, new_event_time, (2, recovery_time))
         end
-        new_event_time = time - (1/system.lambda)*log(fabs(rand(rng)))
-        recovery_time = time - (1/system.mu)*log(fabs(rand(rng)))
+        new_event_time = time - (1/system.lambda)*log(rand(rng))
+        recovery_time = time - (1/system.mu)*log(rand(rng))
         add!(event_handler, recovery_time, (1, recovery_time))
         if new_event_time < recovery_time
             add!(event_handler, new_event_time, (2, recovery_time))
