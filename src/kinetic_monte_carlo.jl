@@ -2,14 +2,14 @@
 struct KineticMonteCarlo end
 
 """
-    step(alg::KineticMonteCarlo, event_rates::Union{AbstractEventHandlerRate, AbstractWeights, AbstractVector}, [rng::AbstractRNG])
+    next(alg::KineticMonteCarlo, event_rates::Union{AbstractEventHandlerRate, AbstractWeights, AbstractVector}, [rng::AbstractRNG])
 
 Next stochastic event (`\\Delta t`, index) drawn randomly (default is
 GLOBAL_RNG) proportional to probability given in `event_rates` (which can be a
 `rate event handler`, `AbstractWeights` or a simple vector [slow])
 
 """
-function step(alg::KineticMonteCarlo, 
+function next(alg::KineticMonteCarlo, 
               event_rates::Union{AbstractEventHandlerRate, AbstractWeights, AbstractVector}, 
               rng::AbstractRNG = Random.GLOBAL_RNG)
     sum_rates = sum(event_rates)
@@ -23,20 +23,20 @@ end
 
 
 """
-    step(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerTime, [rng::AbstractRNG])
+    next(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerTime, [rng::AbstractRNG])
 
-Take next event from the event handler
+Take next event from the event handler (does NOT use rng)
 """
-function step(alg::KineticMonteCarlo, 
+function next(alg::KineticMonteCarlo, 
               event_handler::AbstractEventHandlerTime, 
               rng::AbstractRNG = Random.GLOBAL_RNG)
     if (length(event_handler) > 0)
         time, event = popfirst!(event_handler)
-        dtime = time - get_last_time(event_handler)
-        set_last_time!(event_handler, time)
+        dtime = time - get_time(event_handler)
+        set_time!(event_handler, time)
         return dtime, event
     else
-        return Inf, event_handler.noevent
+        return Inf, nothing
     end
 end
 
@@ -151,7 +151,7 @@ function next_event(event_handler::AbstractEventHandlerRate{T}, rng::AbstractRNG
     elseif ne == 1
         return index = first_index(event_handler)
     else
-        return event_handler.noevent 
+        return nothing
     end
 end
 
@@ -160,7 +160,7 @@ function next_event(event_handler::ListEventRateSimple{T}, rng::AbstractRNG = Ra
         index = next_event(event_handler.list_rate, rng)
         return event_handler.list_event[index] 
     else
-        return event_handler.noevent
+        return nothing
     end
 end
 
@@ -169,12 +169,20 @@ end
 
 Draw events from `event_handler` and update `event_handler` with `update!` until `total_time` has passed. Return time of last event.
 """
-function advance!(alg::KineticMonteCarlo, event_handler::AbstractEventHandler, update!::Function, total_time::T, rng::AbstractRNG = Random.GLOBAL_RNG)::T where {T <: AbstractFloat}
-    time::T = 0
-    while time <= total_time
-        dtime, event = step(alg, event_handler, rng)
-        (event == event_handler.noevent) || update!(event_handler, event)
+function advance!(alg::KineticMonteCarlo, event_handler::AbstractEventHandler, update!::Function, total_time::Number, rng::AbstractRNG = Random.GLOBAL_RNG)
+    time = 0
+    while true
+        dtime, event = next(alg, event_handler, rng)
+        #@Martin: it is crucial that the update function is called one last
+        #time because in there we typically do the last update of the measurement ... maybe this is wrong? 
+        # (event == nothing) || update!(event_handler, event)
+        #update!(event_handler, event)
+        # TODO: noevent replacement has to be updated in all my codes
         time += dtime
+        if time > total_time 
+            return time
+        else
+            update!(event_handler, event)
+        end
     end
-    return time 
 end

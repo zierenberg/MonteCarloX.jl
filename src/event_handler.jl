@@ -211,7 +211,7 @@ Flexible event queue that stores an ordered list of (time, event) tuples
 """
 mutable struct EventQueue{T} <: AbstractEventHandlerTime{T}
     sorted_list::LinkedList{Tuple{Float64,T}}
-    last_time::Float64
+    time::Float64
 
     function EventQueue{T}(start_time::Number) where T
         sorted_list = LinkedList{Tuple{Float64,T}}()
@@ -220,12 +220,12 @@ mutable struct EventQueue{T} <: AbstractEventHandlerTime{T}
 end
 EventQueue{T}() where T = EventQueue{T}(0.0)
 
-function get_last_time(event_handler::EventQueue)
-    return event_handler.last_time
+function get_time(event_handler::EventQueue)
+    return event_handler.time
 end
 
-function set_last_time!(event_handler::EventQueue, time::Number)
-    event_handler.last_time = time
+function set_time!(event_handler::EventQueue, time::Number)
+    event_handler.time = time
 end
 
 function Base.length(event_handler::EventQueue)
@@ -266,7 +266,7 @@ end
 
 function add!(event_handler::EventQueue, tuple_time_event::Tuple{Float64, T}) where T
     time = first(tuple_time_event)
-    if time < event_handler.last_time
+    if time < event_handler.time
         throw(ErrorException("added event to queue with time in the past"))
     end
     if length(event_handler) == 0

@@ -44,7 +44,8 @@ export  # base
         # non-equilibrium
         next_event,
         timestep,
-        step,
+        next,
+        get_time, 
         advance!,
         add!
 
