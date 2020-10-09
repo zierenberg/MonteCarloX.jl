@@ -124,6 +124,7 @@ end
 function simulation_naive!(hist_I, system, t, num_trajectories;
                             dT::Float64 = 1.0,
                             seed = 1000)
+    measure() = system.I
     hist_I.weights .= 0
     @showprogress 1 for i in 1:num_trajectories
         rng = MersenneTwister(seed+i);
@@ -131,9 +132,9 @@ function simulation_naive!(hist_I, system, t, num_trajectories;
         # evolution
         rates = current_rates(system)
         pass_update!(rates, event) = update!(rates, event, system)
-        dT_sim = advance!(KineticMonteCarlo(), rng, rates, pass_update!, Float64(t))
-        if system.measure_I in hist_I.edges[1]
-            hist_I[system.measure_I] += 1
+        dT_sim, obs_I = advance!(KineticMonteCarlo(), rng, rates, pass_update!, measure, Float64(t))
+        if obs_I in hist_I.edges[1]
+            hist_I[obs_I] += 1
         end
     end
 end
@@ -146,7 +147,8 @@ function muca_iteration!(hist_I, logW, system, t, num_updates;
     rng_mc = MersenneTwister(seed_mc);
     rng_dynamics = MutableRandomNumbers(MersenneTwister(seed_dynamics), mode=:dynamic)
 
-    current_I = system.I
+    measure() = system.I
+    current_I = measure()
     hist_I.weights .= 0
     @showprogress 1 for i in 1:(updates_therm + num_updates)
         # update (todo: make incremental update of rng) 
@@ -159,8 +161,7 @@ function muca_iteration!(hist_I, logW, system, t, num_updates;
         reset!(system)
         rates = current_rates(system)
         pass_update!(rates, event) = update!(rates, event, system)
-        dT_sim = advance!(KineticMonteCarlo(), rng_dynamics, rates, pass_update!, Float64(t))
-        new_I = system.measure_I
+        dT_sim, new_I = advance!(KineticMonteCarlo(), rng_dynamics, rates, pass_update!, measure, Float64(t))
 
         # acceptance
         accept = false
@@ -207,34 +208,26 @@ mutable struct SIR
     S0::Int
     I0::Int
     R0::Int
-    measure_S::Int
-    measure_I::Int
-    measure_R::Int
     
     function SIR(lambda, mu, epsilon, S0::Int, I0::Int, R0::Int)
         N = S0 + I0 + R0
-        new(lambda, mu, epsilon, N, S0, I0, R0, S0, I0, R0, S0, I0, R0)
+        new(lambda, mu, epsilon, N, S0, I0, R0, S0, I0, R0)
     end
 end
 
 function reset!(system::SIR)
-    system.S = system.measure_S = system.S0
-    system.I = system.measure_I = system.I0
-    system.R = system.measure_R = system.R0
+    system.S = system.S0
+    system.I = system.I0
+    system.R = system.R0
 end
 
 function update!(rates::AbstractVector, event::Int, system::SIR)
-    system.measure_S = system.S
-    system.measure_I = system.I
-    system.measure_R = system.R
     if event == 1 # recovery
         system.I -= 1
         system.R += 1
     elseif event == 2 # infection
         system.S -= 1
         system.I += 1
-    elseif event == 0 # absorbing state of zero infected
-        
     else
         throw(UndefVarError(:event))
     end
