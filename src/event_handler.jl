@@ -1,4 +1,6 @@
 # EventHandler
+#
+# TODO: explicit copy in constructor!
 
 abstract type AbstractEventHandler{T} end
 abstract type AbstractEventHandlerTime{T} <: AbstractEventHandler{T} end
@@ -15,6 +17,7 @@ function reset_sum_rate(event_handler::AbstractEventHandlerRate)
         @inbounds event_handler.list_rate.sum += event_handler.list_rate[i]
     end
 end
+
 
 ###############################################################################
 ###############################################################################
@@ -34,13 +37,12 @@ mutable struct ListEventRateSimple{T} <: AbstractEventHandlerRate{T}
     list_rate::ProbabilityWeights{Float64,Float64,Vector{Float64}}    # static list of rates
     threshold_active::Float64
     num_active::Int
-    noevent::T
     check_sum::Int64
 
-    function ListEventRateSimple{T}(list_event::Vector{T}, list_rate_::Vector{Float64}, threshold_active::Float64, noevent::T) where T
+    function ListEventRateSimple{T}(list_event::Vector{T}, list_rate_::Vector{Float64}, threshold_active::Float64) where T
         list_rate = ProbabilityWeights(list_rate_)
         num_active = count(x->x > threshold_active, list_rate)
-        new(list_event, list_rate, threshold_active, num_active, noevent, 0)
+        new(list_event, list_rate, threshold_active, num_active, 0)
     end
 end
 
@@ -85,10 +87,9 @@ mutable struct ListEventRateActiveMask{T} <: AbstractEventHandlerRate{T}
     num_active::Int
     index_first_active::Int
     index_last_active::Int
-    noevent::T
     check_sum::Int64
 
-    function ListEventRateActiveMask{T}(list_event::Vector{T}, list_rate_::Vector{Float64}, threshold_active::Float64, noevent::T; initial::String = "all_active") where T
+    function ListEventRateActiveMask{T}(list_event::Vector{T}, list_rate_::Vector{Float64}, threshold_active::Float64; initial::String = "all_active") where T
         list_rate = ProbabilityWeights(list_rate_)
         if initial == "all_active"
             num_active = length(list_rate)
@@ -105,7 +106,7 @@ mutable struct ListEventRateActiveMask{T} <: AbstractEventHandlerRate{T}
         else 
             throw(UndefVarError(:initial))
         end
-        new(list_event, list_rate, threshold_active, list_active, num_active, index_first_active, index_last_active, noevent, 0)
+        new(list_event, list_rate, threshold_active, list_active, num_active, index_first_active, index_last_active, 0)
     end
 end
 
@@ -198,9 +199,9 @@ end
 ###############################################################################
 ###############################################################################
 @doc """
-    EventQueue{T}
+    EventQueue{T}([start_time::FLoat64])
 
-    Flexible event queue that stores an ordered list of (time, event) tuples event manager for a list of events of type T with a static list of rates
+Flexible event queue that stores an ordered list of (time, event) tuples 
 
 #API implemented:
 - length(event_handler) 
@@ -210,12 +211,21 @@ end
 """
 mutable struct EventQueue{T} <: AbstractEventHandlerTime{T}
     sorted_list::LinkedList{Tuple{Float64,T}}
-    noevent::T
+    last_time::Float64
 
-    function EventQueue{T}(noevent::T) where T
+    function EventQueue{T}(start_time::Number) where T
         sorted_list = LinkedList{Tuple{Float64,T}}()
-        new(sorted_list, noevent)
+        new(sorted_list, Float64(start_time))
     end
+end
+EventQueue{T}() where T = EventQueue{T}(0.0)
+
+function get_last_time(event_handler::EventQueue)
+    return event_handler.last_time
+end
+
+function set_last_time!(event_handler::EventQueue, time::Number)
+    event_handler.last_time = time
 end
 
 function Base.length(event_handler::EventQueue)
@@ -230,9 +240,16 @@ function Base.getindex(event_handler::EventQueue, index::Int64)
     end
 end
 
-function Base.setindex!(event_handler::EventQueue, tuple_time_event::Tuple{Float64,T}, index::Int64) where T
-    setindex!(event_handler.sorted_list, positiontoindex(event_handler.sorted_list, index), tuple_time_event)
-end
+# TODO: would require to resort list obviously
+#function Base.setindex!(event_handler::EventQueue, tuple_time_event::Tuple{Float64,T}, index::Int64) where T
+#    setindex!(event_handler.sorted_list, positiontoindex(index, event_handler.sorted_list), tuple_time_event)
+#end
+#
+#function Base.setindex!(event_handler::EventQueue, time::Float64, index::Int64) where T
+#    pos = positiontoindex(index, event_handler.sorted_list)
+#    event = event_handler.sorted_list[pos][2]
+#    setindex!(event_handler.sorted_list, pos, (time,event))
+#end
 
 function popfirst!(event_handler::EventQueue)
     return popfirst!(event_handler.sorted_list)
@@ -247,16 +264,20 @@ function Base.getindex(list::LinkedLists.LinkedList{Tuple{Float64,T}}, index::In
     end
 end
 
-function add!(event_handler::EventQueue, time::Float64, event::T) where T
+function add!(event_handler::EventQueue, tuple_time_event::Tuple{Float64, T}) where T
+    time = first(tuple_time_event)
+    if time < event_handler.last_time
+        throw(ErrorException("added event to queue with time in the past"))
+    end
     if length(event_handler) == 0
-        push!(event_handler.sorted_list, (time, event))
+        push!(event_handler.sorted_list, tuple_time_event)
     elseif time <= first(event_handler[1])
-        pushfirst!(event_handler.sorted_list, (time, event))
+        pushfirst!(event_handler.sorted_list, tuple_time_event)
     elseif time >= first(event_handler[length(event_handler)])
-        push!(event_handler.sorted_list, (time, event))
+        push!(event_handler.sorted_list, tuple_time_event)
     else
         # find position in sorted list (if multiple same times, insert before first)
         position = binary_search(event_handler.sorted_list, time)
-        insert!(event_handler.sorted_list, positiontoindex(position, event_handler.sorted_list), (time, event))
+        insert!(event_handler.sorted_list, positiontoindex(position, event_handler.sorted_list), tuple_time_event)
     end
 end

@@ -2,58 +2,51 @@
 struct KineticMonteCarlo end
 
 """
-    next(alg::KineticMonteCarlo, rates::AbstractWeights, [rng::AbstractRNG])::Tuple{Float64,Int}
+    step(alg::KineticMonteCarlo, event_rates::Union{AbstractEventHandlerRate, AbstractWeights, AbstractVector}, [rng::AbstractRNG])
 
-Next stochastic event (`\\Delta t`, index) drawn proportional to probability given in `rates`
+Next stochastic event (`\\Delta t`, index) drawn randomly (default is
+GLOBAL_RNG) proportional to probability given in `event_rates` (which can be a
+`rate event handler`, `AbstractWeights` or a simple vector [slow])
+
 """
-function next(alg::KineticMonteCarlo, rates::Union{AbstractWeights, AbstractVector}, rng::AbstractRNG = Random.GLOBAL_RNG)::Tuple{Float64,Int}
-    sum_rates = sum(rates)
+function step(alg::KineticMonteCarlo, 
+              event_rates::Union{AbstractEventHandlerRate, AbstractWeights, AbstractVector}, 
+              rng::AbstractRNG = Random.GLOBAL_RNG)
+    sum_rates = sum(event_rates)
     if !(sum_rates > 0)
-        return Inf, 0
+        return Inf, nothing
     end
-    dtime = next_time(sum_rates, rng)
-    event = next_event(rates, rng)
+    dtime = timestep(sum_rates, rng)
+    event = next_event(event_rates, rng)
     return dtime, event
 end
 
+
 """
-    next(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerTime, [rng::AbstractRNG])::Tuple{Float64,Int}
+    step(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerTime, [rng::AbstractRNG])
 
 Take next event from the event handler
 """
-function next(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerTime, rng::AbstractRNG = Random.GLOBAL_RNG)::Tuple{Float64,Int}
+function step(alg::KineticMonteCarlo, 
+              event_handler::AbstractEventHandlerTime, 
+              rng::AbstractRNG = Random.GLOBAL_RNG)
     if (length(event_handler) > 0)
-        dtime, event = pop_first!(event_handler)
+        time, event = popfirst!(event_handler)
+        dtime = time - get_last_time(event_handler)
+        set_last_time!(event_handler, time)
+        return dtime, event
     else
-        dtime, event = Inf, event_handler.noevent
-    end
-        
-    return dtime, event
-end
-
-"""
-    next(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate, [rng::AbstractRNG])
-
-Next stochastic event (`\\Delta t`, event type) organized by `event_handler`
-fast(to be tested, depends on overhead of EventList) implementation of next_event_rate if defined by EventList object
-
-TOOD: write this as wrapper around above..
-"""
-function next(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate, rng::AbstractRNG = Random.GLOBAL_RNG)::Tuple{Float64,Int}
-    if !(sum(event_handler.list_rate) > 0)
         return Inf, event_handler.noevent
     end
-    dtime = next_time(sum(event_handler.list_rate), rng)
-    event = next_event(event_handler, rng)
-    return dtime, event
 end
 
 """
-    next_time(rate::Float64, [rng::AbstractRNG])::Float64
+    timestep(rate::Float64, [rng::AbstractRNG])::Float64
 
 Next stochastic `\\Delta t` for Poisson process with `rate`
 """
-function next_time(rate::Float64, rng::AbstractRNG = Random.GLOBAL_RNG)::Float64
+function timestep(rate::Float64, 
+                  rng::AbstractRNG = Random.GLOBAL_RNG)::Float64
     return randexp(rng) / rate
 end
 
@@ -179,9 +172,9 @@ Draw events from `event_handler` and update `event_handler` with `update!` until
 function advance!(alg::KineticMonteCarlo, event_handler::AbstractEventHandler, update!::Function, total_time::T, rng::AbstractRNG = Random.GLOBAL_RNG)::T where {T <: AbstractFloat}
     time::T = 0
     while time <= total_time
-        dt, event = next(alg, rng, event_handler)
-        time += dt
+        dtime, event = step(alg, event_handler, rng)
         (event == event_handler.noevent) || update!(event_handler, event)
+        time += dtime
     end
     return time 
 end

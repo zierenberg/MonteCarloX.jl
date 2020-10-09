@@ -91,3 +91,75 @@ function test_event_handler_rate(event_handler_type::String; verbose = false)
 
     return pass
 end
+
+function test_event_queue(;verbose = false)
+    pass = true
+
+    event_1 = (1.0,1)
+    event_2 = (2.0,2)
+    event_3 = (3.0,3)
+
+    # test sorted insert
+    queue = EventQueue{Int}()
+    add!(queue, event_1)
+    add!(queue, event_3)
+    add!(queue, event_2)
+    # access
+    pass &= queue[1] ==event_1
+    # popfirst
+    pass &= popfirst!(queue) == event_1
+    pass &= popfirst!(queue) == event_2
+    pass &= popfirst!(queue) == event_3
+    if verbose
+        println("... breakpoint 1: $(pass)")
+    end
+
+
+    # test non-default start time
+    queue = EventQueue{Int}(1.0)
+    pass &= MonteCarloX.get_last_time(queue)==1.0
+    add!(queue, event_3)
+    add!(queue, event_2)
+    try
+        add!(queue, event_1)
+    catch
+        pass &= false
+    end
+    pass &= popfirst!(queue) == event_1
+    pass &= popfirst!(queue) == event_2
+    pass &= popfirst!(queue) == event_3
+    if verbose
+        println("... breakpoint 2: $(pass)")
+    end
+
+    # test error upon adding event with past time
+    queue = EventQueue{Int}(nextfloat(first(event_1)))
+    try
+        add!(queue, event_1)
+    catch
+        pass &= true
+    end
+    MonteCarloX.set_last_time!(queue, 0)
+    try
+        add!(queue, event_1)
+    catch
+        pass &= false
+    end
+    if verbose
+        println("... breakpoint 3: $(pass)")
+    end
+
+
+    # test manipulation -> not clear how to deal with this in terms of API
+    # queue = EventQueue{Int}()
+    # add!(queue, event_1)
+    # add!(queue, event_2)
+    # add!(queue, event_3)
+    # queue[1] = event_2
+    # pass &= queue[1] == event_2
+    # pass &= queue[2] == event_2
+    # queue[1] = event_3
+
+
+    return pass
+end

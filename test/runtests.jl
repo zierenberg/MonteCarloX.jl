@@ -14,6 +14,7 @@ import Distributions.cdf
     include("test_event_handler.jl")
     @test test_event_handler_rate("ListEventRateSimple")
     @test test_event_handler_rate("ListEventRateActiveMask")
+    @test test_event_queue()
 
     # equilibrium
     include("test_equilibrium.jl")

@@ -43,9 +43,10 @@ export  # base
         # update -> will be moved to test/utils.jl for now and later to SpinSystems.jl
         # non-equilibrium
         next_event,
-        next_time,
-        next,
-        advance!
+        timestep,
+        step,
+        advance!,
+        add!
 
 # helper
 export  log_sum,
@@ -55,6 +56,8 @@ export  log_sum,
         AbstractEventHandlerRate,
         ListEventRateSimple,
         ListEventRateActiveMask,
+        AbstractEventHandlerTime,
+        EventQueue,
         # rng 
         MutableRandomNumbers
         
