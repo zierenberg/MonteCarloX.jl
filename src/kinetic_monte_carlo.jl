@@ -124,7 +124,9 @@ to advance for some time.
 
 See also: [`advance!`](@ref)
 """
-function next_event(event_handler::AbstractEventHandlerRate{T}, rng::AbstractRNG = Random.GLOBAL_RNG)::T where T
+function next_event(event_handler::AbstractEventHandlerRate{T}, 
+                    rng::AbstractRNG = Random.GLOBAL_RNG
+                   )::T where T
     ne = length(event_handler)
     if ne > 1 
         theta::Float64 = rand(rng) * sum(event_handler.list_rate)
@@ -155,7 +157,9 @@ function next_event(event_handler::AbstractEventHandlerRate{T}, rng::AbstractRNG
     end
 end
 
-function next_event(event_handler::ListEventRateSimple{T}, rng::AbstractRNG = Random.GLOBAL_RNG)::T where T
+function next_event(event_handler::ListEventRateSimple{T}, 
+                    rng::AbstractRNG = Random.GLOBAL_RNG
+                   )::T where T
     if length(event_handler) > 0
         index = next_event(event_handler.list_rate, rng)
         return event_handler.list_event[index] 
@@ -169,20 +173,65 @@ end
 
 Draw events from `event_handler` and update `event_handler` with `update!` until `total_time` has passed. Return time of last event.
 """
-function advance!(alg::KineticMonteCarlo, event_handler::AbstractEventHandler, update!::Function, total_time::Number, rng::AbstractRNG = Random.GLOBAL_RNG)
+function advance!(alg::KineticMonteCarlo, 
+                  event_handler, 
+                  update!::Function, 
+                  measure::Function, 
+                  time_measure::AbstractArray, 
+                  measurements::AbstractArray, 
+                  rng::AbstractRNG = Random.GLOBAL_RNG
+                 )
+    @assert length(time_measure) == lenght(measurement)
     time = 0
-    while true
+    index = 1
+    time_next_measurement = time_measure[index]
+    while time <= time_next_measurement 
         dtime, event = next(alg, event_handler, rng)
-        #@Martin: it is crucial that the update function is called one last
-        #time because in there we typically do the last update of the measurement ... maybe this is wrong? 
-        # (event == nothing) || update!(event_handler, event)
-        #update!(event_handler, event)
-        # TODO: noevent replacement has to be updated in all my codes
         time += dtime
-        if time > total_time 
-            return time
-        else
-            update!(event_handler, event)
+        # always measure before update because the desired measuremnt time was that of the last step
+        if time > time_next_measurement
+            measurement[index] = measure()
+            index += 1
+            if index < length(time_measure)
+                time_next_measurement = time_measure[index]
+            end
         end
+        (event==nothing) || update!(event_handler, event)
     end
+    return time
 end
+
+function advance!(alg::KineticMonteCarlo, 
+                  event_handler, 
+                  update!::Function, 
+                  measure::Function, 
+                  time_total::Number,
+                  rng::AbstractRNG = Random.GLOBAL_RNG
+                 )
+    time = measurement = 0.0
+    while time <= time_total
+        dtime, event = next(alg, event_handler, rng)
+        time += dtime
+        if time > time_total
+            measurement = measure()
+        end
+        (event==nothing) || update!(event_handler, event)
+    end
+    return time, measurement
+end
+
+function advance!(alg::KineticMonteCarlo, 
+         event_handler, 
+         update!::Function,
+         time_total::Number,
+         rng::AbstractRNG=Random.GLOBAL_RNG
+        ) 
+    time = 0
+    while time <= time_total
+        dtime, event = next(alg, event_handler, rng)
+        time += dtime
+        (event==nothing) || update!(event_handler, event)
+    end
+    return time
+end
+
