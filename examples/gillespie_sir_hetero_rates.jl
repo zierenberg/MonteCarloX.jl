@@ -239,20 +239,17 @@ SIR dynamics is goverened by differential equation
 function trajectory!(rng, list_T, list_S, list_I, list_R, system)
     rates = current_rates(system)
     pass_update!(rates, index) = update!(rates, index, system, rng)
-    
-    list_S[1] = system.measure_S
-    list_I[1] = system.measure_I
-    list_R[1] = system.measure_R
+    measure() = [system.S, system.I, system.R]
+
+    list_S[1], list_I[1], list_R[1] = measure()
     time_simulation = Float64(list_T[1])
     for i in 2:length(list_T)
         if time_simulation < list_T[i]
             dT = list_T[i] - time_simulation
-            dT_sim = advance!(KineticMonteCarlo(), rng, rates, pass_update!, dT)
+            dT_sim, obs = advance!(KineticMonteCarlo(), rates, pass_update!, measure, dT, rng)
             time_simulation += dT_sim
         end
-        list_S[i] = system.measure_S
-        list_I[i] = system.measure_I
-        list_R[i] = system.measure_R
+        list_S[i], list_I[i], list_R[i] = measure()
     end
 end
 

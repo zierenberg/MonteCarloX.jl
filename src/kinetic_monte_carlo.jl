@@ -6,11 +6,15 @@ struct KineticMonteCarlo end
 
 Next stochastic event (`\\Delta t`, index) drawn randomly (default is
 GLOBAL_RNG) proportional to probability given in `event_rates` (which can be a
-`rate event handler`, `AbstractWeights` or a simple vector [slow])
+`rate event handler`, `AbstractWeights`, a simple vector [slow] or any custom object)
 
+Requirements on event_rates:
+Base.sum(event_rates)
+Base.getindex(event_rates,index)
+length(event_rates)
 """
 function next(alg::KineticMonteCarlo, 
-              event_rates::Union{AbstractEventHandlerRate, AbstractWeights, AbstractVector}, 
+              event_rates,
               rng::AbstractRNG = Random.GLOBAL_RNG)
     sum_rates = sum(event_rates)
     if !(sum_rates > 0)
@@ -72,7 +76,7 @@ Select a single random index in `1:length(rates)` with probability proportional 
 # Remarks
 This is on average twice as fast as StatsBase.sampling because it can iterate from either beginning or end of rates
 """
-function next_event(rates::Union{AbstractWeights, AbstractVector}, rng::AbstractRNG = Random.GLOBAL_RNG)::Int 
+function next_event(rates, rng::AbstractRNG = Random.GLOBAL_RNG)::Int 
     sum_rates = sum(rates)
     theta = rand(rng) * sum_rates
 
