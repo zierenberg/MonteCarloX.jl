@@ -265,15 +265,12 @@ mutable struct SIR{D}
     S::Int
     I::Int
     R::Int
-    measure_S::Int
-    measure_I::Int
-    measure_R::Int
     
     function SIR{D}(rng::AbstractRNG, P_lambda::D, epsilon, mu, S0::Int, I0::Int, R0::Int) where D
         N = S0 + I0 + R0
         current_lambda = rand(rng, P_lambda, I0)
         sum_current_lambda = sum(current_lambda)
-        new(epsilon, mu, P_lambda, current_lambda, sum_current_lambda, 0, N, S0, I0, R0, S0, I0, R0)
+        new(epsilon, mu, P_lambda, current_lambda, sum_current_lambda, 0, N, S0, I0, R0)
     end
 end
 
@@ -283,9 +280,7 @@ recovery:  1
 infection: 2
 """
 function update!(rates::AbstractVector, index::Int, system::SIR, rng::AbstractRNG)
-    system.measure_S = system.S
-    system.measure_I = system.I
-    system.measure_R = system.R
+    println(system.I, " ", index, " ", rates)
     if index == 1 # recovery
         random_I = rand(rng, 1:system.I)
         delete_from_system!(system, random_I)
@@ -296,10 +291,6 @@ function update!(rates::AbstractVector, index::Int, system::SIR, rng::AbstractRN
         system.S -= 1
         system.I += 1
         @assert length(system.current_lambda) == system.I
-    elseif index == 0 # absorbing state of zero infected
-        system.measure_S = system.S
-        system.measure_I = system.I
-        system.measure_R = system.R
     else
         throw(UndefVarError(:index))
     end
