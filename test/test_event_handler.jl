@@ -104,6 +104,8 @@ function test_event_queue(;verbose = false)
     add!(queue, event_1)
     add!(queue, event_3)
     add!(queue, event_2)
+    # length
+    pass &= length(queue) == 3
     # access
     pass &= queue[1] ==event_1
     # popfirst
