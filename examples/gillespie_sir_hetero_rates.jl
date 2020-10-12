@@ -280,7 +280,6 @@ recovery:  1
 infection: 2
 """
 function update!(rates::AbstractVector, index::Int, system::SIR, rng::AbstractRNG)
-    println(system.I, " ", index, " ", rates)
     if index == 1 # recovery
         random_I = rand(rng, 1:system.I)
         delete_from_system!(system, random_I)
