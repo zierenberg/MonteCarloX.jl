@@ -13,8 +13,9 @@ using ProgressMeter
 using Distributions
 
 using Plots
+import StatsBase.kldivergence
 
-function run(path_out::String; 
+function run(; 
              mu=1/8, lambda=1/8, 
              time_total = 14.0,
              N::Int=Int(1e5)
@@ -31,17 +32,32 @@ function run(path_out::String;
     hist_queue = Histogram(0:I_max+1)
     hist_rates = Histogram(0:I_max+1)
 
-    println("original method with global rates")
-    @time simulation_rates!(hist_rates, system_rates, time_total, 1000)
-    println(hist_rates.weights[1:10])
-    println("new method with local event times")
-    @time simulation_queue!(hist_queue, system_queue, time_total, 1000)
-    println(hist_queue.weights[1:10])
+    list_N = Array{Int}([1e1,1e2,1e3,1e4,1e5,1e6]);
+    list_KL = similar(list_N, Float64)
+    for (i,num_trajectories) in enumerate(list_N)
+        println("number trajectories: ", num_trajectories)
+        println("original method with global rates")
+        @time simulation_rates!(hist_rates, system_rates, time_total, num_trajectories)
+        println(hist_rates.weights[1:10])
+        println("new method with local event times")
+        @time simulation_queue!(hist_queue, system_queue, time_total, num_trajectories)
+        println(hist_queue.weights[1:10])
+
+        dist_rates = normalize!(float(hist_rates));
+        dist_queue = normalize!(float(hist_queue));
+        dist_rates.weights[dist_rates.weights .== 0] .= 1e-300
+        dist_queue.weights[dist_queue.weights .== 0] .= 1e-300
+        list_KL[i] =  kldivergence(dist_rates.weights, dist_queue.weights)
+    end
 
     #display(plot(hist_queue.weights - hist_rates.weights))
-    plot()
-    display(plot!(hist_queue, yscale = :log10))
-    display(plot!(hist_rates, yscale = :log10))
+    p1 = plot(hist_queue, yscale = :log10, ylabel="H_waiting")
+    p2 = plot(hist_rates, yscale = :log10, ylabel="H_std")
+    mask = hist_queue.weights .> 10
+    p3 = plot((hist_queue.weights[mask] - hist_rates.weights[mask])./hist_rates.weights[mask], ylabel = "relative deviation")
+    p4 = plot(list_N, list_KL, xscale = :log10, yscale = :log10, ylabel="KL divergence", xlabel ="number trajectories")
+    plot(p1, p2, p3, p4, layout=(2,2), legend=false)
+    
 end
 
 function simulation_queue!(hist_I, system, time_total, num_trajectories; seed=1000)
@@ -133,7 +149,7 @@ function update!(handler::AbstractEventHandlerTime{Tuple{Int64,Float64}},
         system.R += 1
     elseif first(event) == 2 # infection
         # encounter leads randomly to new infection
-        if rand(rng) < system.S/system.N
+        if rand(system.rng) < system.S/system.N
             new_infection(handler, system)
             system.S -= 1
             system.I += 1

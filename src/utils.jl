@@ -133,3 +133,6 @@ function Base.setindex!(h::Histogram{T,N}, value::Real, xs::NTuple{N,Real}) wher
         return missing
     end
 end
+
+function kl_divergence()
+end
