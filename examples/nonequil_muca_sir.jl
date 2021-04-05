@@ -89,7 +89,7 @@ function generate_data(path_out::String;
         writedlm(fout, [collect(range_I) dist])
     end
     
-    # naive estimation with same "computing time" (skip for now because muca is not very efficient)
+    # naive estimation with same "computing time" (skip for now because muca is not optimized)
     # Time of evaluation on my machine: 0:03:35
     if do_naive
         num_trajectories = Int(1e7)
