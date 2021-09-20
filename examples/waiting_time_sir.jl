@@ -10,8 +10,6 @@ using Printf
 using DelimitedFiles
 using ProgressMeter
 
-using Distributions
-
 using Plots
 import StatsBase.kldivergence
 
@@ -48,6 +46,9 @@ function run(;
         dist_rates.weights[dist_rates.weights .== 0] .= 1e-300
         dist_queue.weights[dist_queue.weights .== 0] .= 1e-300
         list_KL[i] =  kldivergence(dist_rates.weights, dist_queue.weights)
+
+        println(sum(dist_rates.edges[1][1:end-1].*dist_rates.weights))
+        println(sum(dist_queue.edges[1][1:end-1].*dist_queue.weights))
     end
 
     #display(plot(hist_queue.weights - hist_rates.weights))

@@ -46,12 +46,16 @@ mutable struct ListEventRateSimple{T} <: AbstractEventHandlerRate{T}
     end
 end
 
+function sum(event_handler::ListEventRateSimple)
+    return sum(event_handler.list_rate)
+end
+
 function Base.length(event_handler::ListEventRateSimple)
     return event_handler.num_active
 end
 
 function Base.setindex!(event_handler::ListEventRateSimple, rate::Float64, index::Int64)
-    if rate > event_handler.threshold_active 
+    if rate > event_handler.threshold_active
         if !(event_handler.list_rate[index] > event_handler.threshold_active)
             event_handler.num_active += 1
         end
@@ -83,7 +87,7 @@ mutable struct ListEventRateActiveMask{T} <: AbstractEventHandlerRate{T}
     list_event::Vector{T}                                            # static list of events
     list_rate::ProbabilityWeights{Float64,Float64,Vector{Float64}}  # static list of rates
     threshold_active::Float64
-    list_active::Vector{Bool} 
+    list_active::Vector{Bool}
     num_active::Int
     index_first_active::Int
     index_last_active::Int
@@ -103,7 +107,7 @@ mutable struct ListEventRateActiveMask{T} <: AbstractEventHandlerRate{T}
             list_active = [false for i = 1:length(list_rate)]
             index_first_active = length(list_active) + 1
             index_last_active = 0
-        else 
+        else
             throw(UndefVarError(:initial))
         end
         new(list_event, list_rate, threshold_active, list_active, num_active, index_first_active, index_last_active, 0)
@@ -120,17 +124,17 @@ end
 function Base.setindex!(event_handler::ListEventRateActiveMask, rate::Float64, index::Int64)
     if event_handler.list_active[index]
         if rate > event_handler.threshold_active
-            event_handler.list_rate[index] = rate 
+            event_handler.list_rate[index] = rate
         else
-            event_handler.list_rate[index] = 0 
+            event_handler.list_rate[index] = 0
             deactivate!(event_handler, index)
         end
     else # not active
         if rate > event_handler.threshold_active
-            event_handler.list_rate[index] = rate 
+            event_handler.list_rate[index] = rate
             activate!(event_handler, index)
         else
-            event_handler.list_rate[index] = 0 
+            event_handler.list_rate[index] = 0
         end
     end
 
@@ -201,13 +205,16 @@ end
 @doc """
     EventQueue{T}([start_time::FLoat64])
 
-Flexible event queue that stores an ordered list of (time, event) tuples 
+Flexible event queue that stores an ordered list of (time, event) tuples
 
 #API implemented:
-- length(event_handler) 
+- length(event_handler)
 - getindex(event_handler, index)
 - popfirst!(event_handler)
 - add!(event_handler, time, event)
+
+# Remark
+This is currently implemented with LinkedLists but may obtain performance boost for BinaryHeaps with FasterForward() from DataStrucutres.jl
 """
 mutable struct EventQueue{T} <: AbstractEventHandlerTime{T}
     sorted_list::LinkedList{Tuple{Float64,T}}
@@ -277,6 +284,7 @@ function add!(event_handler::EventQueue, tuple_time_event::Tuple{Float64, T}) wh
         push!(event_handler.sorted_list, tuple_time_event)
     else
         # find position in sorted list (if multiple same times, insert before first)
+        # TODO: replace this with searchsortedfirst !!!!
         position = binary_search(event_handler.sorted_list, time)
         insert!(event_handler.sorted_list, positiontoindex(position, event_handler.sorted_list), tuple_time_event)
     end

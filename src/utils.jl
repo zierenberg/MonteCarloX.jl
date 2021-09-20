@@ -129,10 +129,6 @@ function Base.setindex!(h::Histogram{T,N}, value::Real, xs::NTuple{N,Real}) wher
     idx = StatsBase.binindex(h, xs)
     if checkbounds(Bool, h.weights, idx...)
         @inbounds h.weights[idx...] = value
-    else
-        return missing
     end
 end
 
-function kl_divergence()
-end

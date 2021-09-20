@@ -185,21 +185,25 @@ function advance!(alg::KineticMonteCarlo,
                   measurements::AbstractArray, 
                   rng::AbstractRNG = Random.GLOBAL_RNG
                  )
-    @assert length(time_measure) == lenght(measurement)
-    time = 0
+    @assert length(time_measure) == length(measurements)
+    time  = 0
     index = 1
     time_next_measurement = time_measure[index]
-    while time <= time_next_measurement 
+    flag_advance = true
+    while flag_advance
         dtime, event = next(alg, event_handler, rng)
         time += dtime
-        # always measure before update because the desired measuremnt time was that of the last step
-        if time > time_next_measurement
-            measurement[index] = measure()
+        while time > time_next_measurement
+            measurements[index] = measure()
             index += 1
-            if index < length(time_measure)
+            if index <= length(time_measure)
                 time_next_measurement = time_measure[index]
+            else 
+                flag_advance = false 
+                break
             end
         end
+        # always measure before update because the desired measuremnt time was that of the last step
         (event==nothing) || update!(event_handler, event)
     end
     return time
@@ -239,3 +243,5 @@ function advance!(alg::KineticMonteCarlo,
     return time
 end
 
+#TODO: we could think about using PCG random number generators because it would
+#allow to go back in sequence to really stop at end of time 
