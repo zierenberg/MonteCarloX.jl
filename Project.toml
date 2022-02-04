@@ -1,6 +1,6 @@
 name = "MonteCarloX"
 uuid = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
-authors = ["Johannes Zierenberg"]
+authors = ["Johannes Zierenberg", "Martin Weigel"]
 version = "0.1.0"
 
 [deps]
