@@ -1,6 +1,7 @@
 # here tests should be written for utility functions in src/Utils.jl
 using MonteCarloX
 using StatsBase
+include("utils.jl")
 
 function test_histogram_set_get(;verbose = false)
     pass = true
@@ -48,6 +49,38 @@ function test_histogram_set_get(;verbose = false)
         vlaid = true
     end
     pass &= valid
+
+    return pass
+end
+
+function test_log_sum(;verbose = false)
+    pass = true
+    if verbose
+        println("... test for numbers that can be exactly converted")
+    end
+    a = 2.0; A = exp(a)
+    b = 3.0; B = exp(b)
+    C = A + B
+    c = log_sum(a,b)
+    pass &= log(C) == c
+
+    if verbose
+        println("... test for integer types")
+    end
+    a = 5; A = exp(a)
+    b = 5; B = exp(b)
+    C = A + B
+    c = log_sum(a,b)
+    pass &= log(C) == c
+
+    if verbose
+        println("... test for mixed types")
+    end
+    a = 5;   A = exp(a)
+    b = 3.0; B = exp(b)
+    C = A + B
+    c = log_sum(a,b)
+    pass &= log(C) == c
 
     return pass
 end

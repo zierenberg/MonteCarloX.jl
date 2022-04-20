@@ -50,10 +50,8 @@ julia> exp(MonteCarloX.log_sum(log(2.), log(3.)))
 5.000000000000001
 
 ```
-
-
 """
-function log_sum(a::T, b::T)::T where T <: AbstractFloat
+function log_sum(a::Number, b::Number)::Float64
     if b < a
         return a + log(1 + exp(b - a))
     else
@@ -63,7 +61,7 @@ end
 
 
 """
-    random_element(list_probabilities::Vector{T}, rng::AbstractRNG)::Int where T<:AbstractFloat
+    random_element(rng::AbstractRNG, list_probabilities::Vector{T})::Int where T<:AbstractFloat
 
 Pick an index with probability defined by `list_probability` (which needs to be normalized).
 
@@ -76,17 +74,17 @@ julia> using Random
 
 julia> rng = MersenneTwister(1000);
 
-julia> MonteCarloX.random_element([0.1,0.2,0.3,0.4],rng)
+julia> MonteCarloX.random_element(rng, [0.1,0.2,0.3,0.4])
 4
-julia> MonteCarloX.random_element([0.1,0.2,0.3,0.4],rng)
+julia> MonteCarloX.random_element(rng, [0.1,0.2,0.3,0.4])
 4
-julia> MonteCarloX.random_element([0.1,0.2,0.3,0.4],rng)
+julia> MonteCarloX.random_element(rng, [0.1,0.2,0.3,0.4])
 3
-julia> MonteCarloX.random_element([0.1,0.2,0.3,0.4],rng)
+julia> MonteCarloX.random_element(rng, [0.1,0.2,0.3,0.4])
 4
 ```
 """
-function random_element(list_probabilities::Vector{Float64}, rng::AbstractRNG)::Int
+function random_element(rng::AbstractRNG, list_probabilities::Vector{Float64})::Int
     theta = rand(rng) * sum(list_probabilities)
 
     id = 1
