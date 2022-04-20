@@ -13,13 +13,19 @@ Ref: U. Wolff, Phys. Rev. Lett. 62, 361 (1989)
 consider for Potts:
 https://stanford.edu/~kurinsky/ClassWork/Physics271_Final_Paper.pdf
 
-consider BlumeCapel implementation
+consider BlumeCapel implementation used in
+Fytas et al. Phys. Rev. E 97, 040102(R) (2018)
 
-todo:
-return dE?
-how to specify function type for performance?
+#WARNING
+This is depricated
 """
-function update(alg::ClusterWolff, rng::AbstractRNG, spins::Vector{Int}, nearest_neighbors::Function, betaJ::Float64)
+function update(
+        alg::ClusterWolff,
+        rng::AbstractRNG,
+        spins::Vector{Int},
+        nearest_neighbors::Function,
+        betaJ::Float64
+    )
     N = length(spins)
 
     # get random spin and flip it

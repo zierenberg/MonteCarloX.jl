@@ -31,5 +31,23 @@ function test_histogram_set_get(;verbose = false)
         pass &= hist[i] == target[1 + floor(Int, (i - 1) / 10)]
     end
 
+    # check missing API
+    if verbose
+        println("... hist[200] == missing")
+    end
+    pass &= ismissing(hist[200])
+
+    if verbose
+        println("... hist[200] = 3 throws error")
+    end
+    valid = true
+    try
+        hist[200] = 3
+        valid = false
+    catch e
+        vlaid = true
+    end
+    pass &= valid
+
     return pass
 end
