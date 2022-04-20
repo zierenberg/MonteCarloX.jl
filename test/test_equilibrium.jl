@@ -10,7 +10,7 @@ function test_sweep_random_element(;verbose = false)
         N = 10000000
         sum = 0.0
         for i in 1:N
-            id = MonteCarloX.random_element(list_prob, rng)
+            id = MonteCarloX.random_element(rng, list_prob)
             sum += id / N
         end
         return sum
@@ -105,7 +105,7 @@ function test_unimodal_metropolis(;verbose = false)
                 x = x_new
             end
             if update > 100
-                list_x[update - 100] = x 
+                list_x[update - 100] = x
             end
         end
         # sort into binned histogram
@@ -156,8 +156,8 @@ function test_2D_unimodal_metropolis(;verbose = false)
                 y = y_new
             end
             if update > 100
-                list_x[update - 100] = x 
-                list_y[update - 100] = y 
+                list_x[update - 100] = x
+                list_y[update - 100] = y
             end
         end
         # sort into binned histogram
@@ -206,7 +206,7 @@ function test_unimodal_sweep(;verbose = false)
         stats2 = Stats(0, 0)
         for updates in 1:samples
             sweep(list_updates, list_probabilities, rng, number_updates = 10)
-            list_x[updates] = system.x 
+            list_x[updates] = system.x
         end
 
 
@@ -252,7 +252,7 @@ function test_unimodal_sweep(;verbose = false)
         update1() = update(log_weight_sampling, system, 0.1, rng)
         for updates in 1:samples
             sweep(update1, rng, number_updates = 10)
-            list_x[updates] = system.x 
+            list_x[updates] = system.x
         end
         ##########################################################################
         # sort into binned histogram
@@ -287,7 +287,7 @@ end
 ###############################################################################
 ###############################################################################
 ###############################################################################
- 
+
 mutable struct System
     x::Float64
 end
@@ -311,7 +311,7 @@ function update(log_weight_sampling, system::System, dx, rng::AbstractRNG, stats
     if accept(rng, log_weight_sampling, x_new, system.x)
         system.x = x_new
         stats.accept += 1
-    else 
+    else
         stats.reject += 1
     end
 end

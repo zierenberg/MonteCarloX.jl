@@ -10,7 +10,8 @@ import Distributions.cdf
     # basics and helper
     include("test_utils.jl")
     @test test_histogram_set_get()
-    
+    @test test_log_sum()
+
     include("test_event_handler.jl")
     @test test_event_handler_rate("ListEventRateSimple")
     @test test_event_handler_rate("ListEventRateActiveMask")
@@ -21,7 +22,7 @@ import Distributions.cdf
     @test test_unimodal_metropolis()
     @test test_2D_unimodal_metropolis()
     @test test_unimodal_sweep()
- 
+
     include("test_ising.jl")
     @test test_ising_reweighting()
     @test test_ising_metropolis()
