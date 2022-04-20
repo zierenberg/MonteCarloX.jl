@@ -17,11 +17,10 @@ include("rng.jl")
 # Equilibrium
 include("importance_sampling.jl")
 
-# Non-equilibrium 
+# Non-equilibrium
 include("kinetic_monte_carlo.jl")
 include("poisson_process.jl")
 include("gillespie.jl")
-
 
 # TODO: move to external SpinSystems.jl package
 include("cluster_wolff.jl")
@@ -53,16 +52,16 @@ export  log_sum,
         AbstractEventHandlerRate,
         ListEventRateSimple,
         ListEventRateActiveMask,
-        # rng 
+        # rng
         MutableRandomNumbers
-        
-        
+
+
 
 
 # Check georges 2nd workshop notebook on github
 #    i::Int = StatsBase.binindex(d.h, x) -> remember this for custom things similar to EmpiricalDistributions.jl (not well documented though)
 
- 
+
 end # module
 
 # Maybe embedd this into StatisticalPhysics.jl the including SpinSystems.jl PolymerSystems.jl etc ;)
