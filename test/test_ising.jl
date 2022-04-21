@@ -25,7 +25,7 @@ function test_ising_reweighting(;verbose = false)
     N = length(system.spins)
 
     for beta in list_beta
-        samples = 1000
+        samples = 2000
         ntherm = 300
         list_energy = zeros(samples)
         # thermalization 100 sweeps
