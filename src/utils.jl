@@ -159,10 +159,8 @@ function Base.setindex!(h::Histogram{T,N}, value::Real, xs::NTuple{N,Real}) wher
 end
 
 
-using StatsBase
-import StatsBase.kldivergence
-using LinearAlgebra
 
+import StatsBase.kldivergence
 """
     kldivergence(P::Histogram, Q::Function)
 
