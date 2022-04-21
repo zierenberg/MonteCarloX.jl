@@ -4,7 +4,7 @@ using Random
 using StatsBase
 using LinearAlgebra
 using StaticArrays
-# exports that are relevant to run simulations in MonteCarloX
+# TODO: ?exports that are relevant to run simulations in MonteCarloX
 # using Reexports
 # @reexport using Random
 # @reexport using StatsBase
@@ -48,6 +48,7 @@ export  # base
 export  log_sum,
         binary_search,
         random_element,
+        kldivergence,
         # event handler
         AbstractEventHandlerRate,
         ListEventRateSimple,

@@ -1,7 +1,6 @@
 # here tests should be written for utility functions in src/Utils.jl
 using MonteCarloX
 using StatsBase
-include("utils.jl")
 
 function test_histogram_set_get(;verbose = false)
     pass = true
@@ -83,4 +82,8 @@ function test_log_sum(;verbose = false)
     pass &= log(C) == c
 
     return pass
+end
+
+function test_binary_search(verbose=false)
+
 end
