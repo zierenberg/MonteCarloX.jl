@@ -1,8 +1,7 @@
 using LightGraphs
 using MonteCarloX
 using Random
-
-include("utils.jl")
+using LinearAlgebra
 
 function test_sweep_random_element(;verbose = false)
     function test_random_element(list_prob::Vector{Float64})

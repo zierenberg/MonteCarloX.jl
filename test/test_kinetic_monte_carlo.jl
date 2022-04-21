@@ -3,13 +3,10 @@ using MonteCarloX
 using StatsBase
 using Random
 
-# for kldivergence
-include("utils.jl")
-
 function test_kmc_next(;verbose = false)
     pass = true
 
-    list_rates = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0] 
+    list_rates = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
     sum_rates = sum(list_rates)
     weights = ProbabilityWeights(list_rates)
     tbin = 0.5 / sum_rates
@@ -34,7 +31,7 @@ function test_kmc_next(;verbose = false)
     end
 
     t_max = maximum(times)
-    hist_time = fit(Histogram, times, 0:tbin:t_max + tbin) 
+    hist_time = fit(Histogram, times, 0:tbin:t_max + tbin)
     cdf_time_meas = normalize(float(hist_time), mode = :probability)
     pdf_sum = 0.0
     for i in 1:length(cdf_time_meas.weights)
@@ -51,7 +48,7 @@ function test_kmc_next(;verbose = false)
         println("... kldivergence cdf_time to cdf_true = $(kld_time)")
     end
 
-    hist_event = fit(Histogram, events, 1:(length(list_rates) + 1)) 
+    hist_event = fit(Histogram, events, 1:(length(list_rates) + 1))
     pdf_event_meas = normalize(float(hist_event))
     kld_event = kldivergence(pdf_event_meas, pdf_event)
     if verbose
