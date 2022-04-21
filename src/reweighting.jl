@@ -1,7 +1,7 @@
 # Reweighting functions
 # TODO: change names so that reweight is included because no longer namespace Reweighting
 
-# new API
+# new API [in development; may make things a lot more flexible]
 # function reweighting_weights(list_args, log_P_source, log_P_target)
 #    N = length(list_obs)
 #    log_weight_diff(i) = log_P_target(list_args[i]...) - log_P_source(list_args[i]...)
@@ -52,7 +52,7 @@
 #    return normalize(hist, mode=:pdf)
 # end
 #
-##TODO: everywhere - get types semi-ok
+##TODO: everywhere - gettypes semi-ok
 # function reweighting_distribution(hist::Histogram, log_P_source::Function, log_P_target::Function)::Histogram
 #    reweighting_distribution = zero(hist)
 #    log_norm = log_normalization(log_P_target, log_P_source, hist)
@@ -73,7 +73,7 @@
 # end
 
 @doc raw"""
-    expectation_value_from_timeseries_log(log_P_target::Function, log_P_source::Function, list_args, list_obs::Vector{Tin})::Tout where {Tin<:Number,Tout<:AbstractFloat}
+    expectation_value_from_timeseries(log_P_target::Function, log_P_source::Function, list_args, list_obs::Vector{Tin})::Tout where {Tin<:Number,Tout<:AbstractFloat}
 
 Calculate the expectation value of an observable in `P_target` from a list of measured observables in `P_source`.
 
@@ -160,7 +160,7 @@ hists are dictionaries?
 can this be generalized to higher dimensions? nd histograms as dictionary?
 """
 function expectation_value_from_histogram(f_args::Function, log_P_target::Function, log_P_source::Function, hist::Histogram)
-    log_norm = log_normalization(log_P_target, log_P_source, hist)
+    log_norm = _log_normalization(log_P_target, log_P_source, hist)
     expectation_value = 0
     for (args, H) in zip(hist.edges[1], hist.weights)
         expectation_value += f_args(args) * H * exp(log_P_target(args...) - log_P_source(args...) - log_norm)
@@ -171,7 +171,7 @@ end
 # TODO: this is only valid for 1D histograms!!
 # what is missing in StatsBase is an API to iterate over histogram edges and weights (multidimensional)
 function expectation_value_from_histogram(log_P_target::Function, log_P_source::Function, hist::Histogram, hist_obs::Histogram)
-    log_norm = log_normalization(log_P_target, log_P_source, hist)
+    log_norm = _log_normalization(log_P_target, log_P_source, hist)
     expectation_value = 0
     for (args, sum_obs) in zip(hist_obs.edges[1], hist_obs.weights)
         expectation_value += sum_obs * exp(log_P_target(args...) - log_P_source(args...) - log_norm)
@@ -179,7 +179,7 @@ function expectation_value_from_histogram(log_P_target::Function, log_P_source::
     return expectation_value
 end
 
-function log_normalization(log_P_target, log_P_source, hist::Histogram)
+function _log_normalization(log_P_target, log_P_source, hist::Histogram)
     log_norm = -Inf
     for (args, H) in zip(hist.edges[1], hist.weights)
         log_norm = MonteCarloX.log_sum(log_norm, log(H) + log_P_target(args...) - log_P_source(args...))
