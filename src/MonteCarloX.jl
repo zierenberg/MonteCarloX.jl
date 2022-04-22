@@ -54,7 +54,8 @@ export  log_sum,
         ListEventRateSimple,
         ListEventRateActiveMask,
         # rng
-        MutableRandomNumbers
+        MutableRandomNumbers,
+        reset
 
 
 

@@ -1,68 +1,70 @@
 using MonteCarloX
 using StatsBase
+using Random
 
-function test_rng_mutable(;verbose = false)
+include("includes.jl")
+
+function test_rng_mutable()
     pass = true
     seed = 1000
 
-    if verbose; println("\nstatic mutable random numbers"); end
+    if test_verbose; println("\ntest static mutable random numbers"); end
     rng = MutableRandomNumbers(MersenneTwister(seed),100)
     rng_MT = MersenneTwister(seed)
 
-    if verbose; println("uniform floats:"); end
+    if test_verbose; println("...test uniform floats:"); end
     for (r1, r2) in zip(rand(rng, 10), rand(rng_MT,10))
-        if verbose; println(r1, " vs ", r2); end 
-        pass &= r1==r2
+        pass &= check(r1==r2, @sprintf("... %f vs %f\n", r1, r2))
     end
 
-    if verbose; println("\nexponentially distributed floats:"); end
+    if test_verbose; println("...test exponentially distributed floats:"); end
     for (r1, r2) in zip(randexp(rng, 10), randexp(rng_MT,10))
-        if verbose; println(r1, " vs ", r2); end
-        pass &= r1==r2
+        pass &= check(r1==r2, @sprintf("... %f vs %f\n", r1, r2))
     end
 
-    if verbose; println("\ndynamic mutable random numbers"); end
+    if test_verbose; println("\ntest ndynamic mutable random numbers"); end
     rng = MutableRandomNumbers(MersenneTwister(seed),10, mode=:dynamic)
+    pass &= length(rng)==10
     rng_MT = MersenneTwister(seed)
     for (i, r1, r2) in zip(1:20, rand(rng, 20), rand(rng_MT,20))
         status = "old"
         if i > 10; status = "new"; end
-        if verbose; println(status, " ", r1, " vs ", r2); end
-        pass &= r1==r2
+        pass &= check(r1==r2, @sprintf("... %s: %f vs %f\n", status, r1, r2))
     end
+    length_final = length(rng)
+    pass &= check(length_final==20,
+                  @sprintf("...final length: %d vs 20\n", length_final))
+    reset(rng)
+    pass &= check(rng.index_current==0,
+                  @sprintf("...reset rng shifts index to zero: %d\n",  rng.index_current))
 
-    if verbose; println("\ntest outcome:"); end
+    rand_number = rand(rng)
+    pass &= check(rand_number == rng[1],
+                  @sprintf("...such that next rand returns first number: %f vs %f\n",  rand_number, rng[1]))
+
+    if test_verbose; println("\ntest default initialization modes"); end
+    rng = MutableRandomNumbers(100)
+    pass &= check(rng.mode == :static,
+                  @sprintf("...default for empty is static: %s\n",rng.mode)
+                 )
+    rng = MutableRandomNumbers()
+    pass &= check(rng.mode == :dynamic,
+                  @sprintf("...default for empty is dynamic: %s\n",rng.mode)
+                 )
+
+    if test_verbose; println("\ntest access and manipulation"); end
+    rng = MutableRandomNumbers(MersenneTwister(seed),100)
+    idx = 10
+    backup = rng[idx]
+    pass &= check(rng[idx] == backup,
+                  @sprintf("...old value at pos %d is %f vs %f\n",idx,rng[idx], backup))
+    new = 0.23
+    rng[idx] = new
+    pass &= check(rng[idx] == new,
+                  @sprintf("...set  value at pos %d as %f vs %f\n",idx,new, rng[idx]))
+
+    if test_verbose; println("\ntest outcome:"); end
     return pass
 end
 
-function test_histogram_set_get(;verbose = false)
-    pass = true
 
-    # bin uniform values into histogram (each bin has 10 elements)
-    list_vals = [i for i = 1:100]
-    hist = fit(Histogram, list_vals, 1:10:101)
-
-    # reset the size of the histogram bins (accessing each bin via random
-    # elements that are included in the bin)
-    target = [i for i = 1:10]
-    hist[1] = target[1]
-    hist[12] = target[2]
-    hist[23] = target[3]
-    hist[34] = target[4]
-    hist[45] = target[5]
-    hist[56] = target[6]
-    hist[67] = target[7]
-    hist[78] = target[8]
-    hist[89] = target[9]
-    hist[100] = target[10]
-
-    # check that the histgram entries correspond to the target values
-    for i = 1:100
-        if verbose
-            println("... $(hist[i]) == $(target[1 + floor(Int, (i - 1) / 10)])")
-        end
-        pass &= hist[i] == target[1 + floor(Int, (i - 1) / 10)]
-    end
-
-    return pass
-end

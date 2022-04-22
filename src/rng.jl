@@ -2,14 +2,14 @@ using Random
 
 import Random: rand, SamplerTrivial, CloseOpen12_64, CloseOpen01_64, BitInteger, UInt52Raw, CloseOpen12, SamplerUnion, SamplerType
 
-
+import Base.reset
 """
     MutableRandomNumbers([rng_base=GLOBAL_RNG], size, mode:=static)
 
 Create a `MutableRandomNumbers` RNG object with a vector of size `size`
 containing floating-point random_numbers initially generated with `rng_base`. Random
 numbers are then generated sequentially from this vector. The RNG object can be
-initialized in two modes: 
+initialized in two modes:
 * :static - then there is an exception thrown once all random numbers are used
 * :dynamic - then there are new random numbers generated on the flow from the (copied) rng
 
@@ -40,7 +40,7 @@ julia> rand(rng)
 0.2
 ```
 
-Use `reset` in order to rerun the (manipulated) `random` number sequence. 
+Use `reset` in order to rerun the (manipulated) `random` number sequence.
 
 ```jldoctest
 julia> reset(rng)
@@ -59,21 +59,20 @@ mutable struct MutableRandomNumbers <: AbstractRNG
         new(rand(rng_base, size), 0, mode, copy(rng_base))
     end
 end
-
-MutableRandomNumbers(rng_base::AbstractRNG; mode=:static) = MutableRandomNumbers(rng_base, 1, mode=mode)
+#default when initializing with certain size is a static sequeunce
 MutableRandomNumbers(size::Int; mode=:static) = MutableRandomNumbers(Random.GLOBAL_RNG, size, mode=mode)
-MutableRandomNumbers(; mode=:static) = MutableRandomNumbers(Random.GLOBAL_RNG, 1, mode=mode)
+#default when initializing wihtout size is an emtpy but dynamic sequence
+MutableRandomNumbers(; mode=:dynamic) = MutableRandomNumbers(Random.GLOBAL_RNG, 0, mode=mode)
 
 """
     reset(rng::MutableRandomNumbers, [index::Int=0])
 
 Reset the state of a MutableRandomNumbers object `rng` to `index`. Default
-resets the RNG object to the pre-initial index (0) 
+resets the RNG object to the pre-initial index (0)
 """
 function reset(r::MutableRandomNumbers, index::Int)
     r.index_current = index
 end
-
 reset(r::MutableRandomNumbers) = reset(r,0)
 
 # easy access overloads
@@ -81,7 +80,7 @@ Base.length(r::MutableRandomNumbers) = Base.length(r.random_numbers)
 Base.getindex(r::MutableRandomNumbers, i::Int) = Base.getindex(r.random_numbers, i)
 
 function Base.setindex!(r::MutableRandomNumbers, value::Real, i::Int)
-    if 0 <= value < 1 
+    if 0 <= value < 1
         Base.setindex!(r.random_numbers, value, i)
     else
         throw(DomainError(value, "random numbers have to be in the domain [0,1)"))
@@ -113,13 +112,11 @@ rand_inbounds(r::MutableRandomNumbers, ::CloseOpen01_64=CloseOpen01()) =
 
 rand_inbounds(r::MutableRandomNumbers, ::UInt52Raw{T}) where {T<:BitInteger} =
     reinterpret(UInt64, rand_inbounds(r, CloseOpen12())) % T
-    
-#### generation
 
+#### generation
 function rand(r::MutableRandomNumbers, x::SamplerTrivial{UInt52Raw{UInt64}})
     rand_inbounds(r, x[])
 end
-
 rand(r::MutableRandomNumbers, sp::SamplerTrivial{CloseOpen12_64}) = rand_inbounds(r, sp[])
 
 # currently no support for integer cast of random numbers ...
