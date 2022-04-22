@@ -15,7 +15,6 @@ import Distributions.cdf
 
     include("test_rng.jl")
     @test test_rng_mutable()
-    @test test_histogram_set_get()
 
     include("test_event_handler.jl")
     @test test_event_handler_rate("ListEventRateSimple")
