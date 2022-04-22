@@ -2,6 +2,7 @@
 using MonteCarloX
 using StatsBase
 using Random
+using LinearAlgebra
 
 function test_kmc_next(;verbose = false)
     pass = true

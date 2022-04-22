@@ -85,5 +85,11 @@ function test_log_sum(;verbose = false)
 end
 
 function test_binary_search(verbose=false)
+    pass = true
 
+    pass &= (binary_search([1.,2.,3.,4.],2.5)==3)
+    pass &= (binary_search([1.,2.,2.2,2.6,15.0],2.5)==4)
+    pass &= (binary_search([1,2,3,4],2)==2)
+
+    return pass
 end
