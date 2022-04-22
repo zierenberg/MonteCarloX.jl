@@ -2,7 +2,9 @@
 using MonteCarloX
 using StatsBase
 
-function test_histogram_set_get(;verbose = false)
+include("./includes.jl")
+
+function test_histogram_set_get()
     pass = true
 
     # bin uniform values into histogram (each bin has 10 elements)
@@ -25,21 +27,14 @@ function test_histogram_set_get(;verbose = false)
 
     # check that the histgram entries correspond to the target values
     for i = 1:100
-        if verbose
-            println("... $(hist[i]) == $(target[1 + floor(Int, (i - 1) / 10)])")
-        end
-        pass &= hist[i] == target[1 + floor(Int, (i - 1) / 10)]
+        h = hist[i]
+        t = target[1 + floor(Int, (i - 1) / 10)]
+        pass &= check(h == t, @sprintf("... check bin for %d: %d == %d\n", i, h, t))
     end
 
     # check missing API
-    if verbose
-        println("... hist[200] == missing")
-    end
-    pass &= ismissing(hist[200])
+    pass &= check(ismissing(hist[200]), "... hist[200] == missing\n")
 
-    if verbose
-        println("... hist[200] = 3 throws error")
-    end
     valid = true
     try
         hist[200] = 3
@@ -47,44 +42,35 @@ function test_histogram_set_get(;verbose = false)
     catch e
         vlaid = true
     end
-    pass &= valid
+    pass &= check(valid, "... hist[200] = 3 throws error\n")
 
     return pass
 end
 
-function test_log_sum(;verbose = false)
+function test_log_sum()
     pass = true
-    if verbose
-        println("... test for numbers that can be exactly converted")
-    end
     a = 2.0; A = exp(a)
     b = 3.0; B = exp(b)
     C = A + B
     c = log_sum(a,b)
-    pass &= log(C) == c
+    pass &= check(log(C) == c, "... test float types\n")
 
-    if verbose
-        println("... test for integer types")
-    end
     a = 5; A = exp(a)
     b = 5; B = exp(b)
     C = A + B
     c = log_sum(a,b)
-    pass &= log(C) == c
+    pass &= check(log(C) == c, "... test integer types\n")
 
-    if verbose
-        println("... test for mixed types")
-    end
     a = 5;   A = exp(a)
     b = 3.0; B = exp(b)
     C = A + B
     c = log_sum(a,b)
-    pass &= log(C) == c
+    pass &= check(log(C) == c, "... test mixed types\n")
 
     return pass
 end
 
-function test_binary_search(verbose=false)
+function test_binary_search()
     pass = true
 
     pass &= (binary_search([1.,2.,3.,4.],2.5)==3)
