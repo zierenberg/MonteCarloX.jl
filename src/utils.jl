@@ -183,14 +183,3 @@ function kldivergence(P::Histogram, Q::Function)
     end
     return kld
 end
-function kldivergence(P::Dict, Q::Dict)
-        ##KL divergence sum P(args)logP(args)/Q(args)
-        ## P=P_meas, Q=P_true s.t P(args)=0 simply ignored
-        #
-        kld = 0.0
-        for (args, p) in P
-            q = Q[args]
-            kld += p * log(p / q)
-        end
-        return kld
-end
