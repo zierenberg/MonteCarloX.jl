@@ -9,18 +9,22 @@ function test_rng_mutable()
     seed = 1000
 
     if test_verbose; println("\ntest static mutable random numbers"); end
-    rng = MutableRandomNumbers(MersenneTwister(seed),100)
+    rng = MutableRandomNumbers(MersenneTwister(seed),10)
     rng_MT = MersenneTwister(seed)
 
     if test_verbose; println("...test uniform floats:"); end
     for (r1, r2) in zip(rand(rng, 10), rand(rng_MT,10))
         pass &= check(r1==r2, @sprintf("... %f vs %f\n", r1, r2))
     end
-
-    if test_verbose; println("...test exponentially distributed floats:"); end
-    for (r1, r2) in zip(randexp(rng, 10), randexp(rng_MT,10))
-        pass &= check(r1==r2, @sprintf("... %f vs %f\n", r1, r2))
+    valid = true
+    try
+        rand(rng)
+        valid = false
+    catch e
+        valid = true
     end
+    pass &= check(valid, "... test drawing more random numbers than available for :static throws error\n")
+
 
     if test_verbose; println("\ntest ndynamic mutable random numbers"); end
     rng = MutableRandomNumbers(MersenneTwister(seed),10, mode=:dynamic)
@@ -42,6 +46,16 @@ function test_rng_mutable()
     pass &= check(rand_number == rng[1],
                   @sprintf("...such that next rand returns first number: %f vs %f\n",  rand_number, rng[1]))
 
+
+    # randexp requires to redraw random number in 1.1% of tries ... requires mode=:dynamic
+    rng = MutableRandomNumbers(MersenneTwister(seed),10, mode=:dynamic)
+    rng_MT = MersenneTwister(seed)
+    if test_verbose; println("...test exponentially distributed floats:"); end
+    for (r1, r2) in zip(randexp(rng, 10), randexp(rng_MT,10))
+        pass &= check(r1==r2, @sprintf("... %f vs %f\n", r1, r2))
+    end
+
+
     if test_verbose; println("\ntest default initialization modes"); end
     rng = MutableRandomNumbers(100)
     pass &= check(rng.mode == :static,
@@ -52,6 +66,9 @@ function test_rng_mutable()
                   @sprintf("...default for empty is dynamic: %s\n",rng.mode)
                  )
 
+
+
+
     if test_verbose; println("\ntest access and manipulation"); end
     rng = MutableRandomNumbers(MersenneTwister(seed),100)
     idx = 10
@@ -61,9 +78,34 @@ function test_rng_mutable()
     new = 0.23
     rng[idx] = new
     pass &= check(rng[idx] == new,
-                  @sprintf("...set  value at pos %d as %f vs %f\n",idx,new, rng[idx]))
+                  @sprintf("...set value inside range [0,1), here %f vs %f\n", new, rng[idx]))
+    rng[idx] = 0
+    pass &= check(rng[idx] == 0.0, "... set value intside range [0,1), here 0.0,\n")
+    valid = true
+    try
+        rng[1] = 1.1
+        valid = false
+    catch e
+        vlaid = true
+    end
+    pass &= check(valid, "... set value outside range [0,1), here 1.1, throws error\n")
+    valid = true
+    try
+        rng[1] = 1.0
+        valid = false
+    catch e
+        vlaid = true
+    end
+    pass &= check(valid, "... set value outside range [0,1), here 1.0, throws error\n")
+    valid = true
+    try
+        rng[1] = -0.1
+        valid = false
+    catch e
+        vlaid = true
+    end
+    pass &= check(valid, "... set value outside range [0,1), here -0.1, throws error\n")
 
-    if test_verbose; println("\ntest outcome:"); end
     return pass
 end
 

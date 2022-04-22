@@ -1,8 +1,8 @@
 using Random
 
 import Random: rand, SamplerTrivial, CloseOpen12_64, CloseOpen01_64, BitInteger, UInt52Raw, CloseOpen12, SamplerUnion, SamplerType
-
 import Base.reset
+
 """
     MutableRandomNumbers([rng_base=GLOBAL_RNG], size, mode:=static)
 
