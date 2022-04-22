@@ -36,7 +36,7 @@ true
 Importantly, the random numbers can be accessed and manipulated as in ordinary
 array objects.
 
-```jldoctest
+```julia
 julia> rng[1]
 0.5908446386657102
 julia> rng[3] = 0.2
@@ -46,7 +46,7 @@ julia> rand(rng)
 
 Use `reset` in order to rerun the (manipulated) `random` number sequence.
 
-```jldoctest
+```julia
 julia> reset(rng)
 
 ```

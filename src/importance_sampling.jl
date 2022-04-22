@@ -22,13 +22,13 @@ struct RealMicrocanonical end # todo
     end
 end
 
-@doc """
+@doc raw"""
     accept(log_weight::Function, args_new::Tuple{Number, N}, args_old::Tuple{Number, N}, rng::AbstractRNG)::Bool where N
 
-Evaluate most general acceptance probability for imporance sampling of ``P(x) \\propto e^{log\\_weight(x)}``.
+Evaluate most general acceptance probability for imporance sampling of ``P(x) \propto e^{\text{log_weight}(x)}``.
 
 # Arguments
-- `log_weight(args)`: logarithmic ensemble weight function, e.g., canomical ensemble ``log\\_weight(x) = -\\beta x``
+- `log_weight(args)`: logarithmic ensemble weight function, e.g., canomical ensemble ``\text{log_weight}(x) = -\beta x``
 - `args_new`: arguments (can be Number or Tuple) for new (proposed) state
 - `args_old`: arguments (can be Number or Tuple) for old                        state
 - `rng`: random number generator, e.g. MersenneTwister
@@ -40,7 +40,6 @@ function accept(rng::AbstractRNG, log_weight::Function, args_new::NTuple{N,T}, a
     log_difference = log_weight(args_new...) - log_weight(args_old...)
     return _evaluate(rng, log_difference)
 end
-
 function accept(rng::AbstractRNG, log_weight::Function, args_new::T, args_old::T)::Bool where T
     log_difference = log_weight(args_new) - log_weight(args_old)
     return _evaluate(rng, log_difference)
@@ -49,12 +48,12 @@ end
 @doc """
     accept(alg::Metropolis, rng::AbstractRNG, beta::Float64, dx::T)::Bool where T
 
-Standard metropolis algorithm with 
+Standard metropolis algorithm with
 ```p(x\\to x^') = \\text{min}\\left(1, e^{-\\beta \\Delta x}\\right)```
 where `dx = x^' - x`
 """
 function accept(alg::Metropolis, rng::AbstractRNG, beta::Float64, dx::T)::Bool where T
-    if dx < 0 
+    if dx < 0
         return true
     elseif rand(rng) < exp(-beta * dx)
         return true

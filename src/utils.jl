@@ -5,11 +5,11 @@ Perfom a binary search to return the index i of an sorted array
 such that sorted[i-1] < value <= sorted[i]
 
 # Examples
-```jldoctest
+```julia
 julia> MonteCarloX.binary_search([1.,2.,3.,4.],2.5)
 3
 ```
-```jldoctest
+```julia
 julia> MonteCarloX.binary_search([1,2,3,4],2)
 2
 ```
@@ -45,7 +45,7 @@ magnitude, e.g., the partition sum that is required as normalization factor
 during reweighting.
 
 # Examples
-```jldoctest
+```julia
 julia> exp(MonteCarloX.log_sum(log(2.), log(3.)))
 5.000000000000001
 
@@ -69,7 +69,7 @@ Pick an index with probability defined by `list_probability` (which needs to be 
 Deprecated for use of StatsBase.sample
 
 # Examples
-```jldoctest
+```julia
 julia> using Random
 
 julia> rng = MersenneTwister(1000);
@@ -106,7 +106,7 @@ can be high-dimensional. Returns `missing` in case the bin does not exist.
 
 # Examples
 
-```jldoctest
+```julia
 julia> using StatsBase
 julia> h = fit(Histogram, [1,1,1,2], 1:3);
 julia> h[1]
@@ -135,7 +135,7 @@ certain `value` . `x` can be high-dimensional.
 
 # Examples
 
-```jldoctest
+```julia
 julia> using StatsBase
 julia> h = Histogram(1:3);
 julia> h[1]
