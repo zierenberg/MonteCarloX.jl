@@ -11,11 +11,11 @@ using StaticArrays
 
 include("utils.jl")
 include("event_handler.jl")
-include("reweighting.jl")
 include("rng.jl")
 
 # Equilibrium
 include("importance_sampling.jl")
+include("reweighting.jl")
 
 # Non-equilibrium
 include("kinetic_monte_carlo.jl")
@@ -43,6 +43,11 @@ export  # base
         next_time,
         next,
         advance!
+
+# reweighting (needs makeover)
+export  # reweighting
+        expectation_value_from_timeseries,
+        distribution_from_timeseries
 
 # helper
 export  log_sum,

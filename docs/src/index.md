@@ -1,6 +1,6 @@
 ```@meta
 DocTestSetup = quote
-    using MyModule
+    using MonteCarloX
 end
 ```
 
