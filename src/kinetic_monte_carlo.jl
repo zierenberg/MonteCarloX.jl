@@ -15,26 +15,24 @@ function next(alg::KineticMonteCarlo, rng::AbstractRNG, rates::Union{AbstractWei
     event = next_event(rng, rates)
     return dtime, event
 end
-
 next(alg::KineticMonteCarlo, rates::AbstractWeights) = next(alg, Random.GLOBAL_RNG, rates)
 
 """
     next(alg::KineticMonteCarlo, [rng::AbstractRNG,] event_handler::AbstractEventHandlerRate)
 
 Next stochastic event (`\\Delta t`, event type) organized by `event_handler`
-fast(to be tested, depends on overhead of EventList) implementation of next_event_rate if defined by EventList object
-
-TOOD: write this as wrapper around above..
+fast(to be tested, depends on overhead of EventList) implementation of
+next_event_rate if defined by EventList object
 """
 function next(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractEventHandlerRate)::Tuple{Float64,Int}
-    if !(sum(event_handler.list_rate) > 0)
+    sum_rates = sum(event_handler.list_rate)
+    if !(sum_rates > 0)
         return Inf, 0
     end
-    dtime = next_time(rng, sum(event_handler.list_rate))
+    dtime = next_time(rng, sum_rates)
     event = next_event(rng, event_handler)
     return dtime, event
 end
-
 next(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate) = next(alg, Random.GLOBAL_RNG, event_handler)
 
 """
@@ -45,7 +43,6 @@ Next stochastic `\\Delta t` for Poisson process with `rate`
 function next_time(rng::AbstractRNG, rate::Float64)::Float64
     return randexp(rng) / rate
 end
-
 next_time(rate::Float64) = next_time(Random.GLOBAL_RNG, rate)
 
 """
@@ -63,14 +60,14 @@ function next_event_cumulative(rng::AbstractRNG, cumulated_rates::Vector{T})::In
 end
 
 """
-    next_event([rng::AbstractRNG,] rates::AbstractWeights)::Int 
+    next_event([rng::AbstractRNG,] rates::AbstractWeights)::Int
 
 Select a single random index in `1:length(rates)` with probability proportional to the entry in `rates`.
 
 # Remarks
 This is on average twice as fast as StatsBase.sampling because it can iterate from either beginning or end of rates
 """
-function next_event(rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVector})::Int 
+function next_event(rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVector})::Int
     sum_rates = sum(rates)
     theta = rand(rng) * sum_rates
 
@@ -97,7 +94,7 @@ function next_event(rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVect
     end
 end
 # relevent to write this as extra function this for performance issues (compared to keyword argument with preset value on GLOBAL_RNG)
-next_event(rates::Union{AbstractWeights, AbstractVector}) = next_event(Random.GLOBAL_RNG, rates) 
+next_event(rates::Union{AbstractWeights, AbstractVector}) = next_event(Random.GLOBAL_RNG, rates)
 
 """
     next_event([rng::AbstractRNG,] rates::MVector{2,T})::Int where {T <: AbstractFloat}
@@ -112,7 +109,7 @@ function next_event(rng::AbstractRNG, rates::MVector{2,T})::Int where {T <: Abst
         return 2
     end
 end
-next_event(rates::MVector{2,T}) where T = next_event(Random.GLOBAL_RNG, rates) 
+next_event(rates::MVector{2,T}) where T = next_event(Random.GLOBAL_RNG, rates)
 
 
 
@@ -129,13 +126,13 @@ See also: [`advance!`](@ref)
 """
 function next_event(rng::AbstractRNG, event_handler::AbstractEventHandlerRate{T})::T where T
     ne = length(event_handler)
-    if ne > 1 
+    if ne > 1
         theta::Float64 = rand(rng) * sum(event_handler.list_rate)
-        index_last = last_index(event_handler) 
+        index_last = last_index(event_handler)
         index_first = first_index(event_handler)
 
         if theta < 0.5 * sum(event_handler.list_rate)
-            index = index_first 
+            index = index_first
             cumulated_rates = event_handler.list_rate[index]
             while cumulated_rates < theta && index < index_last
                 index = next_index(event_handler, index)
@@ -146,7 +143,7 @@ function next_event(rng::AbstractRNG, event_handler::AbstractEventHandlerRate{T}
             cumulated_rates_lower = sum(event_handler.list_rate) - event_handler.list_rate[index]
             # cumulated_rates in this case belong to id-1
             while cumulated_rates_lower > theta && index > index_first
-                index = previous_index(event_handler, index) 
+                index = previous_index(event_handler, index)
                 @inbounds cumulated_rates_lower -= event_handler.list_rate[index]
             end
         end
@@ -154,28 +151,26 @@ function next_event(rng::AbstractRNG, event_handler::AbstractEventHandlerRate{T}
     elseif ne == 1
         return index = first_index(event_handler)
     else
-        return event_handler.noevent 
+        return event_handler.noevent
     end
 end
-
-next_event(event_handler::AbstractEventHandlerRate) = next_event(Random.GLOBAL_RNG, event_handler) 
+next_event(event_handler::AbstractEventHandlerRate) = next_event(Random.GLOBAL_RNG, event_handler)
 
 function next_event(rng::AbstractRNG, event_handler::ListEventRateSimple{T})::T where T
     if length(event_handler) > 0
         index = next_event(rng, event_handler.list_rate)
-        return event_handler.list_event[index] 
+        return event_handler.list_event[index]
     else
         return event_handler.noevent
     end
 end
-
-#Q: need to keep the type stability output?
-next_event(event_handler::ListEventRateSimple) = next_event(Random.GLOBAL_RNG, event_handler) 
+next_event(event_handler::ListEventRateSimple) = next_event(Random.GLOBAL_RNG, event_handler)
 
 """
-    advance!(alg::KineticMonteCarlo, [rng::AbstractRNG], event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T<:Real} 
+    advance!(alg::KineticMonteCarlo, [rng::AbstractRNG], event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T<:Real}
 
-Draw events from `event_handler` and update `event_handler` with `update!` until `total_time` has passed. Return time of last event.
+Draw events from `event_handler` and update `event_handler` with `update!`
+until `total_time` has passed. Return time of last event.
 """
 function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat}
     time::T = 0
@@ -188,19 +183,19 @@ function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::Abstr
         time += dt
         update!(event_handler, event)
     end
-    return time 
+    return time
 end
 
-function advance!(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat} 
+function advance!(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat}
   advance!(alg, Random.GLOBAL_RNG, event_handler, update!, total_time)
 end
 
 """
-    advance!(alg::KineticMonteCarlo, [rng::AbstractRNG], rates::AbstractVector, update!::Function, total_time::T)::T where {T<:Real} 
+    advance!(alg::KineticMonteCarlo, [rng::AbstractRNG], rates::AbstractVector, update!::Function, total_time::T)::T where {T<:Real}
 
 Draw events from `event_handler` and update `event_handler` with `update!` until `total_time` has passed. Return time of last event.
-#TODO: Discuss with Martin what a suitable API is here
 """
+#TODO: Discuss with Martin what a suitable API is here
 function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, rates::AbstractVector, update!::Function, total_time::T)::T where {T <: AbstractFloat}
     time::T = 0
     while time <= total_time
@@ -208,5 +203,5 @@ function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, rates::AbstractVecto
         time += dt
         update!(rates, event)
     end
-    return time 
+    return time
 end
