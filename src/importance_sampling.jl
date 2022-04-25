@@ -25,10 +25,10 @@ end
 @doc raw"""
     accept(log_weight::Function, args_new::Tuple{Number, N}, args_old::Tuple{Number, N}, rng::AbstractRNG)::Bool where N
 
-Evaluate most general acceptance probability for imporance sampling of ``P(x) \propto e^{\text{log_weight}(x)}``.
+Evaluate most general acceptance probability for imporance sampling of $P(x) \propto e^{\text{log_weight}(x)}$.
 
 # Arguments
-- `log_weight(args)`: logarithmic ensemble weight function, e.g., canomical ensemble ``\text{log_weight}(x) = -\beta x``
+- `log_weight(args)`: logarithmic ensemble weight function, e.g., canomical ensemble $\text{log_weight}(x) = -\beta x$
 - `args_new`: arguments (can be Number or Tuple) for new (proposed) state
 - `args_old`: arguments (can be Number or Tuple) for old                        state
 - `rng`: random number generator, e.g. MersenneTwister
