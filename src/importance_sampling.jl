@@ -25,10 +25,10 @@ end
 @doc raw"""
     accept(log_weight::Function, args_new::Tuple{Number, N}, args_old::Tuple{Number, N}, rng::AbstractRNG)::Bool where N
 
-Evaluate most general acceptance probability for imporance sampling of $P(x) \propto e^{\text{log_weight}(x)}$.
+Evaluate most general acceptance probability for imporance sampling of ``P(x) \propto e^{\mathrm{log\_weight}(x)}``.
 
 # Arguments
-- `log_weight(args)`: logarithmic ensemble weight function, e.g., canomical ensemble $\text{log_weight}(x) = -\beta x$
+- `log_weight(args)`: logarithmic ensemble weight function, e.g., canomical ensemble ``\mathrm{log\_weight}(x) = -\beta x``
 - `args_new`: arguments (can be Number or Tuple) for new (proposed) state
 - `args_old`: arguments (can be Number or Tuple) for old                        state
 - `rng`: random number generator, e.g. MersenneTwister
@@ -45,12 +45,12 @@ function accept(rng::AbstractRNG, log_weight::Function, args_new::T, args_old::T
     return _evaluate(rng, log_difference)
 end
 
-@doc """
+@doc raw"""
     accept(alg::Metropolis, rng::AbstractRNG, beta::Float64, dx::T)::Bool where T
 
 Standard metropolis algorithm with
-```p(x\\to x^') = \\text{min}\\left(1, e^{-\\beta \\Delta x}\\right)```
-where `dx = x^' - x`
+``p(x\to x^\prime) = \mathrm{min} (1, e^{-\beta \Delta x} )``
+where ``\Delta x = x^\prime - x``
 """
 function accept(alg::Metropolis, rng::AbstractRNG, beta::Float64, dx::T)::Bool where T
     if dx < 0
@@ -87,15 +87,13 @@ function sweep(list_updates, list_weights::AbstractWeights, rng::AbstractRNG; nu
 
     for i in 1:number_updates
         id = StatsBase.sample(rng, list_weights)
-        # update is requred to call Metropolis.accept() itself
+        # update is required to call Metropolis.accept() itself
         list_updates[id]()
     end
 end
-
-# TODO: Should we keep this specialization?
 function sweep(update::Function, rng::AbstractRNG; number_updates::Int = 1)
     for i in 1:number_updates
-        # update is requred to call Metropolis.accept() itself
+        # update is required to call Metropolis.accept() itself
         update()
     end
 end

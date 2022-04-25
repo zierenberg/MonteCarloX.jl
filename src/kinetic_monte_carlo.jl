@@ -1,10 +1,10 @@
 # KineticMonteCarlo
 struct KineticMonteCarlo end
 
-"""
+@doc raw"""
     next(alg::KineticMonteCarlo, [rng::AbstractRNG,] rates::AbstractWeights)::Tuple{Float64,Int}
 
-Next stochastic event (`\\Delta t`, index) drawn proportional to probability given in `rates`
+Next stochastic event (``\Delta t``, index) drawn proportional to probability given in `rates`
 """
 function next(alg::KineticMonteCarlo, rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVector})::Tuple{Float64,Int}
     sum_rates = sum(rates)
@@ -17,10 +17,10 @@ function next(alg::KineticMonteCarlo, rng::AbstractRNG, rates::Union{AbstractWei
 end
 next(alg::KineticMonteCarlo, rates::AbstractWeights) = next(alg, Random.GLOBAL_RNG, rates)
 
-"""
+@doc raw"""
     next(alg::KineticMonteCarlo, [rng::AbstractRNG,] event_handler::AbstractEventHandlerRate)
 
-Next stochastic event (`\\Delta t`, event type) organized by `event_handler`
+Next stochastic event (``\Delta t``, event type) organized by `event_handler`
 fast(to be tested, depends on overhead of EventList) implementation of
 next_event_rate if defined by EventList object
 """
@@ -35,10 +35,10 @@ function next(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractE
 end
 next(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate) = next(alg, Random.GLOBAL_RNG, event_handler)
 
-"""
+@doc raw"""
     next_time([rng::AbstractRNG,] rate::Float64)::Float64
 
-Next stochastic `\\Delta t` for Poisson process with `rate`
+Next stochastic ``\Delta t`` for Poisson process with `rate`
 """
 function next_time(rng::AbstractRNG, rate::Float64)::Float64
     return randexp(rng) / rate
