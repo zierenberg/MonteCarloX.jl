@@ -41,7 +41,7 @@ import Distributions.cdf
     # test_kinetic_monte_carlo.jl
     include("test_kinetic_monte_carlo.jl")
     @test test_kmc_next()
-    #@test test_kmc_advance()
+    @test test_kmc_advance()
     include("test_gillespie.jl")
     @test test_gillespie()
 

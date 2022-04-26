@@ -1,9 +1,9 @@
-# generalized ensemble algorithms such as 
+# generalized ensemble algorithms such as
 # * muca / WL
 # * population annealing
 
-#Idea: These structs could actually carry information! E.g the current weight factor for WangLandau (then mutable)
-#      in principle also the weights ...
+#Idea: These structs could actually carry information! E.g the current weight
+#factor for WangLandau (then mutable) in principle also the weights ...
 struct Multicanonical end
 struct WangLandau end #todo (in terms of log_dos instead of log_weight)
 
@@ -29,11 +29,11 @@ end
 
 """
 
-mode can be 
-* :simple 
+mode can be
+* :simple
 * :extrapolate
 * ... ?
 """
-function update_weights(alg::Multicanonical, log_weight::Histogram, histogram::Histogram; mode::Symbol=:simple)
-end
+#function update_weights(alg::Multicanonical, log_weight::Histogram, histogram::Histogram; mode::Symbol=:simple)
+#end
 
