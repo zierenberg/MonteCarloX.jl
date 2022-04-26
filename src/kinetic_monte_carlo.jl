@@ -1,8 +1,11 @@
 # KineticMonteCarlo
 struct KineticMonteCarlo end
 
-#TODO: find better name for event_handler that captures both event_handler and
-#vector of rates
+#TODO:
+# * find better name for event_handler that captures both event_handler and
+#   vector of rates
+# * devise an abstract Simulation type ?
+#   abstract type SimulationKineticMonteCarlo end
 
 """
     SimulationKineticMonteCarlo
