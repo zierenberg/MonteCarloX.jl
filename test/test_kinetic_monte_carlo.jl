@@ -92,6 +92,34 @@ end
 function test_kmc_advance()
     pass = true
 
+    list_rates = [0.1,0.2,0.3]
+    weights = ProbabilityWeights(list_rates)
+    event_handler_rate_simple = ListEventRateSimple{Int}(collect(1:length(list_rates)), list_rates, 0.0, 0)
+    event_handler_rate_mask = ListEventRateActiveMask{Int}(collect(1:length(list_rates)), list_rates, 0.0, 0)
+
+    T = 10.
+    update!(rates,event) = missing
+    time_base = advance!(MersenneTwister(1000),
+                         KineticMonteCarlo(),
+                         weights,
+                         update!,
+                         T)
+    pass &= check(time_base > T, @sprintf("... final time base > target \n"))
+    time_simple = advance!(MersenneTwister(1000),
+                         KineticMonteCarlo(),
+                         event_handler_rate_simple,
+                         update!,
+                         T)
+    pass &= check(time_simple > T, @sprintf("... final time simple > target \n"))
+    pass &= check(time_simple == time_base, @sprintf("... final time simple == base  \n"))
+    time_mask = advance!(MersenneTwister(1000),
+                         KineticMonteCarlo(),
+                         event_handler_rate_mask,
+                         update!,
+                         T)
+    pass &= check(time_mask > T, @sprintf("... final time mask > target \n"))
+    pass &= check(time_mask == time_base, @sprintf("... final time mask == base  \n"))
+
     return pass
 end
 

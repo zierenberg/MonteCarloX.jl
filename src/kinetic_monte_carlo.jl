@@ -176,7 +176,8 @@ function advance!(
         rng::AbstractRNG,
         alg::KineticMonteCarlo,
         event_handler::AbstractEventHandlerRate,
-        update!::Function, total_time::T
+        update!::Function,
+        total_time::T
     )::T where {T <: AbstractFloat}
     time::T = 0
     while time <= total_time
@@ -191,7 +192,7 @@ function advance!(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRat
 end
 
 """
-    advance!([rng::AbstractRNG], alg::KineticMonteCarlo, rates::AbstractVector, update!::Function, total_time::T)::T where {T<:Real}
+    advance!([rng::AbstractRNG], alg::KineticMonteCarlo, rates::Union{AbstractWeights,AbstractVector}, update!::Function, total_time::T)::T where {T<:Real}
 
 Draw events from `event_handler` and update `event_handler` with `update!`
 until `total_time` has passed. Return time of last event.
@@ -199,7 +200,7 @@ until `total_time` has passed. Return time of last event.
 function advance!(
         rng::AbstractRNG,
         alg::KineticMonteCarlo,
-        rates::AbstractVector,
+        rates::Union{AbstractWeights, AbstractVector},
         update!::Function,
         total_time::T
     )::T where {T <: AbstractFloat}

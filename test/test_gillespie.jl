@@ -52,6 +52,14 @@ function test_gillespie()
                  )
 
     # test advance (TODO)
+    T = 10.
+    update!(rates,event) = missing
+    time_advance = advance!(MersenneTwister(1000),
+                         KineticMonteCarlo(),
+                         event_handler,
+                         update!,
+                         T)
+    pass &= check(time_advance > T, @sprintf("... final time > target \n"))
 
     return pass
 end
