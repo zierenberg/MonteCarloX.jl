@@ -27,10 +27,9 @@ function test_kmc_next()
     samples = 10^5
     times = zeros(samples)
     events = zeros(samples)
-    alg = KineticMonteCarlo()
-    rng = MersenneTwister(1000)
+    sim = init(MersenneTwister(1000), KineticMonteCarlo(), weights)
     for i = 1:samples
-        time, event = next(rng, alg, weights)
+        time, event = next(sim)
         times[i] = time
         events[i] = event
     end
@@ -62,7 +61,8 @@ function test_kmc_next()
                  )
 
     # check zero rates give infinite time
-    pass &= check(next(rng, alg, [0.0])==(Inf,0), "... if no rates left, return (Inf,0)\n")
+    sim = init(MersenneTwister(1000), KineticMonteCarlo(), [0.0])
+    pass &= check(next(sim)==(Inf,0), "... if no rates left, return (Inf,0)\n")
 
     ###############################################################################
     ###### event handler
@@ -72,13 +72,13 @@ function test_kmc_next()
     event_handler_rate_mask = ListEventRateActiveMask{Int}(collect(1:length(list_rates)), list_rates, 0.0, 0)
 
     samples = 10
-    rng_base = MersenneTwister(1000)
-    rng_rate_simple = MersenneTwister(1000)
-    rng_rate_mask = MersenneTwister(1000)
+    sim_base = init(MersenneTwister(1000), KineticMonteCarlo(), weights)
+    sim_simple = init(MersenneTwister(1000), KineticMonteCarlo(), event_handler_rate_simple)
+    sim_mask = init(MersenneTwister(1000), KineticMonteCarlo(), event_handler_rate_mask)
     for i = 1:samples
-        t_base, e_base = next(rng_base, alg, weights)
-        t_rate_simple, e_rate_simple = next(rng_rate_simple, alg, event_handler_rate_simple)
-        t_rate_mask, e_rate_mask = next(rng_rate_mask, alg, event_handler_rate_mask)
+        t_base, e_base = next(sim_base)
+        t_rate_simple, e_rate_simple = next(sim_simple)
+        t_rate_mask, e_rate_mask = next(sim_mask)
         pass &= check(t_base==t_rate_simple, @sprintf("... %d, base == simple (time) \n", i))
         pass &= check(e_base==e_rate_simple, @sprintf("... %d, base == simple (event) \n", i))
         pass &= check(t_base==t_rate_mask, @sprintf("... %d, base == mask (time) \n", i))
@@ -88,7 +88,6 @@ function test_kmc_next()
     return pass
 end
 
-# TODO
 function test_kmc_advance()
     pass = true
 
@@ -97,26 +96,18 @@ function test_kmc_advance()
     event_handler_rate_simple = ListEventRateSimple{Int}(collect(1:length(list_rates)), list_rates, 0.0, 0)
     event_handler_rate_mask = ListEventRateActiveMask{Int}(collect(1:length(list_rates)), list_rates, 0.0, 0)
 
+    sim_base = init(MersenneTwister(1000), KineticMonteCarlo(), weights)
+    sim_simple = init(MersenneTwister(1000), KineticMonteCarlo(), event_handler_rate_simple)
+    sim_mask = init(MersenneTwister(1000), KineticMonteCarlo(), event_handler_rate_mask)
+
     T = 10.
-    update!(rates,event) = missing
-    time_base = advance!(MersenneTwister(1000),
-                         KineticMonteCarlo(),
-                         weights,
-                         update!,
-                         T)
+    update!(sim,event) = missing
+    time_base = advance!(sim_base, update!, T)
     pass &= check(time_base > T, @sprintf("... final time base > target \n"))
-    time_simple = advance!(MersenneTwister(1000),
-                         KineticMonteCarlo(),
-                         event_handler_rate_simple,
-                         update!,
-                         T)
+    time_simple = advance!(sim_simple, update!, T)
     pass &= check(time_simple > T, @sprintf("... final time simple > target \n"))
     pass &= check(time_simple == time_base, @sprintf("... final time simple == base  \n"))
-    time_mask = advance!(MersenneTwister(1000),
-                         KineticMonteCarlo(),
-                         event_handler_rate_mask,
-                         update!,
-                         T)
+    time_mask = advance!(sim_mask, update!, T)
     pass &= check(time_mask > T, @sprintf("... final time mask > target \n"))
     pass &= check(time_mask == time_base, @sprintf("... final time mask == base  \n"))
 

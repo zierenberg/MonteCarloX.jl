@@ -9,7 +9,7 @@ using DelimitedFiles
 using StaticArrays
 
 """
-Reproduce results similar to Fig.2 of Lloyed-Smith et al., Nature (2005) on the 
+Reproduce results similar to Fig.2 of Lloyed-Smith et al., Nature (2005) on the
 the probability of exctinction (here after 3 weeks for mu=1/8) and the
 occurrance of the first outbreak (here first day with >50 cases per trajectory).
 """
@@ -23,10 +23,10 @@ function reproduce_lloyed_smith_nature_2005_fig2(path)
     S0 = N - I0
     epsilon=0
     range_seed = 1:Int(1e6);
-    
+
 
     # motivated by COVID-19 parameters [cf. Dehning et al, Science (2020)]
-    mu = 1/8. # avg. infectious time of 5+3 days  
+    mu = 1/8. # avg. infectious time of 5+3 days
     time_meas = 50 # days of simulation
     dT = 1
 
@@ -35,7 +35,7 @@ function reproduce_lloyed_smith_nature_2005_fig2(path)
         list_P = []
         list_P_name = []
         for k in list_k
-            P_Gamma = Gamma(k, lambda_0/k) 
+            P_Gamma = Gamma(k, lambda_0/k)
             push!(list_P, P_Gamma)
             push!(list_P_name, @sprintf("Gamma_k%.2e",k))
         end
@@ -61,20 +61,20 @@ function reproduce_lloyed_smith_nature_2005_fig2(path)
             trajectory_R = zeros(Int,length(list_time))
 
             # observables
-            probability_exctinction_per_day = zeros(length(list_time)) 
-            probability_first_day_more_than_50 = zeros(length(list_time)) 
+            probability_exctinction_per_day = zeros(length(list_time))
+            probability_first_day_more_than_50 = zeros(length(list_time))
 
             #generate and analyse trajectories
             @showprogress 1 for seed in range_seed
                 rng = MersenneTwister(seed);
                 system = SIR{typeof(P)}(rng, P, epsilon, mu, S0, I0, R0)
                 trajectory!(rng, list_time, trajectory_S, trajectory_I, trajectory_R, system)
-                 
+
                 first_index_more_than_50 = findfirst(x->x>50, trajectory_I)
                 if !(typeof(first_index_more_than_50) == Nothing)
                     probability_first_day_more_than_50[first_index_more_than_50] += 1
                 end
-                
+
                 probability_exctinction_per_day[trajectory_I .== 0] .+= 1
             end
 
@@ -84,26 +84,26 @@ function reproduce_lloyed_smith_nature_2005_fig2(path)
             #write out
             filename =  @sprintf("%s/reproduce_lloyed_smith_nature_2005_fig2_%s_R%.2e_mu%.2e_N%.2e_I0%.2e.dat",
                                  path, P_name, ratio_lambda_mu, mu, N, I0)
-            
-            open(filename; write=true) do f 
+
+            open(filename; write=true) do f
                 write(f, "#P_ext(t) - probability of trajectory to be extinct at this day\n")
                 write(f, "#P_50(t)  - probability that trajectory has more than 50 infections for the first time on this day\n")
                 write(f, "#t\t P_ext(t)\t N_50\n")
-                writedlm(f, [list_time  probability_exctinction_per_day probability_first_day_more_than_50]) 
+                writedlm(f, [list_time  probability_exctinction_per_day probability_first_day_more_than_50])
             end
         end
     end
 end
 
-function example_dist_sir_hetero_rates(path; 
+function example_dist_sir_hetero_rates(path;
                                        ratio_lambda_mu=1.0)
     # define default values (some specific initial conditions, I0=100)
     N = Int(1e5)
     list_I0 = Int[1,10,100]
     seeds = collect(Int, 1:1e6);
-    
+
     # motivated by COVID-19 parameters [cf. Dehning et al, Science (2020)]
-    mu = 1/8. # avg. infectious time of 5+3 days  
+    mu = 1/8. # avg. infectious time of 5+3 days
     lambda_0 = ratio_lambda_mu*mu # focus on the "critical point" of sustained activity
     sigma = mu/10
     time_meas = 21 # 1 week observation of effect of initial perturbation
@@ -129,7 +129,7 @@ function example_dist_sir_hetero_rates(path;
     # https://en.wikipedia.org/wiki/Gamma_distribution
     #   mean(Gamma) = k*theta = lambda_0 i.e. theta = lambda_0/k
     for k in list_k
-        P_Gamma = Gamma(k, lambda_0/k) 
+        P_Gamma = Gamma(k, lambda_0/k)
         push!(list_P, P_Gamma)
         push!(list_P_name, @sprintf("Gamma_k%.2e",k))
     end
@@ -158,7 +158,7 @@ function example_dist_sir_hetero_rates(path;
         S0 = N-I0
         for (P,P_name) in zip(list_P, list_P_name)
             println(N, " ", I0, " ", P_name)
-            list_time, list_dist = distribution(P, S0, I0, R0, time_meas, seeds, mu=mu); 
+            list_time, list_dist = distribution(P, S0, I0, R0, time_meas, seeds, mu=mu);
             filename_base =  @sprintf("%s/distribution_%s_lambda%.2e_mu%.2e_N%.2e_I0%.2e",
                                  path, P_name, lambda_0, mu, N, I0)
             write_distributions(list_time, list_dist, filename_base)
@@ -169,9 +169,9 @@ end
 function write_distributions(list_time, list_dist, filename_base)
     for (time,dist) in zip(list_time, list_dist)
         filename = @sprintf("%s_T%.2e.dat",filename_base,time)
-        open(filename; write=true) do f 
+        open(filename; write=true) do f
             write(f, "#I\t P(I)\n")
-            writedlm(f, zip(collect(dist.edges[1]),dist.weights)) 
+            writedlm(f, zip(collect(dist.edges[1]),dist.weights))
         end
     end
 end
@@ -206,11 +206,11 @@ function distribution(P_lambda::D, S0, I0, R0, time_meas, seeds;
         trajectory!(rng, list_T, trajectories_S[i], trajectories_I[i], trajectories_R[i], system)
     end
     #index [time,trajectory] -> a way to make this [trajectory,time] to use later trajectories[:,t]
-    trajectories_S = hcat(trajectories_S...); 
-    trajectories_I = hcat(trajectories_I...); 
-    trajectories_R = hcat(trajectories_R...); 
-    
-    # then fit distributions (for now only I) 
+    trajectories_S = hcat(trajectories_S...);
+    trajectories_I = hcat(trajectories_I...);
+    trajectories_R = hcat(trajectories_R...);
+
+    # then fit distributions (for now only I)
     # TODO: generalize (function for this) to all cases
     list_dist = []
     for t=1:size(trajectories_I,1)
@@ -238,8 +238,9 @@ SIR dynamics is goverened by differential equation
 """
 function trajectory!(rng, list_T, list_S, list_I, list_R, system)
     rates = current_rates(system)
-    pass_update!(rates, index) = update!(rates, index, system, rng)
-    
+    sim = init(rng, KineticMonteCarlo(), rates) # stores rates in sim.event_handler
+    pass_update!(sim, index) = update!(sim.event_handler, index, system, rng)
+
     list_S[1] = system.measure_S
     list_I[1] = system.measure_I
     list_R[1] = system.measure_R
@@ -247,7 +248,7 @@ function trajectory!(rng, list_T, list_S, list_I, list_R, system)
     for i in 2:length(list_T)
         if time_simulation < list_T[i]
             dT = list_T[i] - time_simulation
-            dT_sim = advance!(KineticMonteCarlo(), rng, rates, pass_update!, dT)
+            dT_sim = advance!(sim, pass_update!, dT)
             time_simulation += dT_sim
         end
         list_S[i] = system.measure_S
@@ -271,7 +272,7 @@ mutable struct SIR{D}
     measure_S::Int
     measure_I::Int
     measure_R::Int
-    
+
     function SIR{D}(rng::AbstractRNG, P_lambda::D, epsilon, mu, S0::Int, I0::Int, R0::Int) where D
         N = S0 + I0 + R0
         current_lambda = rand(rng, P_lambda, I0)
@@ -306,7 +307,7 @@ function update!(rates::AbstractVector, index::Int, system::SIR, rng::AbstractRN
     else
         throw(UndefVarError(:index))
     end
-    
+
     rates .= current_rates(system)
 end
 
@@ -320,8 +321,8 @@ function add_to_system!(system, lambda)
     update_sum!(system, lambda)
 end
 
-function update_sum!(system, change) 
-    system.sum_current_lambda += change 
+function update_sum!(system, change)
+    system.sum_current_lambda += change
     system.update_current_lambda += 1
     if system.update_current_lambda > 1e5
         system.sum_current_lambda = sum(system.current_lambda)
