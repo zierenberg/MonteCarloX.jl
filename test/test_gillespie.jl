@@ -1,14 +1,18 @@
 using MonteCarloX
 using Random
+using Printf
+using StatsBase
+using LinearAlgebra
+
+include("includes.jl")
 
 function test_gillespie()
     pass = true
-    alg = Gillespie()
 
     #initialize
     list_rates = [0.1,0.2,0.1]
     sum_rates = sum(list_rates)
-    event_handler = initialize(alg, list_rates)
+    sim = init(MersenneTwister(1000), Gillespie(), list_rates)
 
     tbin = 0.5 / sum_rates
     pdf_time(t) = sum_rates * exp(-(t + tbin) * sum_rates)
@@ -18,9 +22,8 @@ function test_gillespie()
     samples = 10^5
     times = zeros(samples)
     events = zeros(samples)
-    rng = MersenneTwister(1000)
     for i = 1:samples
-        time, event = next(rng, alg, event_handler)
+        time, event = next(sim)
         times[i] = time
         events[i] = event
     end
@@ -53,12 +56,8 @@ function test_gillespie()
 
     # test advance (TODO)
     T = 10.
-    update!(rates,event) = missing
-    time_advance = advance!(MersenneTwister(1000),
-                         KineticMonteCarlo(),
-                         event_handler,
-                         update!,
-                         T)
+    update!(sim,event) = missing
+    time_advance = advance!(sim, update!, T)
     pass &= check(time_advance > T, @sprintf("... final time > target \n"))
 
     return pass
