@@ -1,16 +1,32 @@
-# Gillespie simulations wrapper 
+# Gillespie simulations wrapper
+"""
+    Gillespie()
+
+Spezializations for Gillespie-type simulations derived from KineticMonteCarlo().
+
+# Basic functions
+* [`next`](@ref)
+* [`advance!`](@ref)
+
+# Additional functions
+* [`initialize`](@ref)
+"""
 struct Gillespie end
 
 """
-#Remarks
-We could think about a generalization of this to pass also custom events, threhold, etc. But then this exactly becomes the event_handler function ... So I would keep this as a specialization.
+    initialize(alg::Gillespie, rates)
 
-We should however move events to the function argument! Because this is relevant for the update function
+creates `event handler` from a list of `rates` with most simple types of events
+[1:length(rates)]. With `type_event_handler` one can specify the class of event
+handler (default is `ListEventRateSimple`)
 
 #See also direct construction of event handlers
 [`ListEventRateSimple`](@ref), [`ListEventRateActiveMask`](@ref)
 """
-function initialize(alg::Gillespie, rates::Vector{Float64}; type_event_handler::String = "ListEventRateSimple")
+function initialize(alg::Gillespie,
+                    rates::Vector{Float64};
+                    type_event_handler::String = "ListEventRateSimple"
+    )
   events = collect(1:length(rates))
   noevent = 0
   threshold = 0.0
@@ -25,14 +41,15 @@ function initialize(alg::Gillespie, rates::Vector{Float64}; type_event_handler::
   return event_handler
 end
 
-function next(alg::Gillespie, rng::AbstractRNG, event_handler::AbstractEventHandlerRate)::Tuple{Float64,Int}
-  next(KineticMonteCarlo(), rng, event_handler)
+function next(rng::AbstractRNG, alg::Gillespie, event_handler::AbstractEventHandlerRate)::Tuple{Float64,Int}
+  next(rng, KineticMonteCarlo(), event_handler)
 end
 
-function advance!(alg::Gillespie, rng::AbstractRNG, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat}
-  advance!(KineticMonteCarlo(), rng, event_handler, update!, total_time)
-end
-
-function advance!(alg::Gillespie, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat} 
-  advance!(alg, Random.GLOBAL_RNG, event_handler, update!, total_time)
-end
+#should work already
+#function advance!(rng::AbstractRNG, alg::Gillespie, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat}
+#  advance!(rng, KineticMonteCarlo(), event_handler, update!, total_time)
+#end
+## If no rng is specified, uses Random.GLOBAL_RNG per default
+#function advance!(alg::Gillespie, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat}
+#  advance!(alg, event_handler, update!, total_time)
+#end

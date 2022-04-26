@@ -42,7 +42,8 @@ export  # base
         next_event,
         next_time,
         next,
-        advance!
+        advance!,
+        initialize
 
 # reweighting (needs makeover)
 export  # reweighting
