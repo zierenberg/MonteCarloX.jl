@@ -27,29 +27,29 @@ function run(N::Int, p::Float64, m::Float64, h::Float64, T::Float64, T_therm::Fl
     # TODO: think about abstract Gillespie: pass only system, rng, update(), external events as list
     # Q?? Can we do something similar for Metropolis?
     events_since_last_sum = 0
+    sim = init(MersenneTwister(1000), KineticMonteCarlo(), system.rates)
     while time < T_total
     # find next event (dt and time) to be updated
-        dt, n = next(system.rates, system.sum_rates, rng)
-        events_since_last_sum += 1 
-        if events_since_last_sum > 1000 
-            system.sum_rates = sum(system.rates)
+        dt, n = next(sim)
+        events_since_last_sum += 1
+        if events_since_last_sum > 1000
             events_since_last_sum = 0
         end
 
-        # measure observables in discrete time 
+        # measure observables in discrete time
         # use values from last step because they were valid inbetween
         dtime += dt;
         while dtime > dtime_step
             dtime     -= dtime_step
           # TODO: is this correct?
-            if time > T_therm  
+            if time > T_therm
                 avg_activity  += N_active
                 avg_activity2 += N_active * N_active
                 N_meas        += 1
             end
         end
         # TODO: what is correct? T=1e4 with dt=10 -> N=1000 or 1001? here 1001
-    
+
         # only after measurement evolve real time
         time += dt;
 
@@ -61,13 +61,14 @@ end
 
 
 # crucial here is type-stability achieved with F1 and F2!!!
+# Check if ProbabilityWeights have stable sum(rates) when changing rates often
 mutable struct ContactProcess{F1,F2}
     network::SimpleDiGraph{Int64}
     incoming_neighbors::F1
     outgoing_neighbors::F2
     neurons::Vector{Int8}
     active_incoming_neighbors::Vector{Int8}
-    rates::ProbabilityWeights{Float64,Float64,Vector{Float64}}  # static list of rates
+    rates::ProbabilityWeights{Float64,Float64,Vector{Float64}}
     mu::Float64
     lambda::Float64
     h::Float64
@@ -79,8 +80,8 @@ function construct_system(N, p, mu, lambda, h, seed; initial = "empty")::Contact
     network = LightGraphs.SimpleGraphs.erdos_renyi(N, p, is_directed = true, seed = seed)
     incoming_neighbors(n) = inneighbors(network, n)
     outgoing_neighbors(n) = outneighbors(network, n)
-  
-    # initial conditions 
+
+    # initial conditions
     neurons = []
     active_incoming_neighbors = []
     if initial == "empty"
@@ -97,28 +98,27 @@ function construct_system(N, p, mu, lambda, h, seed; initial = "empty")::Contact
     return ContactProcess(network, incoming_neighbors, outgoing_neighbors, neurons, active_incoming_neighbors, rates, mu, lambda, h)
 end
 
-# system has to include list_rates and sum_ratesand neuon_active_neighbors, graph, indegree function etc
+# system has to include list_rates and sum_rates and neuon_active_neighbors,
+# graph, indegree function etc
 function update(system::ContactProcess, n::Int)::Int
     rate_n_old = system.rates[n];
     dstate     = 0;
-    if system.neurons[n] == 0  
+    if system.neurons[n] == 0
         system.neurons[n] = 1;
         system.rates[n]   = system.mu;
         dstate            = 1;
-    else  
+    else
         system.neurons[n] = 0;
         system.rates[n]   = rate_activate(system, n)
         dstate            = -1;
     end
 
     # update rate list
-    system.sum_rates += (system.rates[n] - rate_n_old);
     for nn in system.outgoing_neighbors(n)
         system.active_incoming_neighbors[nn] += dstate;
-        if system.neurons[nn] == 0  
+        if system.neurons[nn] == 0
             rate_nn_old       = system.rates[nn];
             system.rates[nn]  = rate_activate(system, nn)
-            system.sum_rates += (system.rates[nn] - rate_nn_old); 
         end
     end
 
@@ -126,7 +126,7 @@ function update(system::ContactProcess, n::Int)::Int
 end
 
 @inline function rate_activate(system::ContactProcess, n::Int)::Float64
-    return system.h + system.lambda * system.active_incoming_neighbors[n] / length(system.incoming_neighbors(n)) 
+    return system.h + system.lambda * system.active_incoming_neighbors[n] / length(system.incoming_neighbors(n))
 end
 
 ##############################run

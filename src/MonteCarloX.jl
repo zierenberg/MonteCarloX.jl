@@ -13,6 +13,12 @@ include("utils.jl")
 include("event_handler.jl")
 include("rng.jl")
 
+#TODO List
+# * Think about the interface of algorithmic structs; should they include basic
+#   elements such as weight functions or event handler?
+# * Move cluster_wolff.jl to designated SpinSystems.jl, this is an update not
+#   MonteCarlo
+
 # Equilibrium
 include("importance_sampling.jl")
 include("reweighting.jl")
@@ -22,7 +28,7 @@ include("kinetic_monte_carlo.jl")
 include("poisson_process.jl")
 include("gillespie.jl")
 
-# TODO: move to external SpinSystems.jl package
+# move to external
 include("cluster_wolff.jl")
 
 # algorithms
@@ -43,7 +49,8 @@ export  # base
         next_time,
         next,
         advance!,
-        initialize
+        initialize,
+        init
 
 # reweighting (needs makeover)
 export  # reweighting
@@ -66,14 +73,8 @@ export  log_sum,
 
 
 
-# Check georges 2nd workshop notebook on github
-#    i::Int = StatsBase.binindex(d.h, x) -> remember this for custom things similar to EmpiricalDistributions.jl (not well documented though)
-
-
 end # module
 
-# Maybe embedd this into StatisticalPhysics.jl the including SpinSystems.jl PolymerSystems.jl etc ;)
-# TODO: external modules obviously in external modules
-# ("DirectedPercolation.jl") [inlcuding ContactProcess, CellularAutomatoa, etc but not as modules but as models]
-# ("NeuralNetworks.jl) -> maybe NeuralSystems.jl?
-# ("ComplexNetworks.jl)
+# Maybe embedd this into StatisticalPhysics.jl, which could include
+# SpinSystems.jl, PolymerSystems.jl, DirectedPercolation, (NeuralNetworks,)
+# ComplexSystems, ComlexNetworks etc ;)

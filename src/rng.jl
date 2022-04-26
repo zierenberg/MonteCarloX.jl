@@ -66,6 +66,7 @@ end
 #default when initializing with certain size is a static sequeunce
 MutableRandomNumbers(size::Int; mode=:static) = MutableRandomNumbers(Random.GLOBAL_RNG, size, mode=mode)
 #default when initializing wihtout size is an emtpy but dynamic sequence
+MutableRandomNumbers(rng; mode=:dynamic) = MutableRandomNumbers(rng, 0, mode=mode)
 MutableRandomNumbers(; mode=:dynamic) = MutableRandomNumbers(Random.GLOBAL_RNG, 0, mode=mode)
 
 """

@@ -19,7 +19,7 @@ function generate_data(path_out::String;
                        num_updates_production::Int = Int(1e7)
                       )
     # define system
-    I0 = 1 
+    I0 = 1
     S0 = Int(1e5) - I0
     R0 = 0
     lambda = mu
@@ -67,11 +67,11 @@ function generate_data(path_out::String;
             write(fout, "#I\t ln(W^1(I))\t ...\n")
             writedlm(fout, [collect(range_I) list_logW])
         end
-         
+
         # production run with final histogram and final reweighting
         println("production run  ")
         muca_iteration!(hist, logW, system, t, num_updates_production)
-        log_dist = log.(hist.weights) .- logW.weights 
+        log_dist = log.(hist.weights) .- logW.weights
         norm = sum(exp.(log_dist))
         log_dist = log_dist .- log(norm)
         filename = @sprintf("%s/pop_muca_sir_critical_production.dat",path_out)
@@ -88,7 +88,7 @@ function generate_data(path_out::String;
         write(fout, "#I\t P(I)\n")
         writedlm(fout, [collect(range_I) dist])
     end
-    
+
     # naive estimation with same "computing time" (skip for now because muca is not optimized)
     # Time of evaluation on my machine: 0:03:35
     if do_naive
@@ -107,7 +107,7 @@ Analytical solution frrom Raúl Toral (online lecture course)
 https://ifisc.uib-csic.es/raul/CURSOS/SP/Master_equations.pdf
 Eq. (5.31)-(5.32)
 """
-function distribution_analytic_critical(range_I, mu, t) 
+function distribution_analytic_critical(range_I, mu, t)
     b_t = mu*t
 
     dist = zeros(length(range_I))
@@ -130,36 +130,38 @@ function simulation_naive!(hist_I, system, t, num_trajectories;
         reset!(system)
         # evolution
         rates = current_rates(system)
-        pass_update!(rates, event) = update!(rates, event, system)
-        dT_sim = advance!(KineticMonteCarlo(), rng, rates, pass_update!, Float64(t))
+        sim = init(rng, KineticMonteCarlo(), rates)
+        pass_update!(sim, event) = update!(sim.event_handler, event, system)
+        dT_sim = advance!(sim, pass_update!, Float64(t))
         if system.measure_I in hist_I.edges[1]
             hist_I[system.measure_I] += 1
         end
     end
 end
 
-function muca_iteration!(hist_I, logW, system, t, num_updates; 
+function muca_iteration!(hist_I, logW, system, t, num_updates;
                         dT::Float64 = 1.0,
                         epsilon::Float64 = 0.0,
                         updates_therm::Int = Int(1e5),
                         seed_mc = 1000, seed_dynamics = 2000)
     rng_mc = MersenneTwister(seed_mc);
-    rng_dynamics = MutableRandomNumbers(MersenneTwister(seed_dynamics), mode=:dynamic)
+    rng_dynamics = MutableRandomNumbers(MersenneTwister(seed_dynamics), 1, mode=:dynamic)
 
     current_I = system.I
     hist_I.weights .= 0
     @showprogress 1 for i in 1:(updates_therm + num_updates)
-        # update (todo: make incremental update of rng) 
+        # update (todo: make incremental update of rng)
         rand_index = rand(rng_mc, 1:length(rng_dynamics))
         old_rng = rng_dynamics[rand_index]
         rng_dynamics[rand_index] = rand(rng_mc)
-        
+
         # reset dynamics and rerun (has a LOT OF POTENTIAL for optimization)
         MonteCarloX.reset(rng_dynamics)
         reset!(system)
         rates = current_rates(system)
-        pass_update!(rates, event) = update!(rates, event, system)
-        dT_sim = advance!(KineticMonteCarlo(), rng_dynamics, rates, pass_update!, Float64(t))
+        sim = init(rng_dynamics, KineticMonteCarlo(), rates)
+        pass_update!(sim, event) = update!(sim.event_handler, event, system)
+        dT_sim = advance!(sim, pass_update!, Float64(t))
         new_I = system.measure_I
 
         # acceptance
@@ -181,12 +183,14 @@ function muca_iteration!(hist_I, logW, system, t, num_updates;
 end
 
 """
-Naive muca update: 
+Naive muca update:
 W^{n_1}(I) = W^{n}(I)/H(I) for all I in range [0,I_bound)
-if H(I) > 10 [arbitrary choice] 
+if H(I) > 10 [arbitrary choice]
 """
 function muca_update!(logW, hist_I, I_bound)
-    for I in logW.edges[1]
+    # need to iterate over histogram entries that are allowed, which excludes
+    # the right most edge
+    for I in logW.edges[1][1:end-1]
         if I < I_bound && hist_I[I] > 1
             logW[I] = logW[I] - log(hist_I[I])
         elseif I >= I_bound
@@ -210,7 +214,7 @@ mutable struct SIR
     measure_S::Int
     measure_I::Int
     measure_R::Int
-    
+
     function SIR(lambda, mu, epsilon, S0::Int, I0::Int, R0::Int)
         N = S0 + I0 + R0
         new(lambda, mu, epsilon, N, S0, I0, R0, S0, I0, R0, S0, I0, R0)
@@ -234,11 +238,11 @@ function update!(rates::AbstractVector, event::Int, system::SIR)
         system.S -= 1
         system.I += 1
     elseif event == 0 # absorbing state of zero infected
-        
+
     else
         throw(UndefVarError(:event))
     end
-    
+
     rates .= current_rates(system)
 end
 
