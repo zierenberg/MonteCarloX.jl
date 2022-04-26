@@ -55,6 +55,7 @@ function test_gillespie()
                  )
 
     # test advance (TODO)
+    sim = init(Gillespie(), list_rates)
     T = 10.
     update!(sim,event) = missing
     time_advance = advance!(sim, update!, T)

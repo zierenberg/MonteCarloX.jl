@@ -28,4 +28,4 @@ function init(
 
     return SimulationKineticMonteCarlo(rng, event_handler)
 end
-init(alg::Gillespie, rates, type_event_handler) = init(Random.GLOBAL_RNG, alg, rates, type_event_handler)
+init(alg::Gillespie, rates, type_event_handler = "ListEventRateSimple") = init(Random.GLOBAL_RNG, alg, rates, type_event_handler)
