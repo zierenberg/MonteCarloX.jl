@@ -1,4 +1,8 @@
 # EventHandler
+# REMARK:
+# When adding new event_handler, make sure to add unit tests to
+# * test_event_handler
+# * test_kinetic_monte_carlo
 
 abstract type AbstractEventHandler{T} end
 abstract type AbstractEventHandlerTime{T} <: AbstractEventHandler{T} end
@@ -15,6 +19,7 @@ function reset_sum_rate(event_handler::AbstractEventHandlerRate)
         @inbounds event_handler.list_rate.sum += event_handler.list_rate[i]
     end
 end
+
 
 ###############################################################################
 ###############################################################################
@@ -49,7 +54,7 @@ function Base.length(event_handler::ListEventRateSimple)
 end
 
 function Base.setindex!(event_handler::ListEventRateSimple, rate::Float64, index::Int64)
-    if rate > event_handler.threshold_active 
+    if rate > event_handler.threshold_active
         if !(event_handler.list_rate[index] > event_handler.threshold_active)
             event_handler.num_active += 1
         end
@@ -81,7 +86,7 @@ mutable struct ListEventRateActiveMask{T} <: AbstractEventHandlerRate{T}
     list_event::Vector{T}                                            # static list of events
     list_rate::ProbabilityWeights{Float64,Float64,Vector{Float64}}  # static list of rates
     threshold_active::Float64
-    list_active::Vector{Bool} 
+    list_active::Vector{Bool}
     num_active::Int
     index_first_active::Int
     index_last_active::Int
@@ -102,7 +107,7 @@ mutable struct ListEventRateActiveMask{T} <: AbstractEventHandlerRate{T}
             list_active = [false for i = 1:length(list_rate)]
             index_first_active = length(list_active) + 1
             index_last_active = 0
-        else 
+        else
             throw(UndefVarError(:initial))
         end
         new(list_event, list_rate, threshold_active, list_active, num_active, index_first_active, index_last_active, noevent, 0)
@@ -119,17 +124,17 @@ end
 function Base.setindex!(event_handler::ListEventRateActiveMask, rate::Float64, index::Int64)
     if event_handler.list_active[index]
         if rate > event_handler.threshold_active
-            event_handler.list_rate[index] = rate 
+            event_handler.list_rate[index] = rate
         else
-            event_handler.list_rate[index] = 0 
+            event_handler.list_rate[index] = 0
             deactivate!(event_handler, index)
         end
     else # not active
         if rate > event_handler.threshold_active
-            event_handler.list_rate[index] = rate 
+            event_handler.list_rate[index] = rate
             activate!(event_handler, index)
         else
-            event_handler.list_rate[index] = 0 
+            event_handler.list_rate[index] = 0
         end
     end
 

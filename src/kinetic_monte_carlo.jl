@@ -2,11 +2,11 @@
 struct KineticMonteCarlo end
 
 @doc raw"""
-    next(alg::KineticMonteCarlo, [rng::AbstractRNG,] rates::AbstractWeights)::Tuple{Float64,Int}
+    next([rng::AbstractRNG,] alg::KineticMonteCarlo, rates::AbstractWeights)::Tuple{Float64,Int}
 
 Next stochastic event (``\Delta t``, index) drawn proportional to probability given in `rates`
 """
-function next(alg::KineticMonteCarlo, rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVector})::Tuple{Float64,Int}
+function next(rng::AbstractRNG, alg::KineticMonteCarlo, rates::Union{AbstractWeights, AbstractVector})::Tuple{Float64,Int}
     sum_rates = sum(rates)
     if !(sum_rates > 0)
         return Inf, 0
@@ -18,16 +18,16 @@ end
 next(alg::KineticMonteCarlo, rates::AbstractWeights) = next(alg, Random.GLOBAL_RNG, rates)
 
 @doc raw"""
-    next(alg::KineticMonteCarlo, [rng::AbstractRNG,] event_handler::AbstractEventHandlerRate)
+    next([rng::AbstractRNG,] alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate)
 
 Next stochastic event (``\Delta t``, event type) organized by `event_handler`
 fast(to be tested, depends on overhead of EventList) implementation of
 next_event_rate if defined by EventList object
 """
-function next(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractEventHandlerRate)::Tuple{Float64,Int}
+function next(rng::AbstractRNG, alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate)::Tuple{Float64,Int}
     sum_rates = sum(event_handler.list_rate)
     if !(sum_rates > 0)
-        return Inf, 0
+        return Inf, event_handler.noevent
     end
     dtime = next_time(rng, sum_rates)
     event = next_event(rng, event_handler)
@@ -167,39 +167,45 @@ end
 next_event(event_handler::ListEventRateSimple) = next_event(Random.GLOBAL_RNG, event_handler)
 
 """
-    advance!(alg::KineticMonteCarlo, [rng::AbstractRNG], event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T<:Real}
+    advance!([rng::AbstractRNG], alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T<:Real}
 
 Draw events from `event_handler` and update `event_handler` with `update!`
 until `total_time` has passed. Return time of last event.
 """
-function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat}
+function advance!(
+        rng::AbstractRNG,
+        alg::KineticMonteCarlo,
+        event_handler::AbstractEventHandlerRate,
+        update!::Function, total_time::T
+    )::T where {T <: AbstractFloat}
     time::T = 0
     while time <= total_time
-        if length(event_handler) == 0
-            println("WARNING: no events left before total_time reached")
-            return time
-        end
-        dt, event = next(alg, rng, event_handler)
+        dt, event = next(rng, alg, event_handler)
         time += dt
         update!(event_handler, event)
     end
     return time
 end
-
 function advance!(alg::KineticMonteCarlo, event_handler::AbstractEventHandlerRate, update!::Function, total_time::T)::T where {T <: AbstractFloat}
-  advance!(alg, Random.GLOBAL_RNG, event_handler, update!, total_time)
+  advance!(Random.GLOBAL_RNG, alg, event_handler, update!, total_time)
 end
 
 """
-    advance!(alg::KineticMonteCarlo, [rng::AbstractRNG], rates::AbstractVector, update!::Function, total_time::T)::T where {T<:Real}
+    advance!([rng::AbstractRNG], alg::KineticMonteCarlo, rates::AbstractVector, update!::Function, total_time::T)::T where {T<:Real}
 
-Draw events from `event_handler` and update `event_handler` with `update!` until `total_time` has passed. Return time of last event.
+Draw events from `event_handler` and update `event_handler` with `update!`
+until `total_time` has passed. Return time of last event.
 """
-#TODO: Discuss with Martin what a suitable API is here
-function advance!(alg::KineticMonteCarlo, rng::AbstractRNG, rates::AbstractVector, update!::Function, total_time::T)::T where {T <: AbstractFloat}
+function advance!(
+        rng::AbstractRNG,
+        alg::KineticMonteCarlo,
+        rates::AbstractVector,
+        update!::Function,
+        total_time::T
+    )::T where {T <: AbstractFloat}
     time::T = 0
     while time <= total_time
-        dt, event = next(alg, rng, rates)
+        dt, event = next(rng, alg, rates)
         time += dt
         update!(rates, event)
     end
