@@ -54,7 +54,7 @@ function test_gillespie()
                            kld_event)
                  )
 
-    # test advance (TODO)
+    # test advance
     sim = init(Gillespie(), list_rates)
     T = 10.
     update!(sim,event) = missing
