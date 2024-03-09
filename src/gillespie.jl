@@ -6,8 +6,6 @@ struct Gillespie end
 
 create a simple KineticMonteCarlo simulation object that handles Gillespie-type
 simulation.
-
-[`SimulationKineticMonteCarlo`](@ref)
 """
 function init(
         rng::AbstractRNG,

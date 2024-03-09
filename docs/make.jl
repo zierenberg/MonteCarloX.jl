@@ -1,6 +1,8 @@
+push!(LOAD_PATH,"../src/")
+
 using Documenter, MonteCarloX
 
-DocMeta.setdocmeta!(MonteCarloX, :DocTestSetup, :(using MonteCarloX); recursive = true)
+#DocMeta.setdocmeta!(MonteCarloX, :DocTestSetup, :(using MonteCarloX); recursive = true)
 
 makedocs(;
     modules = [MonteCarloX],
@@ -12,7 +14,8 @@ makedocs(;
         "Helper" => "helper.md",
     ],
     sitename = "MonteCarloX",
-    authors = "Johannes Zierenberg",)
+    authors = "Johannes Zierenberg",
+)
 
 # deploydocs(;
 #     deps = Deps.pip("pygments", "mkdocs", "python-markdown-math"),

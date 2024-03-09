@@ -118,9 +118,9 @@ function Base.length(event_handler::ListEventRateActiveMask)
     return event_handler.num_active
 end
 
-"""
-    setindex!(event_handler::ListEventRateActiveMask, rate::Float64, index_event::Int64)
-"""
+# """
+#     setindex!(event_handler::ListEventRateActiveMask, rate::Float64, index_event::Int64)
+# """
 function Base.setindex!(event_handler::ListEventRateActiveMask, rate::Float64, index::Int64)
     if event_handler.list_active[index]
         if rate > event_handler.threshold_active

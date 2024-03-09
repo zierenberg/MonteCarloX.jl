@@ -1,24 +1,24 @@
 struct ClusterWolff end
-"""
-Wolff single cluster update
+# """
+# Wolff single cluster update
 
-#Arguments:
-* `spins` : array of spin values
-* `nearest_neighbors` : function that returns a list of nearest neighbors to index i
-* `beta` : inverse temperature
-* `rng`  : random number generator
+# #Arguments:
+# * `spins` : array of spin values
+# * `nearest_neighbors` : function that returns a list of nearest neighbors to index i
+# * `beta` : inverse temperature
+# * `rng`  : random number generator
 
-Ref: U. Wolff, Phys. Rev. Lett. 62, 361 (1989)
+# Reference: U. Wolff, Phys. Rev. Lett. 62, 361 (1989)
 
-consider for Potts:
-https://stanford.edu/~kurinsky/ClassWork/Physics271_Final_Paper.pdf
+# consider for Potts:
+# https://stanford.edu/~kurinsky/ClassWork/Physics271_Final_Paper.pdf
 
-consider BlumeCapel implementation used in
-Fytas et al. Phys. Rev. E 97, 040102(R) (2018)
+# consider BlumeCapel implementation used in
+# Fytas et al. Phys. Rev. E 97, 040102(R) (2018)
 
-#WARNING
-This is depricated
-"""
+# #WARNING
+# This is depricated
+# """
 function update(
         alg::ClusterWolff,
         rng::AbstractRNG,

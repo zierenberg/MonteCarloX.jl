@@ -97,26 +97,26 @@ function random_element(rng::AbstractRNG, list_probabilities::Vector{Float64})::
     return id
 end
 
-###### Additional utility of Histogram class from StatsBase
-"""
-  getindex(h::AbstractHistogram, x)
+###### Additional utility of Histogram class from StatsBase (does not work with documenter right now)
+# """
+#   getindex(h::AbstractHistogram, x)
 
-access from histogram `h` the bin that corresponds to the coordinate `x`. `x`
-can be high-dimensional. Returns `missing` in case the bin does not exist.
+# access from histogram `h` the bin that corresponds to the coordinate `x`. `x`
+# can be high-dimensional. Returns `missing` in case the bin does not exist.
 
-# Examples
+# # Examples
 
-```julia
-julia> using StatsBase
-julia> h = fit(Histogram, [1,1,1,2], 1:3);
-julia> h[1]
-3
-julia> h[2]
-1
-julia> h[3]
-missing
-```
-"""
+# ```julia
+# julia> using StatsBase
+# julia> h = fit(Histogram, [1,1,1,2], 1:3);
+# julia> h[1]
+# 3
+# julia> h[2]
+# 1
+# julia> h[3]
+# missing
+# ```
+# """
 Base.getindex(h::AbstractHistogram{T,1}, x::Real) where {T} = getindex(h, (x,))
 function Base.getindex(h::Histogram{T,N}, xs::NTuple{N,Real}) where {T,N}
     idx = StatsBase.binindex(h, xs)
@@ -127,26 +127,26 @@ function Base.getindex(h::Histogram{T,N}, xs::NTuple{N,Real}) where {T,N}
     end
 end
 
-"""
-  setindex(h::AbstractHistogram, value x)
+# """
+#   setindex(h::AbstractHistogram, value x)
 
-asign from histogram `h` the bin that corresponds to the coordinate `x` a
-certain `value` . `x` can be high-dimensional.
+# asign from histogram `h` the bin that corresponds to the coordinate `x` a
+# certain `value` . `x` can be high-dimensional.
 
-# Examples
+# # Examples
 
-```julia
-julia> using StatsBase
-julia> h = Histogram(1:3);
-julia> h[1]
-0
-julia> h[1] = 3
-3
-julia> h[1]
-3
-julia> h[3] = 3
-missing
-"""
+# ```julia
+# julia> using StatsBase
+# julia> h = Histogram(1:3);
+# julia> h[1]
+# 0
+# julia> h[1] = 3
+# 3
+# julia> h[1]
+# 3
+# julia> h[3] = 3
+# missing
+# """
 Base.setindex!(h::AbstractHistogram{T,1}, value::Real, x::Real) where {T} = setindex!(h, value, (x,))
 function Base.setindex!(h::Histogram{T,N}, value::Real, xs::NTuple{N,Real}) where {T,N}
     h.isdensity && error("Density histogram must have float-type weights")

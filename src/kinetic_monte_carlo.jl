@@ -7,16 +7,15 @@ struct KineticMonteCarlo end
 # * devise an abstract Simulation type ?
 #   abstract type SimulationKineticMonteCarlo end
 
-"""
-    SimulationKineticMonteCarlo
+# """
+#     SimulationKineticMonteCarlo
 
-object that handles kinetic Monte Carlo simulation. Includes `rng` for
-persistent and reproducible simulation and `event_handler` that determines
-transition events and times.
-
-Most simple terms, event_handler can just be an AbstractVector or
-ProbabilityWeight (latter is more performant)
-"""
+# object that handles kinetic Monte Carlo simulation. Includes `rng` for
+# persistent and reproducible simulation and `event_handler` that determines
+# transition events and times.
+# Most simple terms, event_handler can just be an AbstractVector or
+# ProbabilityWeight (latter is more performant)
+# """
 struct SimulationKineticMonteCarlo{T}
    rng::AbstractRNG
    event_handler::T
