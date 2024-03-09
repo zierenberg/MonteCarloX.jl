@@ -148,17 +148,17 @@ function distribution_from_timeseries(log_P_target, log_P_source, list_args, ran
 end
 
 
-"""
-Estimate expectation value from histogram (
+# """
+#     expectation_value_from_histogram
 
-Ref: Janke
+# Ref: Janke
 
-Todo: rename log_P... to log_weight!!
+# Todo: rename log_P... to log_weight!!
 
-important: hist_obs(args) = sum O_i delta(args - args_i)
-hists are dictionaries?
-can this be generalized to higher dimensions? nd histograms as dictionary?
-"""
+# important: hist_obs(args) = sum O_i delta(args - args_i)
+# hists are dictionaries?
+# can this be generalized to higher dimensions? nd histograms as dictionary?
+# """
 function expectation_value_from_histogram(f_args::Function, log_P_target::Function, log_P_source::Function, hist::Histogram)
     log_norm = _log_normalization(log_P_target, log_P_source, hist)
     expectation_value = 0

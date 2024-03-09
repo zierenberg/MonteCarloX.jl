@@ -80,7 +80,6 @@ function test_sweep_random_element(;verbose = false)
 end
 
 # TODO: use this also for PT and adaptive overlap stories etc
-
 """ Testing metropolis on unimodaL probability distribution"""
 function test_unimodal_metropolis(;verbose = false)
     log_weight_unimodal(x, x0, var) = -(x - x0)^2 / 2 / var - log(sqrt(2 * pi * var))

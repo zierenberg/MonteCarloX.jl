@@ -7,6 +7,13 @@ next_event
 advance!
 ```
 
-### Inhomogeneous Poisson Process
-```@docs
-```
+<!-- ## Full Docs
+
+```@autodocs
+Modules = [MonteCarloX]
+Pages   = [
+    "gillespie.jl",
+    "poisson_process.jl",
+]
+Private = false
+``` -->

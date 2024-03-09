@@ -34,7 +34,7 @@ Evaluate most general acceptance probability for imporance sampling of ``P(x) \p
 - `rng`: random number generator, e.g. MersenneTwister
 
 # Specializations
-- accept(alg::Metropolis(), rng::AbstractRNG, x_new::T, x_old::T) where T (@ref)
+- accept(alg::Metropolis(), rng::AbstractRNG, x_new::T, x_old::T) where T
 """
 function accept(rng::AbstractRNG, log_weight::Function, args_new::NTuple{N,T}, args_old::NTuple{N,T})::Bool where {N,T}
     log_difference = log_weight(args_new...) - log_weight(args_old...)
