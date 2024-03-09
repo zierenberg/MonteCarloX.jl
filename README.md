@@ -1,7 +1,7 @@
 # MonteCarloX
 
 [![Dev](https://img.shields.io/badge/docs-stable-blue.svg)](https://zierenberg.github.io/MonteCarloX.jl/dev)
-[![CI Tests](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/Runtests.yml/badge.svg)](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/ci.yml)
+[![CI Tests](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/Runtests.yml/badge.svg)](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI.yml)
 [![codecov](https://codecov.io/gh/zierenberg/MonteCarloX.jl/branch/main/graph/badge.svg?token=FUn6qFnsSN)](https://codecov.io/gh/zierenberg/MonteCarloX.jl)
 
 
