@@ -2,14 +2,18 @@ using Printf
 
 test_verbose=false
 
-function check(cond::Bool, message::String)
-    if test_verbose
-        if cond
-            printstyled(message; color = :green)
-        else
-            printstyled(message; color = :red)
+if !@isdefined(CHECK_UTILITIES_LOADED)
+    const CHECK_UTILITIES_LOADED = true
+
+    function check(cond::Bool, message::String)
+        if test_verbose
+            if cond
+                printstyled(message; color = :green)
+            else
+                printstyled(message; color = :red)
+            end
         end
-    end
-    return cond
+        return cond
+    end 
 end
 

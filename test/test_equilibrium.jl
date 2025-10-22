@@ -4,9 +4,9 @@ using Random
 using LinearAlgebra
 
 function test_sweep_random_element(;verbose = false)
+    N = 10000000
     function test_random_element(list_prob::Vector{Float64})
         rng = MersenneTwister(1000)
-        N = 10000000
         sum = 0.0
         for i in 1:N
             id = MonteCarloX.random_element(rng, list_prob)
@@ -16,7 +16,6 @@ function test_sweep_random_element(;verbose = false)
     end
     function test_random_element(list_prob::ProbabilityWeights)
         rng = MersenneTwister(1000)
-        N = 10000000
         sum = 0.0
         for i in 1:N
             id = StatsBase.sample(rng, list_prob)
@@ -26,7 +25,6 @@ function test_sweep_random_element(;verbose = false)
     end
     function test_random_element(list_freq::FrequencyWeights)
         rng = MersenneTwister(1000)
-        N = 10000000
         sum = 0.0
         for i in 1:N
             id = StatsBase.sample(rng, list_freq)
@@ -36,7 +34,6 @@ function test_sweep_random_element(;verbose = false)
     end
     function test_binary_search(cum_prob::Vector{Float64})
         rng = MersenneTwister(1000)
-        N = 10000000
         sum = 0.0
         for i in 1:N
             id = MonteCarloX.binary_search(cum_prob, rand(rng))
@@ -60,10 +57,15 @@ function test_sweep_random_element(;verbose = false)
         println("expectation value id = $(expected_id)")
     end
     #############################################################################
-    result_re = @time test_random_element(list_prob)
-    result_pb = @time test_random_element(ProbabilityWeights(list_prob))
-    result_fr = @time test_random_element(FrequencyWeights(list_freq))
-    result_bs = @time test_binary_search(cum_prob)
+    # probe efficiency with @test, last time I got
+    #  0.180528 seconds (23 allocations: 20.281 KiB)
+    #  0.170262 seconds (24 allocations: 20.312 KiB)
+    #  0.163892 seconds (24 allocations: 20.312 KiB)
+    #  0.091118 seconds (23 allocations: 20.281 KiB)
+    result_re = test_random_element(list_prob)
+    result_pb = test_random_element(ProbabilityWeights(list_prob))
+    result_fr = test_random_element(FrequencyWeights(list_freq))
+    result_bs = test_binary_search(cum_prob)
     diff1 = abs(result_re - result_bs)
     diff2 = abs(result_pb - result_bs)
     diff3 = abs(result_fr - result_bs)
@@ -84,27 +86,27 @@ end
 function test_unimodal_metropolis(;verbose = false)
     log_weight_unimodal(x, x0, var) = -(x - x0)^2 / 2 / var - log(sqrt(2 * pi * var))
     var = 1.0
-    dx = 0.1
+    dx = 1.0
     list_x0 = [0.,1.,2.,3.]
     pass = true
 
-    rng = MersenneTwister(1000)
+    rng = MersenneTwister(42)
+    samples = Int(1e6)
+    list_x = zeros(samples)
+    bound_kld = 0.1
+    bound_x = 0.1
 
     for x0 in list_x0
         log_weight_sampling(x) = log_weight_unimodal(x, x0, var)
-        samples = Int(1e6)
-        list_x = zeros(samples)
+        
         x = x0
-        # thermalization 100 updates
-        for update in 1:samples + 100
+        for update in 1:samples 
             # Metropolis:
             x_new = step(x, dx, rng)
             if accept(rng, log_weight_sampling, x_new, x)
                 x = x_new
             end
-            if update > 100
-                list_x[update - 100] = x
-            end
+            list_x[update] = x
         end
         # sort into binned histogram
         # bin size/ 2*sigma ~    #elements per bin (~100)/ samples*0.6/
@@ -115,14 +117,15 @@ function test_unimodal_metropolis(;verbose = false)
         if verbose
             println("result kldivergence P_meas to P_true = $(kld)")
         end
-        pass &= kld < 0.1
+        pass &= kld < bound_kld
+
         ###########################################################################
         est_x0 = sum(list_x) / length(list_x)
         diff_est_x0 = abs(est_x0 - x0)
         if verbose
             println("result estimate x0 = $(est_x0) vs x0 = $(x0) [diff = $(diff_est_x0)]")
         end
-        pass &= diff_est_x0 < 0.1
+        pass &= diff_est_x0 < bound_x
     end
     return pass
 end
