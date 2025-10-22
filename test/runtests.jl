@@ -13,20 +13,24 @@ import Distributions.cdf
     @test test_log_sum()
     @test test_binary_search()
 
+    # println("rng")
     include("test_rng.jl")
     @test test_rng_mutable()
 
+    # println("event handler")
     include("test_event_handler.jl")
     @test test_event_handler_rate("ListEventRateSimple")
     @test test_event_handler_rate("ListEventRateActiveMask")
 
     # equilibrium
+    # println("equilibrium")
     include("test_equilibrium.jl")
     @test test_sweep_random_element()
     @test test_unimodal_metropolis()
     @test test_2D_unimodal_metropolis()
     @test test_unimodal_sweep()
 
+    # println("ising")
     include("test_ising.jl")
     @test test_ising_reweighting()
     @test test_ising_metropolis()
