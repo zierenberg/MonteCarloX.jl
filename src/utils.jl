@@ -1,7 +1,7 @@
 """
     binary_search(sorted::AbstractVector{T}, value::T)::Int where {T<:Real}
 
-Perfom a binary search to return the index i of an sorted array
+Perform a binary search to return the index i of an sorted array
 such that sorted[i-1] < value <= sorted[i]
 
 # Examples

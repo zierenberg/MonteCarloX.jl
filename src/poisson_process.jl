@@ -19,7 +19,7 @@ API - output
 * returns the next event time
 
 """
-function next_time(alg::InhomogeneousPoisson, rng::AbstractRNG, rate::Function, max_rate::Float64)::Float64
+function next_time(rng::AbstractRNG, alg::InhomogeneousPoisson,  rate::Function, max_rate::Float64)::Float64
     dt = 0.0
     theta = 1.0 / max_rate
     while true
@@ -46,7 +46,7 @@ API - output
 * returns the next event time
 
 """
-function next_time(alg::InhomogeneousPoissonPiecewiseDecreasing, rng::AbstractRNG, rate::Function)::Float64
+function next_time(rng::AbstractRNG, alg::InhomogeneousPoissonPiecewiseDecreasing, rate::Function)::Float64
     dt = 0.0
     while true
         # future rate can only be smaller than current rate
@@ -71,7 +71,7 @@ rates Lambda(t).
 API - output
 * returns the next event id
 """
-function next_event(alg::InhomogeneousPoisson, rng::AbstractRNG, rates::Array{Float64}, max_rate::Float64)::Int
+function next_event(rng::AbstractRNG, alg::InhomogeneousPoisson, rates::Array{Float64}, max_rate::Float64)::Int
     next_index = 1
     cumulated_rates = cumsum(rates)
     sum_rate = cumulated_rates[end]
@@ -109,9 +109,9 @@ rates Lambda(t).
 API - output
 * returns the next event time and event id as tuple (dt, id)
 """
-function next(alg::InhomogeneousPoisson, rng::AbstractRNG, rates::Function, max_rate::Float64)::Tuple{Float64,Int}
+function next(rng::AbstractRNG, alg::InhomogeneousPoisson, rates::Function, max_rate::Float64)::Tuple{Float64,Int}
     rate(t) = sum(rates(t))
-    dt = next_time(alg, rng, rate, max_rate)
-    id = next_event(alg, rng, rates(dt), max_rate)
+    dt = next_time(rng, alg, rate, max_rate)
+    id = next_event(rng, alg, rates(dt), max_rate)
     return dt, id
 end
