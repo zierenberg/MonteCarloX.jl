@@ -1,117 +1,82 @@
-# poisson processes 
-#
-struct InhomogeneousPoisson end
-struct InhomogeneousPoissonPiecewiseDecreasing end
-
+struct PoissonProcess end
 """
-next_event_time(rate::Function, max_rate::Float64, rng::AbstractRNG)::Float64
+    SimulationPoissonProcess
 
-Generate a new event from an inhomogeneous poisson process with rate Lambda(t).
-Based on (Ogata’s Modified Thinning Algorithm: Ogata,  1981,  p.25,  Algorithm  2)
-see also https://www.math.fsu.edu/~ychen/research/Thinning%20algorithm.pdf
-
-# Arguments
-- `rate`: rate(dt) has to be defined outside (e..g t-> rate(t+t0,args))
-- `max_rate`: maximal rate in near future (has to be evaluated externally)
-- `rng`: random number generator
-
-API - output
-* returns the next event time
-
+object that handles Poisson process simulations. Includes `rng` for
+persistent and reproducible simulation, the option for time-dependent rates, and the option for optimization schemes (e.g. when the rate function is known to monotonically decrease between events).
 """
-function next_time(rng::AbstractRNG, alg::InhomogeneousPoisson,  rate::Function, max_rate::Float64)::Float64
-    dt = 0.0
-    theta = 1.0 / max_rate
-    while true
-        # generate next event from bounding homogeneous Poisson process with max_rate
-        dt += randexp(rng) * theta
-        # accept next event with probability rate(t)/rate_max [Thinning algorithm]
-        if rand(rng) < rate(dt) / max_rate
-            return dt
+struct SimulationPoissonProcess{T1,T2}
+   rng::AbstractRNG
+   rate::T1
+   generation_rate::T2
+   piecewise_rate_decrease::Bool
+end
+function init(rng::AbstractRNG, alg::PoissonProcess, rate; generation_rate=nothing, piecewise_rate_decrease::Bool=false)
+    if isa(rate, Number)
+        rate = float(rate)
+        @info "Creating Poisson process with constant rate"
+    elseif isa(rate, AbstractVector)
+        rate = float.(rate)
+        @info "Creating Poisson process with constant rates for multiple channels"
+    elseif isa(rate, Function)
+        @info "Creating Poisson process with time-dependent rate(s)"
+        if generation_rate === nothing && piecewise_rate_decrease == false
+            error("Either generation_rate has to be provided or `piecewise_rate_decrease` has to be true.")
         end
+        if isa(generation_rate, Number)
+            generation_rate = float(generation_rate)
+        end
+    else
+        error("Rate has to be either Number, Vector{Number}, or Function.")
     end
+    return SimulationPoissonProcess(rng, rate, generation_rate, piecewise_rate_decrease)
 end
 
+init(alg::PoissonProcess, rate; generation_rate=nothing, piecewise_rate_decrease::Bool=false) = init(Random.GLOBAL_RNG, alg, rate; generation_rate=generation_rate, piecewise_rate_decrease=piecewise_rate_decrease)
+
+@doc raw"""
+    next(sim::PoissonProcess; t=nothing)
+
+Next stochastic event (``\Delta t``, index) for a collection of Poisson processes. 
+If they are inhomogeneous then the current time needs to be provided. 
+For most custom solutions, use `next_time` and `next_event` directly.
 """
-Generate a new event from an inhomogeneous poisson process with rate Lambda(t) under
-the assumption that rate(dt) is monotonically decreasing.
-Based on (Ogata’s Modified Thinning Algorithm: Ogata,  1981,  p.25,  Algorithm  3)
-see also https://www.math.fsu.edu/~ychen/research/Thinning%20algorithm.pdf
-
-# Arguments
-- `rate`: rate(dt) has to be defined outside (e..g t-> rate(t+t0,args))
-- `rng`: random number generator
-
-API - output
-* returns the next event time
-
-"""
-function next_time(rng::AbstractRNG, alg::InhomogeneousPoissonPiecewiseDecreasing, rate::Function)::Float64
-    dt = 0.0
-    while true
-        # future rate can only be smaller than current rate
-        max_rate = rate(dt)
-        # generate next event from bounding homogeneous Poisson process with max_rate
-        dt += randexp(rng) / max_rate
-        # accept next event with probability rate(t)/rate_max [Thinning algorithm]
-        if rand(rng) < rate(dt) / max_rate
-            return dt
-        end
-    end
+# for a single Poisson process
+function next(sim::SimulationPoissonProcess{T1,T2})::Tuple{Float64,Int} where T1 <: Number where T2 <: Nothing
+    rate = sim.rate
+    dt = next_time(sim.rng, rate)
+    return dt, 0
 end
-
-"""
-Generate a new event id from a collection of inhomogeneous poisson processes with
-rates Lambda(t).
-# Arguments
-- `rates`: rates(dt); Float -> [Float]
-- `max_rate`: maximal rate in near future (has to be evaluated externally)
-- `rng`: random number generator
-
-API - output
-* returns the next event id
-"""
-function next_event(rng::AbstractRNG, alg::InhomogeneousPoisson, rates::Array{Float64}, max_rate::Float64)::Int
-    next_index = 1
-    cumulated_rates = cumsum(rates)
-    sum_rate = cumulated_rates[end]
-
-    theta = rand(rng) * sum_rate
-    id = 1
-    # catch lower-bound case that cannot be reached by binary search
-    if theta >= cumulated_rates[1]
-        # binary search
-        index_l = 1
-        index_r = length(cumulated_rates)
-        while index_l < index_r - 1
-            # index_m = floor(Int,(index_l+index_r)/2)
-            index_m = fld(index_l + index_r, 2)
-            if cumulated_rates[index_m] < theta
-                index_l = index_m
-            else
-                index_r = index_m
-            end
-        end
-        id = index_r
+# for multiple Poisson processes (should be identical to the kinetic Monte Carlo case for constant rates)
+function next(sim::SimulationPoissonProcess{T1,T2})::Tuple{Float64,Int} where T1 <: AbstractVector where T2 <: Nothing
+    sum_rates = sum(sim.rate)
+    if !(sum_rates > 0)
+        return Inf, 0
     end
-
-    return id
-end
-
-"""
-Generate a new event from a collection of inhomogeneous poisson processes with
-rates Lambda(t).
-# Arguments
-- `rates`: rates(dt); Float -> [Float]
-- `max_rate`: maximal rate in near future (has to be evaluated externally)
-- `rng`: random number generator
-
-API - output
-* returns the next event time and event id as tuple (dt, id)
-"""
-function next(rng::AbstractRNG, alg::InhomogeneousPoisson, rates::Function, max_rate::Float64)::Tuple{Float64,Int}
-    rate(t) = sum(rates(t))
-    dt = next_time(rng, alg, rate, max_rate)
-    id = next_event(rng, alg, rates(dt), max_rate)
+    dt = next_time(sim.rng, sum_rates)
+    id = next_event(sim.rng, sim.rate)
     return dt, id
 end
+# for inhomogeneous Poisson process with time-dependent rate function and fixed generation rate
+function next(sim::SimulationPoissonProcess{T1,T2}, t::Number)::Tuple{Float64,Int} where T1 <: Function where T2 <: Union{Number, AbstractArray}
+    global_rate(time) = sum(sim.rate(time))
+    generation_rate = sum(sim.generation_rate)
+    if !(generation_rate > 0)
+        return Inf, 0
+    end
+    dt = next_time(sim.rng, global_rate, generation_rate)
+    id = next_event(sim.rng, sim.rate(t+dt))
+    return t+dt, id
+end
+# makes no sense without feedback that intermediately increases the rate
+# # for inhomogeneous Poisson process with time-dependent rate function and local piecewise generation rate
+# function next(sim::SimulationPoissonProcess{T1,T2}, t::Number)::Tuple{Float64,Int} where T1 <: Function where T2 <: Nothing
+#     global_rate(time) = sum(sim.rate(time))
+#     generation_rate = global_rate(t)
+#     if !(generation_rate > 0)
+#         return Inf, 0
+#     end
+#     dt = next_time(sim.rng, global_rate(t), generation_rate)
+#     id = next_event(sim.rng, sim.rate(t+dt))
+#     return t+dt, id
+# end

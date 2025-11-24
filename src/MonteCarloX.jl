@@ -35,27 +35,27 @@ include("cluster_wolff.jl")
 export  Metropolis,
         Gillespie,
         KineticMonteCarlo,
-        InhomogeneousPoisson,
-        InhomogeneousPoissonPiecewiseDecreasing
+        PoissonProcess
+        # InhomogeneousPoisson,
+        # InhomogeneousPoissonPiecewiseDecreasing
 
-# functions
-export  # base
-        # equilibrium
-        accept,
-        sweep,
+# functions (equilibrium)
+export accept,
+       sweep
         # update -> will be moved to test/utils.jl for now and later to SpinSystems.jl
-        # non-equilibrium
-        next_event,
+
+# funtions (non-equilibrium)
+export  next_event,
         next_time,
         next,
         advance!,
-        initialize,
         init
+        # initialize,
 
 # reweighting (needs makeover)
-export  # reweighting
-        expectation_value_from_timeseries,
+export  expectation_value_from_timeseries,
         distribution_from_timeseries
+        # reweighting
 
 # helper
 export  log_sum,

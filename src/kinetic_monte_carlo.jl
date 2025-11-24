@@ -4,18 +4,16 @@ struct KineticMonteCarlo end
 #TODO:
 # * find better name for event_handler that captures both event_handler and
 #   vector of rates
-# * devise an abstract Simulation type ?
-#   abstract type SimulationKineticMonteCarlo end
 
-# """
-#     SimulationKineticMonteCarlo
+"""
+    SimulationKineticMonteCarlo
 
-# object that handles kinetic Monte Carlo simulation. Includes `rng` for
-# persistent and reproducible simulation and `event_handler` that determines
-# transition events and times.
-# Most simple terms, event_handler can just be an AbstractVector or
-# ProbabilityWeight (latter is more performant)
-# """
+object that handles kinetic Monte Carlo simulation. Includes `rng` for
+persistent and reproducible simulation and `event_handler` that determines
+transition events and times.
+Most simple terms, event_handler can just be an AbstractVector or
+ProbabilityWeight (latter is more performant)
+"""
 struct SimulationKineticMonteCarlo{T}
    rng::AbstractRNG
    event_handler::T
@@ -30,7 +28,7 @@ init(alg::KineticMonteCarlo, event_handler) = init(Random.GLOBAL_RNG, alg, event
     next(sim::SimulationKineticMonteCarlo)
 
 Next stochastic event (``\Delta t``, index) drawn according to event_handler in
-simulation protokoll. Simplest case is that event_handler is a list of rates.
+simulation protocol. Simplest case is that event_handler is a list of rates.
 """
 function next(sim::SimulationKineticMonteCarlo{T}) where T <: Union{AbstractVector, AbstractWeights}
     sum_rates = sum(sim.event_handler)
@@ -88,11 +86,34 @@ end
 @doc raw"""
     next_time(rng::AbstractRNG, rate::Float64)::Float64
 
-Next stochastic ``\Delta t`` for Poisson process with `rate`
+Next stochastic ``\Delta t`` for Poisson process constant with `rate`
 """
-function next_time(rng::AbstractRNG, rate::Float64)::Float64
-    return randexp(rng) / rate
+function next_time(rng::AbstractRNG, rate_generation::Number)::Float64
+    dt = randexp(rng) / rate_generation
+    return dt
 end
+
+@doc raw"""
+    next_time(rng::AbstractRNG, rate::Function, rate_generation::Number)::Float64
+
+Next stochastic ``\Delta t`` for inhomogeneous Poisson process constant with `rate` function. 
+Needs to be supplemented by a generation rate for proposals that are selected by the rate(t), which needs to be always larger or equal to rate(t) for all t. 
+Alternatively, one can implement maximum(rate) as rate_generation.
+Uses Ogata's thinning algorithm.
+"""
+function next_time(rng::AbstractRNG, rate::Function, rate_generation::Float64)::Float64
+    dt = 0.0
+    while true
+        dt += next_time(rng, rate_generation)
+        if rand(rng) < rate(dt) / rate_generation
+            return dt
+        end
+    end
+end
+# TODO: test if this could be useful
+# function next_time(rng::AbstractRNG, rate::Function)::Float64
+#     next_time(rng, rate, maximum(rate))
+# end
 
 
 """
