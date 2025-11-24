@@ -21,7 +21,7 @@ function test_poisson_single()
         samples = zeros(nSamples)
 
         for i in 1:nSamples
-            t0 = next_time(alg, rng, Lambda, LambdaMax)
+            t0 = next_time(rng, alg, Lambda, LambdaMax)
             samples[i] = t0
         end
 
@@ -36,7 +36,7 @@ function test_poisson_single()
     samples = zeros(nSamples)
 
     for i in 1:nSamples
-        t0 = next_time(alg, rng, Lambda)
+        t0 = next_time(rng, alg, Lambda)
         samples[i] = t0
     end
 
@@ -60,7 +60,7 @@ function test_poisson_constant()
 
         t0 = 0        
         for i in 1:nSamples
-            t0 += next_time(alg, rng, t->Lambda(t + t0), LambdaMax)
+            t0 += next_time(rng, alg, t->Lambda(t + t0), LambdaMax)
             samples[i] = t0 % 1
         end
 
@@ -85,7 +85,7 @@ function test_poisson_sin_wave()
 
         t0 = 0        
         for i in 1:nSamples
-            t0 += next_time(alg, rng, t->Lambda(t + t0), LambdaMax)
+            t0 += next_time(rng, alg, t->Lambda(t + t0), LambdaMax)
             samples[i] = t0 % (2 * pi)
         end
 
