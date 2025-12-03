@@ -101,7 +101,7 @@ Needs to be supplemented by a generation rate for proposals that are selected by
 Alternatively, one can implement maximum(rate) as rate_generation.
 Uses Ogata's thinning algorithm.
 """
-function next_time(rng::AbstractRNG, rate::Function, rate_generation::Float64)::Float64
+function next_time(rng::AbstractRNG, rate::Function, rate_generation::Real)::Real
     dt = 0.0
     while true
         dt += next_time(rng, rate_generation)
@@ -110,10 +110,6 @@ function next_time(rng::AbstractRNG, rate::Function, rate_generation::Float64)::
         end
     end
 end
-# TODO: test if this could be useful
-# function next_time(rng::AbstractRNG, rate::Function)::Float64
-#     next_time(rng, rate, maximum(rate))
-# end
 
 
 """
@@ -165,7 +161,8 @@ function next_event(rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVect
 
     end
 end
-
+# specialization for single event
+next_event(::AbstractRNG, ::Number) = 1
 # specialization for two events only
 function next_event(rng::AbstractRNG, rates::MVector{2,T})::Int where {T <: AbstractFloat}
     if rand(rng) * (rates[1] + rates[2]) < rates[1]
@@ -228,14 +225,14 @@ advances the `sim` that internally draw events, by updatint `sim` with
 """
 function advance!(
         sim::SimulationKineticMonteCarlo,
-        update!::Function,
-        total_time::T
-    )::T where {T <: AbstractFloat}
-    time::T = 0
-    while time <= total_time
+        total_time;
+        update! = nothing,
+    )
+    time = 0
+    while time < total_time
         dt, event = next(sim)
         time += dt
-        update!(sim, event)
+        update! !== nothing && update!(sim, event)
     end
     return time
 end
