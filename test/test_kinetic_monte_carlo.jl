@@ -102,12 +102,12 @@ function test_kmc_advance()
 
     T = 10.
     update!(sim,event) = missing
-    time_base = advance!(sim_base, update!, T)
+    time_base = advance!(sim_base, T, update! = update!)
     pass &= check(time_base > T, @sprintf("... final time base > target \n"))
-    time_simple = advance!(sim_simple, update!, T)
+    time_simple = advance!(sim_simple, T, update! = update!)
     pass &= check(time_simple > T, @sprintf("... final time simple > target \n"))
     pass &= check(time_simple == time_base, @sprintf("... final time simple == base  \n"))
-    time_mask = advance!(sim_mask, update!, T)
+    time_mask = advance!(sim_mask, T, update! = update!)
     pass &= check(time_mask > T, @sprintf("... final time mask > target \n"))
     pass &= check(time_mask == time_base, @sprintf("... final time mask == base  \n"))
 

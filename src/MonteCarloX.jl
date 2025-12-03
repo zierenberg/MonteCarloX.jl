@@ -35,9 +35,8 @@ include("cluster_wolff.jl")
 export  Metropolis,
         Gillespie,
         KineticMonteCarlo,
-        PoissonProcess
-        # InhomogeneousPoisson,
-        # InhomogeneousPoissonPiecewiseDecreasing
+        PoissonProcess,
+        InhomogeneousPoissonProcess
 
 # functions (equilibrium)
 export accept,
@@ -47,14 +46,14 @@ export accept,
 # funtions (non-equilibrium)
 export  next_event,
         next_time,
-        next,
         advance!,
+        next,
         init
-        # initialize,
 
 # reweighting (needs makeover)
 export  expectation_value_from_timeseries,
         distribution_from_timeseries
+        
         # reweighting
 
 # helper

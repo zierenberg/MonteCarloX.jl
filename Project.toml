@@ -1,26 +1,30 @@
 name = "MonteCarloX"
 uuid = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
-authors = ["Johannes Zierenberg", "Martin Weigel"]
 version = "0.1.0"
+authors = ["Johannes Zierenberg", "Martin Weigel"]
 
 [deps]
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 
 [compat]
-julia = "1"
+BenchmarkTools = "1.6.3"
 Distributions = "0.25"
+Graphs = "1.13.2"
 StaticArrays = "1"
 StatsBase = "0.34"
+julia = "1"
 
 [extras]
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 HypothesisTests = "09f84164-cd44-5f33-b23f-e6b0d136a0d5"
-LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "HypothesisTests", "LightGraphs"]
+test = ["Test", "HypothesisTests", "Graphs", "BenchmarkTools"]
+dev = ["BenchmarkTools"]

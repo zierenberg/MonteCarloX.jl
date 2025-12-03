@@ -1,82 +1,94 @@
-struct PoissonProcess end
+abstract type AbstractPoissonProcess end
 """
-    SimulationPoissonProcess
+    PoissonProcess(rate; rng=Random.GLOBAL_RNG)
 
-object that handles Poisson process simulations. Includes `rng` for
-persistent and reproducible simulation, the option for time-dependent rates, and the option for optimization schemes (e.g. when the rate function is known to monotonically decrease between events).
+Homogeneous Poisson process with constant rate.
+
+# Arguments
+- `rate::Real` — single process
+- `rate::AbstractVector{<:Real}` — multiple processes
 """
-struct SimulationPoissonProcess{T1,T2}
-   rng::AbstractRNG
-   rate::T1
-   generation_rate::T2
-   piecewise_rate_decrease::Bool
+struct PoissonProcess{R<:AbstractRNG,T} <: AbstractPoissonProcess
+    rng::R
+    rate::T
 end
-function init(rng::AbstractRNG, alg::PoissonProcess, rate; generation_rate=nothing, piecewise_rate_decrease::Bool=false)
-    if isa(rate, Number)
-        rate = float(rate)
-        @info "Creating Poisson process with constant rate"
-    elseif isa(rate, AbstractVector)
-        rate = float.(rate)
-        @info "Creating Poisson process with constant rates for multiple channels"
-    elseif isa(rate, Function)
-        @info "Creating Poisson process with time-dependent rate(s)"
-        if generation_rate === nothing && piecewise_rate_decrease == false
-            error("Either generation_rate has to be provided or `piecewise_rate_decrease` has to be true.")
-        end
-        if isa(generation_rate, Number)
-            generation_rate = float(generation_rate)
-        end
-    else
-        error("Rate has to be either Number, Vector{Number}, or Function.")
-    end
-    return SimulationPoissonProcess(rng, rate, generation_rate, piecewise_rate_decrease)
-end
+PoissonProcess(rate; rng=Random.GLOBAL_RNG) = PoissonProcess(rng, float(rate))
 
-init(alg::PoissonProcess, rate; generation_rate=nothing, piecewise_rate_decrease::Bool=false) = init(Random.GLOBAL_RNG, alg, rate; generation_rate=generation_rate, piecewise_rate_decrease=piecewise_rate_decrease)
-
-@doc raw"""
-    next(sim::PoissonProcess; t=nothing)
-
-Next stochastic event (``\Delta t``, index) for a collection of Poisson processes. 
-If they are inhomogeneous then the current time needs to be provided. 
-For most custom solutions, use `next_time` and `next_event` directly.
 """
-# for a single Poisson process
-function next(sim::SimulationPoissonProcess{T1,T2})::Tuple{Float64,Int} where T1 <: Number where T2 <: Nothing
-    rate = sim.rate
-    dt = next_time(sim.rng, rate)
-    return dt, 0
+    InhomogeneousPoissonProcess(rate, generation_rate; rng=Random.GLOBAL_RNG)
+
+Inhomogeneous Poisson process with time-dependent rate.
+
+# Arguments
+- `rate`: function that returns either a scalar or vector of instantaneous rates at time `t`
+- `generation_rate`: upper bound on the instantaneous rate (for thinning algorithm)
+"""
+struct InhomogeneousPoissonProcess{R<:AbstractRNG,F,G} <: AbstractPoissonProcess
+    rng::R
+    rate::F
+    generation_rate::G
 end
-# for multiple Poisson processes (should be identical to the kinetic Monte Carlo case for constant rates)
-function next(sim::SimulationPoissonProcess{T1,T2})::Tuple{Float64,Int} where T1 <: AbstractVector where T2 <: Nothing
-    sum_rates = sum(sim.rate)
-    if !(sum_rates > 0)
-        return Inf, 0
+InhomogeneousPoissonProcess(rate, generation_rate; rng=Random.GLOBAL_RNG) =
+    InhomogeneousPoissonProcess(rng, rate, generation_rate)
+
+"""
+    advance!(pp::AbstractPoissonProcess, t_final; t0=0, update!=nothing)
+
+Advance a Poisson process until time `t_final`.
+
+# Arguments
+- `pp`: the Poisson process (homogeneous or inhomogeneous)
+- `t_final`: final time
+- `t0`: initial time (default 0)
+- `update!`: optional callback `update!(event, t)` for storing events or manipulating state
+
+# Returns
+Final time `t` (may exceed `t_final` for the last event).
+
+# Implementation notes
+For homogeneous processes, events are generated directly from the constant rate.
+For inhomogeneous processes, the thinning algorithm is used with `generation_rate` as an upper bound.
+"""
+advance!(pp::AbstractPoissonProcess, t_final; t0=0, update! = nothing)
+
+# Homogeneous Poisson process
+function advance!(
+    pp::PoissonProcess, 
+    t_final; 
+    t0=zero(typeof(t_final)), 
+    update! = nothing
+)   
+    t = t0
+    while t < t_final
+        sum_rates = sum(pp.rate) # this important in case update! changes rates
+        sum_rates <= 0 && return oftype(t, Inf)     
+        dt = next_time(pp.rng, sum_rates)
+        t += dt
+        event = next_event(pp.rng, pp.rate)
+        update! !== nothing && update!(pp, t, event)
     end
-    dt = next_time(sim.rng, sum_rates)
-    id = next_event(sim.rng, sim.rate)
-    return dt, id
+
+    return t
 end
-# for inhomogeneous Poisson process with time-dependent rate function and fixed generation rate
-function next(sim::SimulationPoissonProcess{T1,T2}, t::Number)::Tuple{Float64,Int} where T1 <: Function where T2 <: Union{Number, AbstractArray}
-    global_rate(time) = sum(sim.rate(time))
-    generation_rate = sum(sim.generation_rate)
-    if !(generation_rate > 0)
-        return Inf, 0
+
+# Inhomogeneous Poisson process
+function advance!(
+    pp::InhomogeneousPoissonProcess,
+    t_final;
+    t0=zero(typeof(t_final)),
+    update! = nothing
+)
+    t = t0
+    while t < t_final
+        # this is important in case update! changes rates
+        gen_rate = sum(pp.generation_rate)
+        gen_rate <= 0 && return oftype(t, Inf)
+        dt = next_time(pp.rng, t->sum(pp.rate(t)), gen_rate)
+        t += dt
+        # get event based on the relative rates at time of event
+        event = next_event(pp.rng, pp.rate(t))
+        update! !== nothing && update!(pp, t, event)
     end
-    dt = next_time(sim.rng, global_rate, generation_rate)
-    id = next_event(sim.rng, sim.rate(t+dt))
-    return t+dt, id
+
+    return t
 end
-# makes no sense without feedback that intermediately increases the rate
-# # for inhomogeneous Poisson process with time-dependent rate function and local piecewise generation rate
-# function next(sim::SimulationPoissonProcess{T1,T2}, t::Number)::Tuple{Float64,Int} where T1 <: Function where T2 <: Nothing
-#     global_rate(time) = sum(sim.rate(time))
-#     generation_rate = global_rate(t)
-#     if !(generation_rate > 0)
-#         return Inf, 0
-#     end
-#     dt = next_time(sim.rng, global_rate(t), generation_rate)
-#     id = next_event(sim.rng, sim.rate(t+dt))
-#     return t+dt, id
-# end
