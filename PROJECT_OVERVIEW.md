@@ -18,10 +18,14 @@ MonteCarloX.jl is a Julia package for Monte Carlo simulations with a focus on **
 ```
 MonteCarloX.jl/
 ├── src/                      # Core algorithms package
+│   ├── abstractions.jl       # Core abstract types (shared by all algorithms)
 │   ├── measurements/         # Measurement framework
-│   ├── equilibrium/          # Equilibrium algorithms (Metropolis, etc.)
-│   ├── nonequilibrium/       # Non-equilibrium algorithms (Gillespie, KMC, etc.)
-│   ├── event_handler.jl      # Event handling for non-equilibrium
+│   ├── algorithms/           # All Monte Carlo algorithms
+│   │   ├── metropolis.jl     # Metropolis algorithm (equilibrium)
+│   │   ├── gillespie.jl      # Gillespie algorithm (non-equilibrium)
+│   │   ├── kinetic_monte_carlo.jl  # Kinetic Monte Carlo
+│   │   └── poisson_process.jl      # Poisson process
+│   ├── event_handler.jl      # Event handling utilities
 │   ├── rng.jl                # Random number generation utilities
 │   ├── utils.jl              # General utilities
 │   └── MonteCarloX.jl        # Main module
@@ -47,41 +51,51 @@ abstract type AbstractMeasurement end
 ### Key Components
 
 #### 1. Systems (AbstractSystem)
-- Represent what you simulate (Ising model, particle system, Bayesian problem)
+- Represent what you simulate
+- **Equilibrium**: Ising model, particle system, Bayesian problem
+- **Non-equilibrium**: Birth-death process, SIR model, reaction networks
 - Live in **submodules** (SpinSystems) or **external packages**
-- Provide state, observables, and update interfaces
+- Provide state, observables, rates, and update interfaces
 - **Never** defined in MonteCarloX core
 
 #### 2. Algorithms (AbstractAlgorithm)
-- Represent how you sample (Metropolis, Gillespie, KMC)
-- Live in **MonteCarloX core**
-- Hold RNG, logweight, statistics
+- Represent how you sample/simulate
+- **All algorithms** use the same AbstractAlgorithm interface
+- **Equilibrium**: Metropolis, Heat Bath, Cluster updates
+- **Non-equilibrium**: Gillespie, Kinetic Monte Carlo, Poisson process
+- Live in **MonteCarloX core** (`src/algorithms/`)
+- Hold RNG, parameters, and statistics
 - Work with any compatible system
 
 #### 3. LogWeights (AbstractLogWeight)
-- Weight functions for importance sampling
+- Weight functions for equilibrium importance sampling
 - Examples: `BoltzmannLogWeight`, `MulticanonicalWeight`
 - Callable objects: `lw(energy) -> log_weight`
+- Used by equilibrium algorithms (Metropolis, etc.)
 
 #### 4. Measurements
-- Framework for tracking observables
+- Framework for tracking observables over time
+- Works for both equilibrium and non-equilibrium simulations
 - Two schedules: `IntervalSchedule` (every N steps), `PreallocatedSchedule` (specific times)
 - Container: `Measurements{K,S}` holds multiple named measurements
 
 ## Module Organization
 
+### src/abstractions.jl
+Core abstract types shared by all algorithms:
+- `AbstractSystem` - Base for all systems (equilibrium and non-equilibrium)
+- `AbstractAlgorithm` - Base for all algorithms (Metropolis, Gillespie, etc.)
+- `AbstractLogWeight` - Weight functions for importance sampling
+- `AbstractUpdate`, `AbstractMeasurement` - Update and measurement interfaces
+
 ### src/measurements/
-Contains the measurement framework:
+Measurement framework:
 - `measurements.jl` - Core measurement types and schedules
 
-### src/equilibrium/
-Equilibrium Monte Carlo algorithms:
-- `abstractions.jl` - Base types (AbstractSystem, AbstractLogWeight, etc.)
-- `equilibrium.jl` - Metropolis and importance sampling algorithms
-
-### src/nonequilibrium/
-Non-equilibrium algorithms for stochastic processes:
-- `gillespie.jl` - Gillespie algorithm (exact stochastic simulation)
+### src/algorithms/
+All Monte Carlo algorithms in one place:
+- `metropolis.jl` - Metropolis algorithm (equilibrium importance sampling)
+- `gillespie.jl` - Gillespie algorithm (non-equilibrium stochastic simulation)
 - `kinetic_monte_carlo.jl` - Kinetic Monte Carlo
 - `poisson_process.jl` - Poisson process simulations
 
@@ -166,15 +180,16 @@ end
 ## File Organization Rules
 
 ### DO's:
-- ✅ Put algorithms in `src/equilibrium/` or `src/nonequilibrium/`
+- ✅ Put all algorithms in `src/algorithms/` (both equilibrium and non-equilibrium)
 - ✅ Put systems in submodules (SpinSystems/) or external packages
 - ✅ Put examples/tutorials in `notebooks/`
 - ✅ Keep utilities at `src/` root if general-purpose
-- ✅ Use descriptive module organization
+- ✅ Use shared abstractions for all algorithm types
 
 ### DON'Ts:
 - ❌ Put system implementations in MonteCarloX core
 - ❌ Mix algorithms and models in same file
+- ❌ Create artificial separation between equilibrium/non-equilibrium
 - ❌ Create examples with old/incompatible API
 - ❌ Add dependencies unless necessary
 
@@ -195,7 +210,7 @@ end
 
 ## Development Workflow
 
-1. **Adding New Algorithm**: Put in `src/equilibrium/` or `src/nonequilibrium/`
+1. **Adding New Algorithm**: Put in `src/algorithms/my_algorithm.jl`
 2. **Adding New System**: Put in appropriate submodule (SpinSystems, etc.)
 3. **Adding Example**: Create notebook in `notebooks/`
 4. **Breaking Change**: Update MIGRATION_GUIDE.md
@@ -218,7 +233,7 @@ end
 
 ### Extending with New Algorithm
 ```julia
-# In src/equilibrium/ or src/nonequilibrium/
+# In src/algorithms/
 mutable struct MyAlgorithm <: AbstractAlgorithm
     rng::AbstractRNG
     # ... parameters
@@ -241,16 +256,16 @@ end
 
 1. **Never add system implementations to MonteCarloX core**
 2. **Maintain clean separation**: algorithms ≠ systems ≠ measurements
-3. **Use type-based dispatch** for extensibility
-4. **Keep backward compatibility** when possible
-5. **Document design decisions** in API_DESIGN.md
-6. **Put examples in notebooks/**, not root examples/
-7. **Organize by purpose**: equilibrium/, nonequilibrium/, measurements/
+3. **All algorithms share the same AbstractSystem and AbstractAlgorithm abstractions**
+4. **No artificial separation between equilibrium/non-equilibrium**
+5. **Use type-based dispatch** for extensibility
+6. **Keep backward compatibility** when possible
+7. **Document design decisions** in API_DESIGN.md
+8. **Put examples in notebooks/**, not root examples/
 
 ## Quick Reference
 
-**Adding equilibrium algorithm**: `src/equilibrium/my_algorithm.jl`  
-**Adding non-equilibrium algorithm**: `src/nonequilibrium/my_algorithm.jl`  
+**Adding algorithm**: `src/algorithms/my_algorithm.jl` (equilibrium or non-equilibrium)  
 **Adding system**: `SpinSystems/src/my_system.jl` or new submodule  
 **Adding example**: `notebooks/my_example.jl` or `.ipynb`  
 **Adding utility**: `src/utils.jl` or new file at `src/`  

@@ -1,5 +1,8 @@
 # Core API Abstractions
-# Based on examples/api.ipynb
+# Based on notebooks/api.ipynb
+# 
+# These abstractions are shared by all Monte Carlo algorithms,
+# both equilibrium (Metropolis, etc.) and non-equilibrium (Gillespie, KMC, etc.)
 
 """
     AbstractSystem
@@ -8,8 +11,15 @@ Base type for all systems in MonteCarloX.
 
 A system contains:
 - State and constraints
+- For equilibrium: spins, particles, configuration
+- For non-equilibrium: population, rates, state variables
 - In Bayesian case: data and latent variables
-- Everything needed to calculate log_weight
+- Everything needed to calculate log_weight or rates
+
+Examples:
+- Equilibrium: Ising model, particle system
+- Non-equilibrium: Birth-death process, SIR model
+- Bayesian: Hierarchical model with latent variables
 """
 abstract type AbstractSystem end
 
@@ -32,9 +42,13 @@ abstract type AbstractLogWeight end
 Base type for all Monte Carlo algorithms.
 
 An Algorithm:
-- Holds the logweight function that operates on the system
-- Represents "the" Markov chain
-- May store state like RNG, step counters, acceptance statistics
+- Represents the sampling/simulation method
+- May hold RNG, parameters, and statistics
+- Works with AbstractSystem
+
+Examples:
+- Equilibrium: Metropolis, Heat Bath, Cluster updates
+- Non-equilibrium: Gillespie, Kinetic Monte Carlo, Poisson process
 """
 abstract type AbstractAlgorithm end
 
