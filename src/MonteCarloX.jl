@@ -6,6 +6,9 @@ using StatsBase
 using LinearAlgebra
 using StaticArrays
 
+# Core abstractions (shared by all algorithms)
+include("abstractions.jl")
+
 # Utilities
 include("utils.jl")
 include("event_handler.jl")
@@ -14,14 +17,11 @@ include("rng.jl")
 # Measurement framework
 include("measurements/measurements.jl")
 
-# Equilibrium algorithms
-include("equilibrium/abstractions.jl")
-include("equilibrium/equilibrium.jl")
-
-# Non-equilibrium algorithms
-include("nonequilibrium/gillespie.jl")
-include("nonequilibrium/kinetic_monte_carlo.jl")
-include("nonequilibrium/poisson_process.jl")
+# Algorithms (equilibrium and non-equilibrium)
+include("algorithms/metropolis.jl")
+include("algorithms/gillespie.jl")
+include("algorithms/kinetic_monte_carlo.jl")
+include("algorithms/poisson_process.jl")
 
 # Include SpinSystems as a submodule
 include("../SpinSystems/src/SpinSystems.jl")

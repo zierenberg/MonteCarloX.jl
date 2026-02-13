@@ -69,10 +69,10 @@ The new API is built around clean abstractions:
 ```
 MonteCarloX.jl/
 ├── src/
+│   ├── abstractions.jl        # Core types (AbstractSystem, AbstractAlgorithm, etc.)
 │   ├── measurements/          # Measurement framework
-│   ├── equilibrium/           # Equilibrium algorithms (Metropolis, etc.)
-│   ├── nonequilibrium/        # Non-equilibrium algorithms (Gillespie, KMC, etc.)
-│   ├── event_handler.jl       # Event handling for non-equilibrium
+│   ├── algorithms/            # All algorithms (Metropolis, Gillespie, KMC, etc.)
+│   ├── event_handler.jl       # Event handling utilities
 │   ├── rng.jl                 # Random number utilities
 │   ├── utils.jl               # General utilities
 │   └── MonteCarloX.jl         # Main module
