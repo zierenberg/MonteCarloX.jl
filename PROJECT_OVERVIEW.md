@@ -21,11 +21,13 @@ MonteCarloX.jl/
 │   ├── abstractions.jl       # Core abstract types (shared by all algorithms)
 │   ├── measurements/         # Measurement framework
 │   ├── algorithms/           # All Monte Carlo algorithms
-│   │   ├── metropolis.jl     # Metropolis algorithm (equilibrium)
-│   │   ├── gillespie.jl      # Gillespie algorithm (non-equilibrium)
-│   │   ├── kinetic_monte_carlo.jl  # Kinetic Monte Carlo
-│   │   └── poisson_process.jl      # Poisson process
-│   ├── event_handler.jl      # Event handling utilities
+│   │   ├── event_handler.jl  # Event handling for kinetic Monte Carlo
+│   │   ├── importance_sampling.jl  # Metropolis (simplest importance sampling)
+│   │   ├── kinetic_monte_carlo.jl  # Gillespie (simplest KMC) and general KMC
+│   │   ├── poisson_process.jl      # Poisson process
+│   │   ├── multicanonical.jl       # (Placeholder) Generalized ensemble methods
+│   │   ├── parallel_tempering.jl   # (Placeholder) Replica exchange
+│   │   └── population_annealing.jl # (Placeholder) Population annealing
 │   ├── rng.jl                # Random number generation utilities
 │   ├── utils.jl              # General utilities
 │   └── MonteCarloX.jl        # Main module
@@ -93,14 +95,22 @@ Measurement framework:
 - `measurements.jl` - Core measurement types and schedules
 
 ### src/algorithms/
-All Monte Carlo algorithms in one place:
-- `metropolis.jl` - Metropolis algorithm (equilibrium importance sampling)
-- `gillespie.jl` - Gillespie algorithm (non-equilibrium stochastic simulation)
-- `kinetic_monte_carlo.jl` - Kinetic Monte Carlo
+All Monte Carlo algorithms organized by type:
+
+**Importance Sampling:**
+- `importance_sampling.jl` - Metropolis (simplest importance sampling)
+- `multicanonical.jl` - (Placeholder) Generalized ensemble methods
+- `parallel_tempering.jl` - (Placeholder) Replica exchange
+- `population_annealing.jl` - (Placeholder) Population annealing
+
+**Kinetic Monte Carlo:**
+- `kinetic_monte_carlo.jl` - Gillespie (simplest KMC) and general KMC
+- `event_handler.jl` - Event handling infrastructure for KMC
 - `poisson_process.jl` - Poisson process simulations
 
+**Design note:** Gillespie is to KMC as Metropolis is to importance sampling - the simplest case that shares the same infrastructure.
+
 ### Utilities (src/ root level)
-- `event_handler.jl` - Event scheduling/handling for non-equilibrium
 - `rng.jl` - Random number generation utilities
 - `utils.jl` - General utility functions (log_sum, binary_search, etc.)
 

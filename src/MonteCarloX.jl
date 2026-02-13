@@ -11,17 +11,20 @@ include("abstractions.jl")
 
 # Utilities
 include("utils.jl")
-include("event_handler.jl")
 include("rng.jl")
 
 # Measurement framework
 include("measurements/measurements.jl")
 
-# Algorithms (equilibrium and non-equilibrium)
-include("algorithms/metropolis.jl")
-include("algorithms/gillespie.jl")
-include("algorithms/kinetic_monte_carlo.jl")
-include("algorithms/poisson_process.jl")
+# Algorithms
+include("algorithms/event_handler.jl")  # Event handling for kinetic Monte Carlo
+include("algorithms/importance_sampling.jl")  # Metropolis and importance sampling
+include("algorithms/kinetic_monte_carlo.jl")  # Gillespie (simplest KMC) and general KMC
+include("algorithms/poisson_process.jl")  # Poisson processes
+# Future algorithms (placeholders):
+# include("algorithms/multicanonical.jl")
+# include("algorithms/parallel_tempering.jl")
+# include("algorithms/population_annealing.jl")
 
 # Include SpinSystems as a submodule
 include("../SpinSystems/src/SpinSystems.jl")
@@ -42,7 +45,7 @@ export Measurement,
        measure!,
        is_complete
 
-# Export equilibrium algorithms (new API)
+# Export importance sampling algorithms
 export AbstractImportanceSampling,
        BoltzmannLogWeight,
        Metropolis,
@@ -50,9 +53,10 @@ export AbstractImportanceSampling,
        acceptance_rate,
        reset_statistics!
 
-# Export non-equilibrium algorithms
+# Export kinetic Monte Carlo algorithms
 export Gillespie,
        KineticMonteCarlo,
+       SimulationKineticMonteCarlo,
        PoissonProcess,
        InhomogeneousPoissonProcess,
        next_event,

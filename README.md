@@ -71,8 +71,14 @@ MonteCarloX.jl/
 ├── src/
 │   ├── abstractions.jl        # Core types (AbstractSystem, AbstractAlgorithm, etc.)
 │   ├── measurements/          # Measurement framework
-│   ├── algorithms/            # All algorithms (Metropolis, Gillespie, KMC, etc.)
-│   ├── event_handler.jl       # Event handling utilities
+│   ├── algorithms/            # All Monte Carlo algorithms
+│   │   ├── event_handler.jl   # Event handling for KMC
+│   │   ├── importance_sampling.jl  # Metropolis (simplest importance sampling)
+│   │   ├── kinetic_monte_carlo.jl  # Gillespie (simplest KMC) and general KMC
+│   │   ├── poisson_process.jl      # Poisson processes
+│   │   ├── multicanonical.jl       # (Placeholder) Generalized ensemble
+│   │   ├── parallel_tempering.jl   # (Placeholder) Replica exchange
+│   │   └── population_annealing.jl # (Placeholder) Population annealing
 │   ├── rng.jl                 # Random number utilities
 │   ├── utils.jl               # General utilities
 │   └── MonteCarloX.jl         # Main module
@@ -84,8 +90,9 @@ MonteCarloX.jl/
 │   └── README.md
 ├── notebooks/                 # Jupyter notebooks with examples
 │   ├── api.ipynb              # API development notebook
-│   ├── simple_ising.jl        # Basic example
-│   └── new_api_demo.jl        # Comprehensive demo
+│   ├── simple_ising.ipynb     # Equilibrium: Ising + Metropolis
+│   ├── branching_process.ipynb       # Non-equilibrium: Branching process
+│   └── birth_death_meanfield.ipynb   # Non-equilibrium: Mean-field dynamics
 ├── examples/stash/            # Legacy examples (for reference)
 └── docs/                      # Documentation
 ```
