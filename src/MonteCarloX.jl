@@ -1,79 +1,99 @@
 module MonteCarloX
-# dependencies
+
+# Core dependencies
 using Random
 using StatsBase
 using LinearAlgebra
 using StaticArrays
-# TODO: ?exports that are relevant to run simulations in MonteCarloX
-# using Reexports
-# @reexport using Random
-# @reexport using StatsBase
 
+# Core abstractions (new API)
+include("abstractions.jl")
+
+# Utilities
 include("utils.jl")
 include("event_handler.jl")
 include("rng.jl")
 
-#TODO List
-# * Think about the interface of algorithmic structs; should they include basic
-#   elements such as weight functions or event handler?
-# * Move cluster_wolff.jl to designated SpinSystems.jl, this is an update not
-#   MonteCarlo
+# Measurement framework (new API)
+include("measurements.jl")
 
-# Equilibrium
+# Equilibrium algorithms (new API)
+include("equilibrium.jl")
+
+# Legacy equilibrium (kept for compatibility, may be deprecated)
 include("importance_sampling.jl")
 include("reweighting.jl")
 
-# Non-equilibrium
+# Non-equilibrium algorithms
 include("kinetic_monte_carlo.jl")
 include("poisson_process.jl")
 include("gillespie.jl")
 
-# move to external
+# Cluster algorithms (to be moved to SpinSystems eventually)
 include("cluster_wolff.jl")
 
-# algorithms
-export  Metropolis,
-        Gillespie,
-        KineticMonteCarlo,
-        PoissonProcess,
-        InhomogeneousPoissonProcess
+# Include SpinSystems as a submodule
+include("../SpinSystems/src/SpinSystems.jl")
 
-# functions (equilibrium)
+# Export core abstractions
+export AbstractSystem,
+       AbstractLogWeight,
+       AbstractAlgorithm,
+       AbstractUpdate,
+       AbstractMeasurement
+
+# Export measurement framework
+export Measurement,
+       Measurements,
+       MeasurementSchedule,
+       IntervalSchedule,
+       PreallocatedSchedule,
+       measure!,
+       is_complete
+
+# Export equilibrium algorithms (new API)
+export AbstractImportanceSampling,
+       BoltzmannLogWeight,
+       Metropolis,
+       accept!,
+       acceptance_rate,
+       reset_statistics!
+
+# Export legacy algorithms (for backward compatibility)
 export accept,
        sweep
-        # update -> will be moved to test/utils.jl for now and later to SpinSystems.jl
 
-# funtions (non-equilibrium)
-export  next_event,
-        next_time,
-        advance!,
-        next,
-        init
+# Export non-equilibrium algorithms
+export Gillespie,
+       KineticMonteCarlo,
+       PoissonProcess,
+       InhomogeneousPoissonProcess,
+       next_event,
+       next_time,
+       advance!,
+       next,
+       init
 
-# reweighting (needs makeover)
-export  expectation_value_from_timeseries,
-        distribution_from_timeseries
-        
-        # reweighting
+# Export reweighting utilities
+export expectation_value_from_timeseries,
+       distribution_from_timeseries
 
-# helper
-export  log_sum,
-        binary_search,
-        random_element,
-        kldivergence,
-        # event handler
-        AbstractEventHandlerRate,
-        ListEventRateSimple,
-        ListEventRateActiveMask,
-        # rng
-        MutableRandomNumbers,
-        reset
+# Export helper functions
+export log_sum,
+       binary_search,
+       random_element,
+       kldivergence
 
+# Export event handler types
+export AbstractEventHandlerRate,
+       ListEventRateSimple,
+       ListEventRateActiveMask
 
+# Export RNG utilities
+export MutableRandomNumbers,
+       reset
 
+# Re-export SpinSystems module
+export SpinSystems
 
-end # module
-
-# Maybe embedd this into StatisticalPhysics.jl, which could include
-# SpinSystems.jl, PolymerSystems.jl, DirectedPercolation, (NeuralNetworks,)
-# ComplexSystems, ComlexNetworks etc ;)
+end # module MonteCarloX
