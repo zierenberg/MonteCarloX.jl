@@ -1,0 +1,11 @@
+name = "SpinSystems"
+uuid = "8a5c3c8d-1234-5678-9abc-def012345678"
+version = "0.1.0"
+authors = ["Johannes Zierenberg", "Martin Weigel"]
+
+[deps]
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+
+[compat]
+Graphs = "1"
+julia = "1"
