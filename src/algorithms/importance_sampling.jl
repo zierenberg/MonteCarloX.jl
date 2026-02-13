@@ -54,23 +54,23 @@ Metropolis algorithm for importance sampling.
 
 # Fields
 - `rng::AbstractRNG`: Random number generator
-- `logweight::Base.Callable`: Log weight function
+- `logweight::Union{AbstractLogWeight, Function}`: Log weight function
 - `steps::Int`: Total number of steps attempted
 - `accepted::Int`: Number of accepted steps
 """
 mutable struct Metropolis <: AbstractImportanceSampling
     rng::AbstractRNG
-    logweight::Base.Callable
+    logweight::Union{AbstractLogWeight, Function}
     steps::Int
     accepted::Int
 end
 
 """
-    Metropolis(rng::AbstractRNG, logweight::Base.Callable)
+    Metropolis(rng::AbstractRNG, logweight::Union{AbstractLogWeight, Function})
 
 Create a Metropolis sampler with a general log weight function.
 """
-Metropolis(rng::AbstractRNG, logweight::Base.Callable) = 
+Metropolis(rng::AbstractRNG, logweight::Union{AbstractLogWeight, Function}) = 
     Metropolis(rng, logweight, 0, 0)
 
 """
