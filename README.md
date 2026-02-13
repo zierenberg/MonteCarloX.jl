@@ -69,26 +69,30 @@ The new API is built around clean abstractions:
 ```
 MonteCarloX.jl/
 ├── src/
-│   ├── abstractions.jl       # Core abstract types
-│   ├── equilibrium.jl         # Equilibrium algorithms (Metropolis, etc.)
-│   ├── measurements.jl        # Measurement framework
-│   ├── gillespie.jl          # Non-equilibrium: Gillespie
-│   ├── kinetic_monte_carlo.jl # Non-equilibrium: KMC
-│   └── ...
-├── SpinSystems/              # Submodule for spin models
+│   ├── measurements/          # Measurement framework
+│   ├── equilibrium/           # Equilibrium algorithms (Metropolis, etc.)
+│   ├── nonequilibrium/        # Non-equilibrium algorithms (Gillespie, KMC, etc.)
+│   ├── event_handler.jl       # Event handling for non-equilibrium
+│   ├── rng.jl                 # Random number utilities
+│   ├── utils.jl               # General utilities
+│   └── MonteCarloX.jl         # Main module
+├── SpinSystems/               # Submodule for spin models
 │   ├── src/
-│   │   ├── ising.jl          # Ising model
-│   │   ├── blume_capel.jl    # Blume-Capel model
+│   │   ├── ising.jl           # Ising model
+│   │   ├── blume_capel.jl     # Blume-Capel model
 │   │   └── ...
 │   └── README.md
-└── examples/
-    ├── new_api_demo.jl       # Demonstration of new API
-    └── api.ipynb             # API development notebook
+├── notebooks/                 # Jupyter notebooks with examples
+│   ├── api.ipynb              # API development notebook
+│   ├── simple_ising.jl        # Basic example
+│   └── new_api_demo.jl        # Comprehensive demo
+├── examples/stash/            # Legacy examples (for reference)
+└── docs/                      # Documentation
 ```
 
 ### Examples
 
-See `examples/new_api_demo.jl` for a complete demonstration showing:
+See `notebooks/new_api_demo.jl` for a complete demonstration showing:
 - Ising model simulation
 - Blume-Capel model simulation  
 - Measurement framework usage
