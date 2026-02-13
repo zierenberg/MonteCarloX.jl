@@ -6,31 +6,22 @@ using StatsBase
 using LinearAlgebra
 using StaticArrays
 
-# Core abstractions (new API)
-include("abstractions.jl")
-
 # Utilities
 include("utils.jl")
 include("event_handler.jl")
 include("rng.jl")
 
-# Measurement framework (new API)
-include("measurements.jl")
+# Measurement framework
+include("measurements/measurements.jl")
 
-# Equilibrium algorithms (new API)
-include("equilibrium.jl")
-
-# Legacy equilibrium (kept for compatibility, may be deprecated)
-include("importance_sampling.jl")
-include("reweighting.jl")
+# Equilibrium algorithms
+include("equilibrium/abstractions.jl")
+include("equilibrium/equilibrium.jl")
 
 # Non-equilibrium algorithms
-include("kinetic_monte_carlo.jl")
-include("poisson_process.jl")
-include("gillespie.jl")
-
-# Cluster algorithms (to be moved to SpinSystems eventually)
-include("cluster_wolff.jl")
+include("nonequilibrium/gillespie.jl")
+include("nonequilibrium/kinetic_monte_carlo.jl")
+include("nonequilibrium/poisson_process.jl")
 
 # Include SpinSystems as a submodule
 include("../SpinSystems/src/SpinSystems.jl")
@@ -59,10 +50,6 @@ export AbstractImportanceSampling,
        acceptance_rate,
        reset_statistics!
 
-# Export legacy algorithms (for backward compatibility)
-export accept,
-       sweep
-
 # Export non-equilibrium algorithms
 export Gillespie,
        KineticMonteCarlo,
@@ -73,10 +60,6 @@ export Gillespie,
        advance!,
        next,
        init
-
-# Export reweighting utilities
-export expectation_value_from_timeseries,
-       distribution_from_timeseries
 
 # Export helper functions
 export log_sum,
