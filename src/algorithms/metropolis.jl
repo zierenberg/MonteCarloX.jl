@@ -26,8 +26,8 @@ alg = Metropolis(Random.default_rng(), β=2.0)
 alg = Metropolis(Random.default_rng(), E -> -2.0 * sum(E))
 
 # Create with a weight object
-weight = BoltzmannLogWeight(1.5)
-alg = Metropolis(Random.default_rng(), weight)
+logweight = BoltzmannLogWeight(1.5)
+alg = Metropolis(Random.default_rng(), logweight)
 ```
 """
 mutable struct Metropolis <: AbstractImportanceSampling
