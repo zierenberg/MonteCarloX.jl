@@ -15,10 +15,10 @@ at a fixed inverse temperature β = 1/(k_B T).
 # Examples
 ```julia
 # Create weight for temperature T=2.0 (assuming k_B = 1)
-weight = BoltzmannLogWeight(0.5)
+logweight = BoltzmannLogWeight(0.5)
 
 # Evaluate log weight for energy E
-logw = weight(energy)  # Returns -β * energy
+logw = logweight(energy)  # Returns -β * energy
 ```
 """
 struct BoltzmannLogWeight <: AbstractLogWeight
@@ -35,10 +35,10 @@ If E is a collection, the sum of all components is used.
 
 # Examples
 ```julia
-weight = BoltzmannLogWeight(1.0)
-weight(-2.5)              # Returns 2.5
-weight([-1, -2, -3])      # Returns 6.0
-weight((H=-10, M=2))      # Returns 8.0 (from named tuple)
+logweight = BoltzmannLogWeight(1.0)
+logweight(-2.5)              # Returns 2.5
+logweight([-1, -2, -3])      # Returns 6.0
+logweight((H=-10, M=2))      # Returns 8.0 (from named tuple)
 ```
 """
 @inline (lw::BoltzmannLogWeight)(E) = -lw.β * sum(E)
