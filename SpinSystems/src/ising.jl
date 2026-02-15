@@ -6,7 +6,7 @@ using Graphs
 """
     Ising{T} <: AbstractSpinSystem
 
-2D Ising model on a graph.
+Ising model on a graph.
 
 # Fields
 - `spins::Vector{Int8}`: Spin configuration (±1)
@@ -87,7 +87,7 @@ function init!(sys::Ising, type::Symbol; rng=nothing, states=[-1, 1])
         # Recompute bookkeeping
         sum_pairs = zero(sys.J)
         for i in 1:length(sys.spins)
-            sum_pairs += _local_spin_pairs(sys, i)
+            sum_pairs += local_spin_pairs(sys, i)
         end
         sys.sum_pairs = sum_pairs ÷ 2
         sys.sum_spins = sum(sys.spins)
@@ -95,22 +95,6 @@ function init!(sys::Ising, type::Symbol; rng=nothing, states=[-1, 1])
         error("Unknown initialization type: $type")
     end
     return sys
-end
-
-# Helper functions
-
-"""
-    _local_spin_pairs(sys::Ising, i)
-
-Calculate sum of sᵢsⱼ for site i with all its neighbors.
-"""
-@inline function _local_spin_pairs(sys::Ising, i)
-    s = sys.spins[i]
-    acc = 0
-    for j in sys.nbrs[i]
-        acc += s * sys.spins[j]
-    end
-    return acc
 end
 
 # Observables
@@ -134,7 +118,7 @@ Calculate total energy.
 
 Calculate energy change if spin at site i is flipped.
 """
-@inline delta_energy(sys::Ising, i) = 2 * sys.J * _local_spin_pairs(sys, i)
+@inline delta_energy(sys::Ising, i) = 2 * sys.J * local_spin_pairs(sys, i)
 
 # Updates
 

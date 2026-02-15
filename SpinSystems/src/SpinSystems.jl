@@ -8,9 +8,8 @@ concrete implementations of AbstractSystem for various spin models.
 """
 module SpinSystems
 
-# Import required types from parent scope
-# These will be defined in MonteCarloX
-using ..MonteCarloX: AbstractSystem, AbstractImportanceSampling, accept!
+# Import required types from MonteCarloX
+using MonteCarloX: AbstractSystem, AbstractImportanceSampling, accept!
 
 export AbstractSpinSystem,
        Ising,

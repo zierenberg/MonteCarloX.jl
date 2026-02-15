@@ -16,18 +16,21 @@ include("rng.jl")
 # Measurement framework
 include("measurements/measurements.jl")
 
-# Algorithms
-include("algorithms/event_handler.jl")  # Event handling for kinetic Monte Carlo
-include("algorithms/importance_sampling.jl")  # Metropolis and importance sampling
-include("algorithms/kinetic_monte_carlo.jl")  # Gillespie (simplest KMC) and general KMC
-include("algorithms/poisson_process.jl")  # Poisson processes
+# Log weights (for importance sampling and other algorithms)
+include("weights/boltzmann.jl")  # Canonical ensemble
+
+# Algorithms (equilibrium)
+include("algorithms/importance_sampling.jl")  # Core importance sampling functions (accept!, etc.)
+include("algorithms/metropolis.jl")  # Metropolis importance sampling
 # Future algorithms (placeholders):
 # include("algorithms/multicanonical.jl")
 # include("algorithms/parallel_tempering.jl")
 # include("algorithms/population_annealing.jl")
 
-# Include SpinSystems as a submodule
-include("../SpinSystems/src/SpinSystems.jl")
+# Algorithms (non-equilibrium)
+include("algorithms/event_handler.jl")  # Event handling for kinetic Monte Carlo (must come before KMC)
+include("algorithms/kinetic_monte_carlo.jl")  # Gillespie (simplest KMC) and general KMC
+include("algorithms/poisson_process.jl")  # Poisson processes
 
 # Export core abstractions
 export AbstractSystem,
@@ -79,8 +82,5 @@ export AbstractEventHandlerRate,
 # Export RNG utilities
 export MutableRandomNumbers,
        reset
-
-# Re-export SpinSystems module
-export SpinSystems
 
 end # module MonteCarloX

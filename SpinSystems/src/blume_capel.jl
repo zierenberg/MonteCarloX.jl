@@ -97,7 +97,7 @@ function init!(sys::BlumeCapel, type::Symbol; rng=nothing)
         # Recompute bookkeeping
         sum_pairs = 0
         for i in 1:length(sys.spins)
-            sum_pairs += _local_spin_pairs(sys, i)
+            sum_pairs += local_spin_pairs(sys, i)
         end
         sys.sum_pairs = sum_pairs ÷ 2
         sys.sum_spins = sum(sys.spins)
@@ -106,22 +106,6 @@ function init!(sys::BlumeCapel, type::Symbol; rng=nothing)
         error("Unknown initialization type: $type")
     end
     return sys
-end
-
-# Helper functions
-
-"""
-    _local_spin_pairs(sys::BlumeCapel, i)
-
-Calculate sum of sᵢsⱼ for site i with all its neighbors.
-"""
-@inline function _local_spin_pairs(sys::BlumeCapel, i)
-    s = sys.spins[i]
-    acc = 0
-    for j in sys.nbrs[i]
-        acc += s * sys.spins[j]
-    end
-    return acc
 end
 
 # Observables
@@ -147,7 +131,7 @@ Calculate energy change if spin at site i changes to s_new.
 """
 @inline function delta_energy(sys::BlumeCapel, i, s_new)
     s_old = sys.spins[i]
-    ΔE_exchange = sys.J * (s_old - s_new) * _local_spin_pairs(sys, i)
+    ΔE_exchange = sys.J * (s_old - s_new) * local_spin_pairs(sys, i)
     ΔE_field = sys.D * (s_new^2 - s_old^2)
     return ΔE_exchange + ΔE_field
 end
@@ -170,7 +154,7 @@ Change spin at site i to s_new and update cached quantities.
     sys.spins[i] = s_new
 
     # Update bookkeeping
-    Δ_pairs = (s_new - s_old) * _local_spin_pairs(sys, i) ÷ 2
+    Δ_pairs = (s_new - s_old) * local_spin_pairs(sys, i) ÷ 2
     sys.sum_pairs += Δ_pairs
     sys.sum_spins += (s_new - s_old)
     sys.sum_spins2 += (s_new^2 - s_old^2)
