@@ -5,7 +5,9 @@ authors = ["Johannes Zierenberg", "Martin Weigel"]
 
 [deps]
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
 
 [compat]
 Graphs = "1"
+MonteCarloX = "0.1"
 julia = "1"
