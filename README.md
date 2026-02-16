@@ -21,13 +21,14 @@ This branch implements a **completely redesigned API** based on `examples/api.ip
 ✓ **Reusable algorithms**: Same Metropolis works for Ising, Blume-Capel, or custom systems  
 ✓ **No system definitions in core**: MonteCarloX contains only algorithms  
 ✓ **Type-based dispatch**: Clean, extensible design using Julia's type system  
+✓ **Testing boundaries**: Core tests live in `test/`; model tests live in `SpinSystems/test/`  
 
 ### Quick Start
 
 ```julia
 using Random
 using MonteCarloX
-using MonteCarloX.SpinSystems
+using SpinSystems
 
 # Create an Ising model
 rng = MersenneTwister(42)
@@ -93,23 +94,31 @@ MonteCarloX.jl/
 │   ├── simple_ising.ipynb     # Equilibrium: Ising + Metropolis
 │   ├── branching_process.ipynb       # Non-equilibrium: Branching process
 │   └── birth_death_meanfield.ipynb   # Non-equilibrium: Mean-field dynamics
+├── SpinSystems/test/          # Model-level tests
 ├── examples/stash/            # Legacy examples (for reference)
 └── docs/                      # Documentation
 ```
 
 ### Examples
 
-See `notebooks/new_api_demo.jl` for a complete demonstration showing:
-- Ising model simulation
-- Blume-Capel model simulation  
-- Measurement framework usage
-- Algorithm reusability across systems
+See the notebooks in `notebooks/` for complete demonstrations:
+- `api.ipynb`: end-to-end API walkthrough
+- `simple_ising.ipynb`: equilibrium Ising + Metropolis
+- `branching_process.ipynb`: non-equilibrium branching process
+- `birth_death_meanfield.ipynb`: mean-field non-equilibrium dynamics
 
 ## Goal
 
 Since Monte Carlo algorithms are often tailored to specific problems, we break them down into small basic functions that can be applied independent of the underlying models. We thereby **separate the algorithmic part from the model part**. 
 
 MonteCarloX contains only the core algorithmic components. Models are provided by submodules (SpinSystems) or external packages. Different from other simulation packages, the goal of MonteCarloX is **not** to hide the final simulation under simple black-box function calls, but to foster the construction of clean **template simulations** where algorithms and models can be easily swapped.
+
+## Testing
+
+- **Core (MonteCarloX)**: Run from the repository root: `julia --project -e 'using Pkg; Pkg.test()'`
+- **Models (SpinSystems)**: Run from the SpinSystems directory: `julia --project=SpinSystems -e 'using Pkg; Pkg.test()'`
+
+Core tests cover algorithms, log weights, measurements, RNG utilities, and event handling. Model behavior (Ising, Blume-Capel, etc.) is validated in `SpinSystems/test/` to keep responsibilities separated.
 
 ## Roadmap
 

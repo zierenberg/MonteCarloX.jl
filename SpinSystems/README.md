@@ -56,7 +56,7 @@ where spins can take values {-1, 0, +1}.
 **Example usage:**
 ```julia
 using MonteCarloX
-using MonteCarloX.SpinSystems
+using SpinSystems
 
 # Create BlumeCapel model
 sys = BlumeCapel([8, 8], J=1, D=0.5, periodic=true)
@@ -100,7 +100,7 @@ SpinSystems is designed to work seamlessly with MonteCarloX's algorithms:
 using Random
 using StatsBase
 using MonteCarloX
-using MonteCarloX.SpinSystems
+using SpinSystems
 
 rng = MersenneTwister(42)
 sys = Ising([8, 8])

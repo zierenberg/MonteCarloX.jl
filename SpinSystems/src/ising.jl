@@ -4,7 +4,7 @@
 Base type for Ising-like models with simplified spin flip interface.
 
 Implementations must provide:
-- `delta_energy(sys, i)`: Energy change from flipping spin i
+- `delta_energy(sys, i)`: Energy change from flipping spin \$i\$
 - `modify!(sys, i, ΔE)`: Apply spin flip and update cached quantities
 """
 abstract type AbstractIsing <: AbstractSpinSystem end
@@ -16,15 +16,15 @@ using Graphs
 Ising model on a graph.
 
 # Fields
-- `spins::Vector{Int8}`: Spin configuration (±1)
+- `spins::Vector{Int8}`: Spin configuration \$(\\pm 1)\$
 - `graph::SimpleGraph`: Underlying graph structure
-- `nbrs::Vector{Vector{Int}}`: Precomputed neighbor lists
-- `J::T`: Coupling constant (can be scalar or vector for inhomogeneous systems)
-- `sum_pairs::Int`: Cached sum of sᵢsⱼ over edges
-- `sum_spins::Int`: Cached sum of spins
+- `nbrs::Vector{Vector{Int}}`: Precomputed neighbor lists (this is done during construction)
+- `J::T`: Coupling constant \$J\$ (can be scalar or vector for inhomogeneous systems)
+- `sum_pairs::Int`: Cached sum of \$\\sum_{\\langle i,j \\rangle} s_i s_j\$ over edges
+- `sum_spins::Int`: Cached sum of \$\\sum_i s_i\$
 
 # Hamiltonian
-\$ H = -J \\sum_{⟨i,j⟩} s_i s_j - h \\sum_i s_i \$
+\$ H = -J \\sum_{\\langle i,j \\rangle} s_i s_j - h \\sum_i s_i \$
 """
 mutable struct Ising{T} <: AbstractIsing
     spins::Vector{Int8}
@@ -57,8 +57,8 @@ end
 Convenience constructor for Ising model on a hypercubic lattice.
 
 # Arguments
-- `dims`: Dimensions of the lattice [Lx, Ly, ...]
-- `J`: Coupling constant (default: 1)
+- `dims`: Dimensions of the lattice \$[L_x, L_y, \\ldots]\$
+- `J`: Coupling constant \$J\$ (default: 1)
 - `periodic`: Use periodic boundary conditions (default: true)
 """
 function Ising(dims::Vector{Int}; J=1, periodic=true)
@@ -73,8 +73,8 @@ Initialize the Ising system.
 
 # Arguments
 - `sys`: Ising system to initialize
-- `type`: Initialization type (:up, :down, :random)
-- `rng`: Random number generator (required for :random)
+- `type`: Initialization type (`:up`, `:down`, `:random`)
+- `rng`: Random number generator (required for `:random`)
 """
 function init!(sys::Ising, type::Symbol; rng=nothing)
     if type == :up
@@ -104,39 +104,48 @@ function init!(sys::Ising, type::Symbol; rng=nothing)
 end
 
 # Observables
-
 """
     magnetization(sys::Ising)
 
-Calculate absolute magnetization.
+Calculate absolute magnetization \$|M| = |\\sum_i s_i|\$.
 """
 @inline magnetization(sys::Ising) = abs(sys.sum_spins)
 
 """
-    energy(sys::Ising)
+    energy(sys::Ising; full=false)
 
-Calculate total energy.
+Calculate total energy \$E = -J \\sum_{\\langle i,j \\rangle} s_i s_j\$.
+
+If `full=false` (default), returns the cached energy. If `full=true`, recomputes from scratch by summing over all spins.
 """
-@inline energy(sys::Ising) = -sys.J * sys.sum_pairs
+function energy(sys::Ising; full=false)
+    if full
+        sum_pairs = zero(sys.J)
+        for i in 1:length(sys.spins)
+            sum_pairs += local_spin_pairs(sys, i)
+        end
+        return -sys.J * (sum_pairs ÷ 2)
+    else
+        return -sys.J * sys.sum_pairs
+    end
+end
 
 """
     delta_energy(sys::Ising, i)
 
-Calculate energy change if spin at site i is flipped.
+Calculate energy change \$\\Delta E\$ if spin \$s_i\$ at site \$i\$ is flipped.
 """
 @inline delta_energy(sys::Ising, i) = 2 * sys.J * local_spin_pairs(sys, i)
-
-# Updates
 
 """
     modify!(sys::Ising, i, ΔE)
 
-Flip spin at site i and update cached quantities.
+Flip spin \$s_i\$ at site \$i\$ and update cached quantities.
 
 # Arguments
 - `sys`: Ising system
 - `i`: Site index
-- `ΔE`: Energy change from the flip
+- `ΔE`: Energy change \$\\Delta E\$ from the flip
 """
 @inline function modify!(sys::Ising, i, ΔE)
     old = sys.spins[i]
@@ -153,11 +162,11 @@ end
 """
     spin_flip!(sys::AbstractIsing, alg::AbstractImportanceSampling)
 
-Perform a single spin flip update for Ising-like models.
+Perform a single spin flip update for Ising-like models using importance sampling.
 
 # Arguments
 - `sys::AbstractIsing`: Ising model to update
-- `alg::AbstractImportanceSampling`: Algorithm with RNG and log weight function
+- `alg::AbstractImportanceSampling`: Algorithm with RNG and log weight function \$\\log w(\\Delta E)\$
 """
 function spin_flip!(sys::AbstractIsing, alg::AbstractImportanceSampling)
     i = pick_site(alg.rng, length(sys.spins))
@@ -177,14 +186,14 @@ end
 """
     Ising_2Dgrid_optim <: AbstractIsing
 
-Fast 2D Ising model with J=1, periodic boundary conditions and on-the-fly neighbor calculation.
+Fast 2D Ising model with \$J=1\$, periodic boundary conditions and on-the-fly neighbor calculation.
 
 # Fields
-- `spins::Vector{Int8}`: Spins (±1) in row-major order
-- `Lx::Int`: Lattice width
-- `Ly::Int`: Lattice height  
-- `energy::Int`: Cached total energy
-- `magnetization::Int`: Cached total magnetization
+- `spins::Vector{Int8}`: Spins \$(\\pm 1)\$ in row-major order
+- `Lx::Int`: Lattice width \$L_x\$
+- `Ly::Int`: Lattice height \$L_y\$
+- `energy::Int`: Cached total energy \$E\$
+- `magnetization::Int`: Cached total magnetization \$M\$
 """
 mutable struct Ising_2Dgrid_optim <: AbstractIsing
     spins::Vector{Int8}
@@ -201,9 +210,22 @@ mutable struct Ising_2Dgrid_optim <: AbstractIsing
 end
 
 """
+    full_energy(sys::Ising_2Dgrid_optim)
+
+Compute the full total energy \$E = -\\sum_{\\langle i,j \\rangle} s_i s_j\$ by iterating over all sites and summing local contributions.
+"""
+function full_energy(sys::Ising_2Dgrid_optim)
+    energy_total = 0
+    for i in 1:length(sys.spins)
+        energy_total += local_energy(sys, i)
+    end
+    return -energy_total ÷ 2  # Divide by 2 because each bond is counted twice
+end
+
+"""
     local_energy(sys::Ising_2Dgrid_optim, i)
 
-Calculate the sum of sᵢsⱼ for site i with its neighbors (on-the-fly calculation).
+Calculate the local energy contribution \$E_i = \\sum_{j \\in \\text{nbrs}(i)} s_i s_j\$ for site \$i\$ with its neighbors (on-the-fly calculation).
 """
 @inline function local_energy(sys::Ising_2Dgrid_optim, i)
     s = sys.spins[i]
@@ -225,6 +247,36 @@ Calculate the sum of sᵢsⱼ for site i with its neighbors (on-the-fly calculat
     end
 
     return acc
+end
+
+"""
+    energy(sys::Ising_2Dgrid_optim; full=false)
+
+Get the energy of the 2D Ising system.
+
+If `full=false` (default), returns the cached energy. If `full=true`, recomputes from scratch.
+"""
+function energy(sys::Ising_2Dgrid_optim; full=false)
+    if full
+        return full_energy(sys)
+    else
+        return sys.energy
+    end
+end
+
+"""
+    magnetization(sys::Ising_2Dgrid_optim; full=false)
+
+Get the magnetization of the 2D Ising system.
+
+If `full=false` (default), returns the cached magnetization. If `full=true`, recomputes from scratch.
+"""
+function magnetization(sys::Ising_2Dgrid_optim; full=false)
+    if full
+        return abs(sum(sys.spins))
+    else
+        return abs(sys.magnetization)
+    end
 end
 
 @inline delta_energy(sys::Ising_2Dgrid_optim, i) = 2 * local_energy(sys, i)
