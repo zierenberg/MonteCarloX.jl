@@ -32,6 +32,7 @@ MonteCarloX.jl/
 │   ├── utils.jl              # General utilities
 │   └── MonteCarloX.jl        # Main module
 ├── SpinSystems/              # Spin model implementations (submodule)
+│   └── test/                 # Model-level tests
 ├── notebooks/                # Jupyter notebooks with examples
 ├── examples/stash/           # Legacy examples (for reference)
 ├── test/                     # Unit tests
@@ -132,7 +133,7 @@ Bayesian inference components:
 
 ```julia
 using MonteCarloX
-using MonteCarloX.SpinSystems
+using SpinSystems
 
 # 1. Create system
 rng = MersenneTwister(42)
@@ -205,9 +206,10 @@ end
 
 ## Testing Strategy
 
-- Unit tests for algorithms in `test/`
+- **Core**: Algorithms, log weights, measurements, RNG utilities, and event handling live in `test/` (root project)
+- **Models**: Spin system behavior (Ising, Blume-Capel, etc.) is validated in `SpinSystems/test/` to keep core tests model-free
 - Statistical tests for stochastic correctness
-- Integration tests for system-algorithm interaction
+- Integration tests for algorithm/system interaction within each package
 - Performance benchmarks for critical paths
 
 ## Documentation
@@ -265,7 +267,7 @@ end
 ## Important Notes for AI Agents
 
 1. **Never add system implementations to MonteCarloX core**
-2. **Maintain clean separation**: algorithms ≠ systems ≠ measurements
+2. **Maintain clean separation**: algorithms ≠ systems ≠ measurements; keep model tests out of the core suite
 3. **All algorithms share the same AbstractSystem and AbstractAlgorithm abstractions**
 4. **No artificial separation between equilibrium/non-equilibrium**
 5. **Use type-based dispatch** for extensibility

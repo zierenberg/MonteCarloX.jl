@@ -11,3 +11,10 @@ MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
 Graphs = "1"
 MonteCarloX = "0.1"
 julia = "1"
+
+[extras]
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test", "Random"]

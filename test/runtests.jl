@@ -30,12 +30,6 @@ import Distributions.cdf
     @test test_2D_unimodal_metropolis()
     @test test_unimodal_sweep()
 
-    # println("ising")
-    include("test_ising.jl")
-    @test test_ising_reweighting()
-    @test test_ising_metropolis()
-    @test test_ising_cluster()
-
     # non-equilibrium
     include("test_inhomogenous_poisson.jl")
     @test test_poisson_single()

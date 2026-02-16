@@ -1,7 +1,7 @@
-using LightGraphs
 using MonteCarloX
 using Random
 using LinearAlgebra
+using StatsBase
 
 function test_sweep_random_element(;verbose = false)
     N = 10000000
@@ -296,6 +296,29 @@ end
 mutable struct Stats
     accept::Float64
     reject::Float64
+end
+
+"""Metropolis accept/reject for symmetric proposals"""
+function accept(rng::AbstractRNG, log_weight_sampling, new_state, old_state)
+    log_new = new_state isa Tuple ? log_weight_sampling(new_state...) : log_weight_sampling(new_state)
+    log_old = old_state isa Tuple ? log_weight_sampling(old_state...) : log_weight_sampling(old_state)
+    log_ratio = log_new - log_old
+    return log_ratio > 0 || rand(rng) < exp(log_ratio)
+end
+
+"""Apply an update function a fixed number of times"""
+function sweep(update_fn::Function, rng::AbstractRNG; number_updates::Int=1)
+    for _ in 1:number_updates
+        update_fn()
+    end
+end
+
+"""Sweep over a weighted set of update functions"""
+function sweep(list_updates::Vector{Function}, list_probabilities::ProbabilityWeights, rng::AbstractRNG; number_updates::Int=1)
+    for _ in 1:number_updates
+        update_fn = StatsBase.sample(rng, list_updates, list_probabilities)
+        update_fn()
+    end
 end
 
 
