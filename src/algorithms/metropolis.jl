@@ -30,9 +30,9 @@ logweight = BoltzmannLogWeight(1.5)
 alg = Metropolis(Random.default_rng(), logweight)
 ```
 """
-mutable struct Metropolis <: AbstractImportanceSampling
-    rng::AbstractRNG
-    logweight::Union{AbstractLogWeight, Function}
+mutable struct Metropolis{LW, RNG<:AbstractRNG} <: AbstractImportanceSampling
+    rng::RNG
+    logweight::LW
     steps::Int
     accepted::Int
 end

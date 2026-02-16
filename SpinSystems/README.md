@@ -24,7 +24,7 @@ H = -J ∑_{<i,j>} sᵢsⱼ
 **Example usage:**
 ```julia
 using MonteCarloX
-using MonteCarloX.SpinSystems
+using SpinSystems
 
 # Create 8×8 Ising model
 sys = Ising([8, 8], J=1, periodic=true)

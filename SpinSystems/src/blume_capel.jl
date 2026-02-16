@@ -177,7 +177,7 @@ function spin_flip!(sys::BlumeCapel, alg::AbstractImportanceSampling)
     
     if s_new != sys.spins[i]
         ΔE = delta_energy(sys, i, s_new)
-        log_ratio = alg.logweight(ΔE)
+        log_ratio::Float64 = alg.logweight(ΔE)
         if accept!(alg, log_ratio)
             modify!(sys, i, s_new, ΔE)
         end

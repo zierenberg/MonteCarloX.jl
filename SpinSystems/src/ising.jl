@@ -1,10 +1,17 @@
-# Ising Model
-# Based on examples/api.ipynb
+"""
+    AbstractIsing <: AbstractSpinSystem
+
+Base type for Ising-like models with simplified spin flip interface.
+
+Implementations must provide:
+- `delta_energy(sys, i)`: Energy change from flipping spin i
+- `modify!(sys, i, ΔE)`: Apply spin flip and update cached quantities
+"""
+abstract type AbstractIsing <: AbstractSpinSystem end
 
 using Graphs
-
 """
-    Ising{T} <: AbstractSpinSystem
+    Ising{T} <: AbstractIsing
 
 Ising model on a graph.
 
@@ -17,9 +24,9 @@ Ising model on a graph.
 - `sum_spins::Int`: Cached sum of spins
 
 # Hamiltonian
-H = -J ∑_{<i,j>} sᵢsⱼ
+\$ H = -J \\sum_{⟨i,j⟩} s_i s_j - h \\sum_i s_i \$
 """
-mutable struct Ising{T} <: AbstractSpinSystem
+mutable struct Ising{T} <: AbstractIsing
     spins::Vector{Int8}
     graph::SimpleGraph
     nbrs::Vector{Vector{Int}}
@@ -60,7 +67,7 @@ function Ising(dims::Vector{Int}; J=1, periodic=true)
 end
 
 """
-    init!(sys::Ising, type::Symbol; rng=nothing, states=[-1, 1])
+    init!(sys::Ising, type::Symbol; rng=nothing)
 
 Initialize the Ising system.
 
@@ -68,9 +75,8 @@ Initialize the Ising system.
 - `sys`: Ising system to initialize
 - `type`: Initialization type (:up, :down, :random)
 - `rng`: Random number generator (required for :random)
-- `states`: Possible spin states (default: [-1, 1])
 """
-function init!(sys::Ising, type::Symbol; rng=nothing, states=[-1, 1])
+function init!(sys::Ising, type::Symbol; rng=nothing)
     if type == :up
         sys.spins .= 1
         sys.sum_pairs = ne(sys.graph)
@@ -82,7 +88,7 @@ function init!(sys::Ising, type::Symbol; rng=nothing, states=[-1, 1])
     elseif type == :random
         @assert rng !== nothing "Random initialization requires rng"
         for i in eachindex(sys.spins)
-            sys.spins[i] = rand(rng, states)
+            sys.spins[i] = rand(rng, [-1,1])
         end
         # Recompute bookkeeping
         sum_pairs = zero(sys.J)
@@ -145,19 +151,87 @@ Flip spin at site i and update cached quantities.
 end
 
 """
-    spin_flip!(sys::Ising, alg::AbstractImportanceSampling)
+    spin_flip!(sys::AbstractIsing, alg::AbstractImportanceSampling)
 
-Perform a single spin flip update using importance sampling.
+Perform a single spin flip update for Ising-like models.
 
 # Arguments
-- `sys`: Ising system
-- `alg`: Importance sampling algorithm (e.g., Metropolis)
+- `sys::AbstractIsing`: Ising model to update
+- `alg::AbstractImportanceSampling`: Algorithm with RNG and log weight function
 """
-function spin_flip!(sys::Ising, alg::AbstractImportanceSampling)
-    i = rand(alg.rng, 1:length(sys.spins))
+function spin_flip!(sys::AbstractIsing, alg::AbstractImportanceSampling)
+    i = pick_site(alg.rng, length(sys.spins))
     ΔE = delta_energy(sys, i)
     log_ratio = alg.logweight(ΔE)
     if accept!(alg, log_ratio)
         modify!(sys, i, ΔE)
     end
+    return nothing
+end
+
+
+# ============================================================================
+# Optimized 2D Ising Model
+# ============================================================================
+
+"""
+    Ising_2Dgrid_optim <: AbstractIsing
+
+Fast 2D Ising model with J=1, periodic boundary conditions and on-the-fly neighbor calculation.
+
+# Fields
+- `spins::Vector{Int8}`: Spins (±1) in row-major order
+- `Lx::Int`: Lattice width
+- `Ly::Int`: Lattice height  
+- `energy::Int`: Cached total energy
+- `magnetization::Int`: Cached total magnetization
+"""
+mutable struct Ising_2Dgrid_optim <: AbstractIsing
+    spins::Vector{Int8}
+    const Lx::Int8
+    const Ly::Int8
+    energy::Int
+    magnetization::Int
+    
+    function Ising_2Dgrid_optim(Lx::Int, Ly::Int)
+        N = Lx * Ly
+        # All spins up: each site has 4 neighbors, so -sum_pairs = -2N
+        new(ones(Int8, N), Lx, Ly, -2N, N)
+    end
+end
+
+"""
+    local_energy(sys::Ising_2Dgrid_optim, i)
+
+Calculate the sum of sᵢsⱼ for site i with its neighbors (on-the-fly calculation).
+"""
+@inline function local_energy(sys::Ising_2Dgrid_optim, i)
+    s = sys.spins[i]
+    acc = 0
+    
+    x = ((i - 1) % sys.Lx) + 1
+    y = div(i - 1, sys.Lx) + 1
+    
+    x_left = x == 1 ? sys.Lx : x - 1
+    x_right = x == sys.Lx ? 1 : x + 1
+    y_up = y == 1 ? sys.Ly : y - 1
+    y_down = y == sys.Ly ? 1 : y + 1
+    
+    @inbounds begin
+        acc += s * sys.spins[x_left + (y - 1) * sys.Lx]
+        acc += s * sys.spins[x_right + (y - 1) * sys.Lx]
+        acc += s * sys.spins[x + (y_up - 1) * sys.Lx]
+        acc += s * sys.spins[x + (y_down - 1) * sys.Lx]
+    end
+
+    return acc
+end
+
+@inline delta_energy(sys::Ising_2Dgrid_optim, i) = 2 * local_energy(sys, i)
+
+function modify!(sys::Ising_2Dgrid_optim, i, ΔE)
+    sys.spins[i] = -sys.spins[i]
+    sys.energy += ΔE
+    sys.magnetization += 2 * sys.spins[i]
+    return nothing
 end

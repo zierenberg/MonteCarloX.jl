@@ -13,7 +13,7 @@ Returns true if the move is accepted based on the Metropolis criterion:
 
 This is the core accept/reject step used by all importance sampling algorithms.
 """
-@inline function accept!(alg::AbstractImportanceSampling, log_ratio::Real)
+function accept!(alg::AbstractImportanceSampling, log_ratio::Real)
     alg.steps += 1
     accepted = log_ratio > 0 || rand(alg.rng) < exp(log_ratio)
     alg.accepted += accepted 
