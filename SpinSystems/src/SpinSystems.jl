@@ -13,6 +13,7 @@ using MonteCarloX: AbstractSystem, AbstractImportanceSampling, accept!
 
 export AbstractSpinSystem,
        Ising,
+       Ising_2Dgrid_optim,
        BlumeCapel,
        # Initialization
        init!,

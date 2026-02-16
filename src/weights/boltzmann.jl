@@ -10,35 +10,46 @@ This is the standard weight for canonical ensemble Monte Carlo simulations
 at a fixed inverse temperature β = 1/(k_B T).
 
 # Fields
-- `β::Real`: Inverse temperature
+- `β::Float64`: Inverse temperature
 
 # Examples
 ```julia
 # Create weight for temperature T=2.0 (assuming k_B = 1)
 logweight = BoltzmannLogWeight(0.5)
 
-# Evaluate log weight for energy E
-logw = logweight(energy)  # Returns -β * energy
+# Evaluate log weight for scalar energy
+logw = logweight(-2.5)  # Returns -0.5 * (-2.5) = 1.25
+
+# Or for vector of energy terms
+logw = logweight([-1, -2, -3])  # Returns -0.5 * (-6) = 3.0
 ```
 """
-struct BoltzmannLogWeight <: AbstractLogWeight
-    β::Real
+struct BoltzmannLogWeight{T<:Real} <: AbstractLogWeight
+    β::T
 end
 
 """
     (lw::BoltzmannLogWeight)(E)
 
-Evaluate log weight: log(w) = -β * sum(E).
+Evaluate log weight for energy term(s).
 
-E can be a scalar energy or a vector/tuple of energy components.
-If E is a collection, the sum of all components is used.
+For scalar energy: log(w) = -β * E
+For array/tuple of terms: log(w) = -β * sum(E)
+
+Specialized for type stability with scalar inputs.
+
+# Arguments
+- `E`: Energy (scalar) or energy components (array/tuple)
+
+# Returns
+- Log weight as Float64
 
 # Examples
 ```julia
 logweight = BoltzmannLogWeight(1.0)
-logweight(-2.5)              # Returns 2.5
-logweight([-1, -2, -3])      # Returns 6.0
-logweight((H=-10, M=2))      # Returns 8.0 (from named tuple)
+logweight(-2.5)              # Returns 2.5 (scalar)
+logweight([-1, -2, -3])      # Returns 6.0 (array)
 ```
 """
-@inline (lw::BoltzmannLogWeight)(E) = -lw.β * sum(E)
+@inline (lw::BoltzmannLogWeight)(E::Real) = -lw.β * E # Real type ensures that E can also be integer
+@inline (lw::BoltzmannLogWeight)(E::AbstractArray) = -lw.β * sum(E)
