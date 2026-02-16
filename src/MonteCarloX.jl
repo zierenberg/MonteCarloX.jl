@@ -16,21 +16,15 @@ include("rng.jl")
 # Measurement framework
 include("measurements/measurements.jl")
 
-# Log weights (for importance sampling and other algorithms)
-include("weights/boltzmann.jl")  # Canonical ensemble
+# Log weights (canonical ensemble)
+include("weights/canonical.jl")
 
 # Algorithms (equilibrium)
 include("algorithms/importance_sampling.jl")  # Core importance sampling functions (accept!, etc.)
 include("algorithms/metropolis.jl")  # Metropolis importance sampling
-# Future algorithms (placeholders):
-# include("algorithms/multicanonical.jl")
-# include("algorithms/parallel_tempering.jl")
-# include("algorithms/population_annealing.jl")
 
 # Algorithms (non-equilibrium)
-include("algorithms/event_handler.jl")  # Event handling for kinetic Monte Carlo (must come before KMC)
-include("algorithms/kinetic_monte_carlo.jl")  # Gillespie (simplest KMC) and general KMC
-include("algorithms/poisson_process.jl")  # Poisson processes
+include("algorithms/event_handler.jl")  # Event handling for kinetic Monte Carlo
 
 # Export core abstractions
 export AbstractSystem,
@@ -47,7 +41,8 @@ export Measurement,
        PreallocatedSchedule,
        measure!,
        is_complete
-
+BoltzmannLogWeight,
+       
 # Export importance sampling algorithms
 export AbstractImportanceSampling,
        BoltzmannLogWeight,
@@ -56,22 +51,9 @@ export AbstractImportanceSampling,
        acceptance_rate,
        reset_statistics!
 
-# Export kinetic Monte Carlo algorithms
-export Gillespie,
-       KineticMonteCarlo,
-       SimulationKineticMonteCarlo,
-       PoissonProcess,
-       InhomogeneousPoissonProcess,
-       next_event,
-       next_time,
-       advance!,
-       next,
-       init
-
 # Export helper functions
 export log_sum,
        binary_search,
-       random_element,
        kldivergence
 
 # Export event handler types

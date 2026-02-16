@@ -1,5 +1,16 @@
 # Importance Sampling - Core functionality
 # Shared by all importance sampling algorithms (Metropolis, Heat Bath, etc.)
+"""
+    AbstractImportanceSampling <: AbstractAlgorithm
+
+Base type for importance sampling algorithms (Metropolis, Heat Bath, etc.).
+
+Importance sampling algorithms:
+- Use accept/reject steps based on log weight ratios
+- Track acceptance statistics
+- Include an RNG and a log weight function
+"""
+abstract type AbstractImportanceSampling <: AbstractAlgorithm end
 
 """
     accept!(alg::AbstractImportanceSampling, log_ratio::Real)
