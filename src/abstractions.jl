@@ -70,15 +70,3 @@ abstract type AbstractUpdate end
 Base type for measurement objects.
 """
 abstract type AbstractMeasurement end
-
-"""
-    AbstractImportanceSampling <: AbstractAlgorithm
-
-Base type for importance sampling algorithms (Metropolis, Heat Bath, etc.).
-
-Importance sampling algorithms:
-- Use accept/reject steps based on log weight ratios
-- Track acceptance statistics
-- Include an RNG and a log weight function
-"""
-abstract type AbstractImportanceSampling <: AbstractAlgorithm end

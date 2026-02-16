@@ -60,42 +60,7 @@ function log_sum(a::Number, b::Number)::Float64
 end
 
 
-"""
-    random_element(rng::AbstractRNG, list_probabilities::Vector{T})::Int where T<:AbstractFloat
 
-Pick an index with probability defined by `list_probability` (which needs to be normalized).
-
-#Remark
-Deprecated for use of StatsBase.sample
-
-# Examples
-```julia
-julia> using Random
-
-julia> rng = MersenneTwister(1000);
-
-julia> MonteCarloX.random_element(rng, [0.1,0.2,0.3,0.4])
-4
-julia> MonteCarloX.random_element(rng, [0.1,0.2,0.3,0.4])
-4
-julia> MonteCarloX.random_element(rng, [0.1,0.2,0.3,0.4])
-3
-julia> MonteCarloX.random_element(rng, [0.1,0.2,0.3,0.4])
-4
-```
-"""
-function random_element(rng::AbstractRNG, list_probabilities::Vector{Float64})::Int
-    theta = rand(rng) * sum(list_probabilities)
-
-    id = 1
-    cumulated_prob = list_probabilities[id]
-    while cumulated_prob < theta
-        id += 1
-        @inbounds cumulated_prob += list_probabilities[id]
-    end
-
-    return id
-end
 
 ###### Additional utility of Histogram class from StatsBase (does not work with documenter right now)
 # """

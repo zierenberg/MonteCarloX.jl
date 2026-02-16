@@ -1,4 +1,4 @@
-# Boltzmann Log Weight
+# Canonical Ensemble Log Weight (Boltzmann weight)
 # For canonical ensemble sampling at fixed temperature
 
 """
