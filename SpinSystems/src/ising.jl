@@ -1,289 +1,473 @@
 """
     AbstractIsing <: AbstractSpinSystem
 
-Base type for Ising-like models with simplified spin flip interface.
+Base type for Ising-like models.
 
 Implementations must provide:
-- `delta_energy(sys, i)`: Energy change from flipping spin \$i\$
-- `modify!(sys, i, ΔE)`: Apply spin flip and update cached quantities
+- `flip_changes(sys, i) -> (Δpair, Δspin)`
+- `modify!(sys, i, Δpair, Δspin)`
+- `_cached_energy(sys)`, `_cached_magnetization(sys)`, `_full_energy(sys)`
 """
 abstract type AbstractIsing <: AbstractSpinSystem end
 
 using Graphs
-"""
-    Ising{T} <: AbstractIsing
+using SparseArrays: SparseMatrixCSC, sparse
 
-Ising model on a graph.
+# Shared observables and update
+@inline energy(sys::AbstractIsing; full=false) = full ? _full_energy(sys) : _cached_energy(sys)
+@inline magnetization(sys::AbstractIsing; full=false) = full ? sum(sys.spins) : _cached_magnetization(sys)
 
-# Fields
-- `spins::Vector{Int8}`: Spin configuration \$(\\pm 1)\$
-- `graph::SimpleGraph`: Underlying graph structure
-- `nbrs::Vector{Vector{Int}}`: Precomputed neighbor lists (this is done during construction)
-- `J::T`: Coupling constant \$J\$ (can be scalar or vector for inhomogeneous systems)
-- `sum_pairs::Int`: Cached sum of \$\\sum_{\\langle i,j \\rangle} s_i s_j\$ over edges
-- `sum_spins::Int`: Cached sum of \$\\sum_i s_i\$
-
-# Hamiltonian
-\$ H = -J \\sum_{\\langle i,j \\rangle} s_i s_j - h \\sum_i s_i \$
-"""
-mutable struct Ising{T} <: AbstractIsing
-    spins::Vector{Int8}
-    graph::SimpleGraph
-    nbrs::Vector{Vector{Int}}
-    J::T
-    sum_pairs::Int
-    sum_spins::Int
-
-    function Ising(graph::SimpleGraph, J)
-        T = typeof(J)
-        if typeof(J) <: Vector{<:Real}
-            @assert length(J) == ne(graph) "J vector must match number of edges"
-        end
-
-        nbrs = [collect(Graphs.neighbors(graph, i)) for i in 1:nv(graph)]
-
-        # Initialize with all spins = +1
-        spins = ones(Int8, nv(graph))
-        sum_pairs = ne(graph)
-        sum_spins = nv(graph)
-
-        new{T}(spins, graph, nbrs, J, sum_pairs, sum_spins)
-    end
+@inline function delta_energy(sys::AbstractIsing, i)
+    Δpair, Δspin = flip_changes(sys, i)
+    return delta_energy(sys, Δpair, Δspin, i)
 end
 
-"""
-    Ising(dims::Vector{Int}; J=1, periodic=true)
-
-Convenience constructor for Ising model on a hypercubic lattice.
-
-# Arguments
-- `dims`: Dimensions of the lattice \$[L_x, L_y, \\ldots]\$
-- `J`: Coupling constant \$J\$ (default: 1)
-- `periodic`: Use periodic boundary conditions (default: true)
-"""
-function Ising(dims::Vector{Int}; J=1, periodic=true)
-    graph = Graphs.SimpleGraphs.grid(dims; periodic)
-    return Ising(graph, J)
+function spin_flip!(sys::AbstractIsing, alg::AbstractImportanceSampling)
+    i = pick_site(alg.rng, length(sys.spins))
+    Δpair, Δspin = flip_changes(sys, i)
+    ΔE = delta_energy(sys, Δpair, Δspin, i)
+    accept!(alg, alg.logweight(ΔE)) && modify!(sys, i, Δpair, Δspin)
+    return nothing
 end
 
-"""
-    init!(sys::Ising, type::Symbol; rng=nothing)
-
-Initialize the Ising system.
-
-# Arguments
-- `sys`: Ising system to initialize
-- `type`: Initialization type (`:up`, `:down`, `:random`)
-- `rng`: Random number generator (required for `:random`)
-"""
-function init!(sys::Ising, type::Symbol; rng=nothing)
+@inline function _init_spins!(spins::Vector{Int8}, type::Symbol; rng=nothing)
     if type == :up
-        sys.spins .= 1
-        sys.sum_pairs = ne(sys.graph)
-        sys.sum_spins = length(sys.spins)
+        spins .= 1
     elseif type == :down
-        sys.spins .= -1
-        sys.sum_pairs = ne(sys.graph)
-        sys.sum_spins = -length(sys.spins)
+        spins .= -1
     elseif type == :random
         @assert rng !== nothing "Random initialization requires rng"
-        for i in eachindex(sys.spins)
-            sys.spins[i] = rand(rng, [-1,1])
-        end
-        # Recompute bookkeeping
-        sum_pairs = zero(sys.J)
-        for i in 1:length(sys.spins)
-            sum_pairs += local_spin_pairs(sys, i)
-        end
-        sys.sum_pairs = sum_pairs ÷ 2
-        sys.sum_spins = sum(sys.spins)
+        spins .= rand(rng, [-1, 1], length(spins))
     else
         error("Unknown initialization type: $type")
     end
+    return nothing
+end
+
+# -----------------------------------------------------------------------------
+# Graph Ising (global J)
+# -----------------------------------------------------------------------------
+
+abstract type IsingGraph <: AbstractIsing end
+
+mutable struct IsingGraphCouplingNoField{TJ<:Real} <: IsingGraph
+    spins::Vector{Int8}
+    graph::SimpleGraph
+    nbrs::Vector{Vector{Int}}
+    J::TJ
+    sum_pair_interactions::TJ
+    sum_spins::Int
+end
+
+mutable struct IsingGraphCouplingUniformField{TJ<:Real,TH<:Real} <: IsingGraph
+    spins::Vector{Int8}
+    graph::SimpleGraph
+    nbrs::Vector{Vector{Int}}
+    J::TJ
+    h::TH
+    sum_pair_interactions::TJ
+    sum_spins::Int
+    sum_field_interactions::Float64
+end
+
+mutable struct IsingGraphCouplingVectorField{TJ<:Real,TH<:Real} <: IsingGraph
+    spins::Vector{Int8}
+    graph::SimpleGraph
+    nbrs::Vector{Vector{Int}}
+    J::TJ
+    h::Vector{TH}
+    sum_pair_interactions::TJ
+    sum_spins::Int
+    sum_field_interactions::Float64
+end
+
+function IsingGraph(graph::SimpleGraph, J::Real; h=0)
+    n = nv(graph)
+    spins = ones(Int8, n)
+    nbrs = [collect(Graphs.neighbors(graph, i)) for i in 1:n]
+    pair0 = J * ne(graph)
+
+    if h isa Real
+        if iszero(h)
+            return IsingGraphCouplingNoField{typeof(J)}(spins, graph, nbrs, J, pair0, n)
+        else
+            hscalar = float(h)
+            return IsingGraphCouplingUniformField{typeof(J),typeof(hscalar)}(
+                spins, graph, nbrs, J, hscalar, pair0, n, hscalar * n
+            )
+        end
+    elseif h isa AbstractVector{<:Real}
+        @assert length(h) == n "Field vector length must match number of spins"
+        hvec = collect(h)
+        return IsingGraphCouplingVectorField{typeof(J),eltype(hvec)}(spins, graph, nbrs, J, hvec, pair0, n, sum(hvec))
+    else
+        error("h must be Real or AbstractVector{<:Real}")
+    end
+end
+
+function init!(sys::IsingGraph, type::Symbol; rng=nothing)
+    _init_spins!(sys.spins, type; rng=rng)
+    _recompute_cached!(sys)
     return sys
 end
 
-# Observables
-"""
-    magnetization(sys::Ising)
-
-Calculate absolute magnetization \$|M| = |\\sum_i s_i|\$.
-"""
-@inline magnetization(sys::Ising) = abs(sys.sum_spins)
-
-"""
-    energy(sys::Ising; full=false)
-
-Calculate total energy \$E = -J \\sum_{\\langle i,j \\rangle} s_i s_j\$.
-
-If `full=false` (default), returns the cached energy. If `full=true`, recomputes from scratch by summing over all spins.
-"""
-function energy(sys::Ising; full=false)
-    if full
-        sum_pairs = zero(sys.J)
-        for i in 1:length(sys.spins)
-            sum_pairs += local_spin_pairs(sys, i)
-        end
-        return -sys.J * (sum_pairs ÷ 2)
-    else
-        return -sys.J * sys.sum_pairs
-    end
-end
-
-"""
-    delta_energy(sys::Ising, i)
-
-Calculate energy change \$\\Delta E\$ if spin \$s_i\$ at site \$i\$ is flipped.
-"""
-@inline delta_energy(sys::Ising, i) = 2 * sys.J * local_spin_pairs(sys, i)
-
-"""
-    modify!(sys::Ising, i, ΔE)
-
-Flip spin \$s_i\$ at site \$i\$ and update cached quantities.
-
-# Arguments
-- `sys`: Ising system
-- `i`: Site index
-- `ΔE`: Energy change \$\\Delta E\$ from the flip
-"""
-@inline function modify!(sys::Ising, i, ΔE)
-    old = sys.spins[i]
-    new = -old
-    sys.spins[i] = new
-
-    # Update bookkeeping
-    sys.sum_pairs -= ΔE ÷ sys.J
-    sys.sum_spins += 2 * new
-
+function _recompute_cached!(sys::IsingGraphCouplingNoField)
+    sys.sum_pair_interactions = _pair_sum(sys)
+    sys.sum_spins = sum(sys.spins)
     return nothing
 end
 
-"""
-    spin_flip!(sys::AbstractIsing, alg::AbstractImportanceSampling)
-
-Perform a single spin flip update for Ising-like models using importance sampling.
-
-# Arguments
-- `sys::AbstractIsing`: Ising model to update
-- `alg::AbstractImportanceSampling`: Algorithm with RNG and log weight function \$\\log w(\\Delta E)\$
-"""
-function spin_flip!(sys::AbstractIsing, alg::AbstractImportanceSampling)
-    i = pick_site(alg.rng, length(sys.spins))
-    ΔE = delta_energy(sys, i)
-    log_ratio = alg.logweight(ΔE)
-    if accept!(alg, log_ratio)
-        modify!(sys, i, ΔE)
-    end
+function _recompute_cached!(sys::IsingGraphCouplingUniformField)
+    sys.sum_pair_interactions = _pair_sum(sys)
+    sys.sum_spins = sum(sys.spins)
+    sys.sum_field_interactions = _field_sum(sys)
     return nothing
 end
 
-
-# ============================================================================
-# Optimized 2D Ising Model
-# ============================================================================
-
-"""
-    Ising_2Dgrid_optim <: AbstractIsing
-
-Fast 2D Ising model with \$J=1\$, periodic boundary conditions and on-the-fly neighbor calculation.
-
-# Fields
-- `spins::Vector{Int8}`: Spins \$(\\pm 1)\$ in row-major order
-- `Lx::Int`: Lattice width \$L_x\$
-- `Ly::Int`: Lattice height \$L_y\$
-- `energy::Int`: Cached total energy \$E\$
-- `magnetization::Int`: Cached total magnetization \$M\$
-"""
-mutable struct Ising_2Dgrid_optim <: AbstractIsing
-    spins::Vector{Int8}
-    const Lx::Int8
-    const Ly::Int8
-    energy::Int
-    magnetization::Int
-    
-    function Ising_2Dgrid_optim(Lx::Int, Ly::Int)
-        N = Lx * Ly
-        # All spins up: each site has 4 neighbors, so -sum_pairs = -2N
-        new(ones(Int8, N), Lx, Ly, -2N, N)
-    end
+function _recompute_cached!(sys::IsingGraphCouplingVectorField)
+    sys.sum_pair_interactions = _pair_sum(sys)
+    sys.sum_spins = sum(sys.spins)
+    sys.sum_field_interactions = _field_sum(sys)
+    return nothing
 end
 
-"""
-    full_energy(sys::Ising_2Dgrid_optim)
-
-Compute the full total energy \$E = -\\sum_{\\langle i,j \\rangle} s_i s_j\$ by iterating over all sites and summing local contributions.
-"""
-function full_energy(sys::Ising_2Dgrid_optim)
-    energy_total = 0
-    for i in 1:length(sys.spins)
-        energy_total += local_energy(sys, i)
+@inline function _graph_pair_sum(sys)
+    pair_unweighted = 0
+    @inbounds for i in eachindex(sys.spins)
+        pair_unweighted += local_pair_interactions(sys, i)
     end
-    return -energy_total ÷ 2  # Divide by 2 because each bond is counted twice
+    return sys.J isa Integer ? (sys.J * div(pair_unweighted, 2)) : typeof(sys.J)(sys.J * (pair_unweighted / 2))
 end
 
-"""
-    local_energy(sys::Ising_2Dgrid_optim, i)
+@inline _pair_sum(sys::IsingGraph) = _graph_pair_sum(sys)
+@inline _field_sum(sys::IsingGraphCouplingNoField) = 0.0
+@inline _field_sum(sys::IsingGraphCouplingUniformField) = sys.h * sum(sys.spins)
+function _field_sum(sys::IsingGraphCouplingVectorField)
+    field_sum = 0.0
+    @inbounds for i in eachindex(sys.spins)
+        field_sum += sys.h[i] * sys.spins[i]
+    end
+    return field_sum
+end
 
-Calculate the local energy contribution \$E_i = \\sum_{j \\in \\text{nbrs}(i)} s_i s_j\$ for site \$i\$ with its neighbors (on-the-fly calculation).
-"""
-@inline function local_energy(sys::Ising_2Dgrid_optim, i)
+@inline _cached_magnetization(sys::IsingGraph) = sys.sum_spins
+@inline _cached_energy(sys::IsingGraphCouplingNoField) = -sys.sum_pair_interactions
+@inline _cached_energy(sys::IsingGraphCouplingUniformField) = -sys.sum_pair_interactions - sys.sum_field_interactions
+@inline _cached_energy(sys::IsingGraphCouplingVectorField) = -sys.sum_pair_interactions - sys.sum_field_interactions
+
+@inline _full_energy(sys::IsingGraph) = -_pair_sum(sys) - _field_sum(sys)
+
+@inline function flip_changes(sys::IsingGraph, i)
     s = sys.spins[i]
-    acc = 0
-    
-    x = ((i - 1) % sys.Lx) + 1
-    y = div(i - 1, sys.Lx) + 1
-    
-    x_left = x == 1 ? sys.Lx : x - 1
-    x_right = x == sys.Lx ? 1 : x + 1
-    y_up = y == 1 ? sys.Ly : y - 1
-    y_down = y == sys.Ly ? 1 : y + 1
-    
-    @inbounds begin
-        acc += s * sys.spins[x_left + (y - 1) * sys.Lx]
-        acc += s * sys.spins[x_right + (y - 1) * sys.Lx]
-        acc += s * sys.spins[x + (y_up - 1) * sys.Lx]
-        acc += s * sys.spins[x + (y_down - 1) * sys.Lx]
-    end
+    Δpair = -2 * sys.J * local_pair_interactions(sys, i)
+    Δspin = -2 * s
+    return Δpair, Δspin
+end
 
+@inline delta_field_interactions(sys::IsingGraphCouplingNoField, Δspin, i) = 0.0
+@inline delta_field_interactions(sys::IsingGraphCouplingUniformField, Δspin, i) = sys.h * Δspin
+@inline delta_field_interactions(sys::IsingGraphCouplingVectorField, Δspin, i) = sys.h[i] * Δspin
+
+@inline delta_energy(sys::IsingGraph, Δpair, Δspin, i) = -Δpair - delta_field_interactions(sys, Δspin, i)
+
+function modify!(sys::IsingGraph, i, Δpair, Δspin)
+    sys.spins[i] = -sys.spins[i]
+    sys.sum_pair_interactions += Δpair
+    sys.sum_spins += Δspin
+    return nothing
+end
+
+function modify!(sys::Union{IsingGraphCouplingUniformField,IsingGraphCouplingVectorField}, i, Δpair, Δspin)
+    sys.spins[i] = -sys.spins[i]
+    sys.sum_pair_interactions += Δpair
+    sys.sum_spins += Δspin
+    sys.sum_field_interactions += delta_field_interactions(sys, Δspin, i)
+    return nothing
+end
+
+# -----------------------------------------------------------------------------
+# Matrix Ising (local J_{ij})
+# -----------------------------------------------------------------------------
+
+abstract type IsingMatrix <: AbstractIsing end
+
+mutable struct IsingMatrixCouplingNoField{TJ<:Real} <: IsingMatrix
+    spins::Vector{Int8}
+    J::SparseMatrixCSC{TJ,Int}
+    sum_pair_interactions::Float64
+    sum_spins::Int
+end
+
+mutable struct IsingMatrixCouplingUniformField{TJ<:Real,TH<:Real} <: IsingMatrix
+    spins::Vector{Int8}
+    J::SparseMatrixCSC{TJ,Int}
+    h::TH
+    sum_pair_interactions::Float64
+    sum_spins::Int
+    sum_field_interactions::Float64
+end
+
+mutable struct IsingMatrixCouplingVectorField{TJ<:Real,TH<:Real} <: IsingMatrix
+    spins::Vector{Int8}
+    J::SparseMatrixCSC{TJ,Int}
+    h::Vector{TH}
+    sum_pair_interactions::Float64
+    sum_spins::Int
+    sum_field_interactions::Float64
+end
+
+function _check_square(J::SparseMatrixCSC{TJ,Int}) where {TJ<:Real}
+    n = size(J, 1)
+    @assert size(J, 2) == n "Sparse J must be square"
+    return nothing
+end
+
+function _check_symmetric(J::SparseMatrixCSC{TJ,Int}) where {TJ<:Real}
+    n = size(J, 1)
+    for col in 1:n
+        for ptr in J.colptr[col]:(J.colptr[col + 1] - 1)
+            row = J.rowval[ptr]
+            if row != col
+                @assert J[row, col] == J[col, row] "Sparse J must be symmetric"
+            end
+        end
+    end
+    return nothing
+end
+
+function IsingMatrix(J::SparseMatrixCSC{TJ,Int}; h=0) where {TJ<:Real}
+    _check_square(J)
+    _check_symmetric(J)
+    n = size(J, 1)
+
+    spins = ones(Int8, n)
+
+    if h isa Real
+        if iszero(h)
+            sys = IsingMatrixCouplingNoField{TJ}(spins, J, 0.0, n)
+            _recompute_cached!(sys)
+            return sys
+        else
+            hscalar = h
+            sys = IsingMatrixCouplingUniformField{TJ,typeof(hscalar)}(spins, J, hscalar, 0.0, n, 0.0)
+            _recompute_cached!(sys)
+            return sys
+        end
+    elseif h isa AbstractVector{<:Real}
+        @assert length(h) == n "Field vector length must match number of spins"
+        hvec = collect(h)
+        sys = IsingMatrixCouplingVectorField{TJ,eltype(hvec)}(spins, J, hvec, 0.0, n, 0.0)
+        _recompute_cached!(sys)
+        return sys
+    else
+        error("h must be Real or AbstractVector{<:Real}")
+    end
+end
+
+function init!(sys::IsingMatrix, type::Symbol; rng=nothing)
+    _init_spins!(sys.spins, type; rng=rng)
+    _recompute_cached!(sys)
+    return sys
+end
+
+@inline function local_pair_interactions(sys::IsingMatrix, i)
+    s_i = sys.spins[i]
+    acc = 0.0
+    @inbounds for ptr in sys.J.colptr[i]:(sys.J.colptr[i + 1] - 1)
+        j = sys.J.rowval[ptr]
+        if j != i
+            acc += s_i * sys.J.nzval[ptr] * sys.spins[j]
+        end
+    end
     return acc
 end
 
-"""
-    energy(sys::Ising_2Dgrid_optim; full=false)
-
-Get the energy of the 2D Ising system.
-
-If `full=false` (default), returns the cached energy. If `full=true`, recomputes from scratch.
-"""
-function energy(sys::Ising_2Dgrid_optim; full=false)
-    if full
-        return full_energy(sys)
-    else
-        return sys.energy
+function _pair_sum(sys::IsingMatrix)
+    pair_sum = 0.0
+    for i in eachindex(sys.spins)
+        pair_sum += local_pair_interactions(sys, i)
     end
+    return pair_sum / 2
 end
 
-"""
-    magnetization(sys::Ising_2Dgrid_optim; full=false)
-
-Get the magnetization of the 2D Ising system.
-
-If `full=false` (default), returns the cached magnetization. If `full=true`, recomputes from scratch.
-"""
-function magnetization(sys::Ising_2Dgrid_optim; full=false)
-    if full
-        return abs(sum(sys.spins))
-    else
-        return abs(sys.magnetization)
+@inline _field_sum(sys::IsingMatrixCouplingNoField) = 0.0
+@inline _field_sum(sys::IsingMatrixCouplingUniformField) = sys.h * sum(sys.spins)
+function _field_sum(sys::IsingMatrixCouplingVectorField)
+    field_sum = 0.0
+    @inbounds for i in eachindex(sys.spins)
+        field_sum += sys.h[i] * sys.spins[i]
     end
+    return field_sum
 end
 
-@inline delta_energy(sys::Ising_2Dgrid_optim, i) = 2 * local_energy(sys, i)
+function _recompute_cached!(sys::IsingMatrixCouplingNoField)
+    sys.sum_pair_interactions = _pair_sum(sys)
+    sys.sum_spins = sum(sys.spins)
+    return nothing
+end
 
-function modify!(sys::Ising_2Dgrid_optim, i, ΔE)
+function _recompute_cached!(sys::IsingMatrixCouplingUniformField)
+    sys.sum_pair_interactions = _pair_sum(sys)
+    sys.sum_spins = sum(sys.spins)
+    sys.sum_field_interactions = _field_sum(sys)
+    return nothing
+end
+
+function _recompute_cached!(sys::IsingMatrixCouplingVectorField)
+    sys.sum_pair_interactions = _pair_sum(sys)
+    sys.sum_spins = sum(sys.spins)
+    sys.sum_field_interactions = _field_sum(sys)
+    return nothing
+end
+
+@inline _cached_magnetization(sys::IsingMatrix) = sys.sum_spins
+@inline _cached_energy(sys::IsingMatrixCouplingNoField) = -sys.sum_pair_interactions
+@inline _cached_energy(sys::IsingMatrixCouplingUniformField) = -sys.sum_pair_interactions - sys.sum_field_interactions
+@inline _cached_energy(sys::IsingMatrixCouplingVectorField) = -sys.sum_pair_interactions - sys.sum_field_interactions
+
+@inline _full_energy(sys::IsingMatrix) = -_pair_sum(sys) - _field_sum(sys)
+
+@inline function flip_changes(sys::IsingMatrix, i)
+    s = sys.spins[i]
+    Δpair = -2.0 * local_pair_interactions(sys, i)
+    Δspin = -2 * s
+    return Δpair, Δspin
+end
+
+@inline delta_field_interactions(sys::IsingMatrixCouplingNoField, Δspin, i) = 0.0
+@inline delta_field_interactions(sys::IsingMatrixCouplingUniformField, Δspin, i) = sys.h * Δspin
+@inline delta_field_interactions(sys::IsingMatrixCouplingVectorField, Δspin, i) = sys.h[i] * Δspin
+
+@inline delta_energy(sys::IsingMatrix, Δpair, Δspin, i) = -Δpair - delta_field_interactions(sys, Δspin, i)
+
+function modify!(sys::IsingMatrix, i, Δpair, Δspin)
     sys.spins[i] = -sys.spins[i]
-    sys.energy += ΔE
-    sys.magnetization += 2 * sys.spins[i]
+    sys.sum_pair_interactions += Δpair
+    sys.sum_spins += Δspin
+    return nothing
+end
+
+function modify!(sys::Union{IsingMatrixCouplingUniformField,IsingMatrixCouplingVectorField}, i, Δpair, Δspin)
+    sys.spins[i] = -sys.spins[i]
+    sys.sum_pair_interactions += Δpair
+    sys.sum_spins += Δspin
+    sys.sum_field_interactions += delta_field_interactions(sys, Δspin, i)
+    return nothing
+end
+
+# -----------------------------------------------------------------------------
+# General Ising constructor (factory)
+# -----------------------------------------------------------------------------
+
+function Ising(graph::SimpleGraph, J::Real; h=0)
+    return IsingGraph(graph, J; h=h)
+end
+
+function Ising(J::SparseMatrixCSC; h=0)
+    return IsingMatrix(J; h=h)
+end
+
+function Ising(graph::SimpleGraph, J::AbstractVector{<:Real}; h=0)
+    @assert ne(graph) == length(J) "Length of J vector must equal number of graph edges"
+
+    TJ = float(eltype(J))
+    rows = Vector{Int}(undef, 2ne(graph))
+    cols = Vector{Int}(undef, 2ne(graph))
+    vals = Vector{TJ}(undef, 2ne(graph))
+
+    k = 1
+    for (idx, e) in enumerate(edges(graph))
+        i = src(e)
+        j = dst(e)
+        Jij = TJ(J[idx])
+
+        rows[k] = i; cols[k] = j; vals[k] = Jij; k += 1
+        rows[k] = j; cols[k] = i; vals[k] = Jij; k += 1
+    end
+    n = nv(graph)
+    Jmat =sparse(rows, cols, vals, n, n) 
+    return IsingMatrix(Jmat; h=h)
+end
+
+function Ising(dims::Vector{Int}; J=1, periodic=true, h=0)
+    graph = Graphs.SimpleGraphs.grid(dims; periodic)
+    if J isa Real
+        return IsingGraph(graph, J; h=h)
+    elseif J isa AbstractVector{<:Real}
+        return Ising(graph, J; h=h)
+    elseif J isa SparseMatrixCSC
+        return IsingMatrix(J; h=h)
+    else
+        error("J must be Real, AbstractVector{<:Real}, or SparseMatrixCSC")
+    end
+end
+
+# -----------------------------------------------------------------------------
+# Optimized 2D Ising Model (J=1, periodic, no field)
+# -----------------------------------------------------------------------------
+
+mutable struct IsingLatticeOptim <: AbstractIsing
+    spins::Vector{Int8}
+    const Lx::Int
+    const Ly::Int
+    const N::Int
+    const nbr4::Vector{NTuple{4,Int}}
+    sum_pair_interactions::Int
+    sum_spins::Int
+end
+
+function IsingLatticeOptim(Lx::Int, Ly::Int)
+    N = Lx * Ly
+    nbr4 = Vector{NTuple{4,Int}}(undef, N)
+
+    @inbounds for y in 1:Ly
+        y_up = (y == 1)  ? Ly : (y - 1)
+        y_dn = (y == Ly) ? 1  : (y + 1)
+        row = (y - 1) * Lx
+        row_up = (y_up - 1) * Lx
+        row_dn = (y_dn - 1) * Lx
+        for x in 1:Lx
+            i = row + x
+            x_l = (x == 1)  ? Lx : (x - 1)
+            x_r = (x == Lx) ? 1  : (x + 1)
+            nbr4[i] = (row + x_l, row + x_r, row_up + x, row_dn + x)
+        end
+    end
+
+    return IsingLatticeOptim(ones(Int8, N), Lx, Ly, N, nbr4, 2N, N)
+end
+
+@inline function local_pair_interactions(sys::IsingLatticeOptim, i)
+    @inbounds begin
+        s = sys.spins[i]
+        n1, n2, n3, n4 = sys.nbr4[i]
+        return s * (sys.spins[n1] + sys.spins[n2] + sys.spins[n3] + sys.spins[n4])
+    end
+end
+
+@inline _cached_magnetization(sys::IsingLatticeOptim) = sys.sum_spins
+@inline _cached_energy(sys::IsingLatticeOptim) = -sys.sum_pair_interactions
+
+function _full_energy(sys::IsingLatticeOptim)
+    s = 0
+    for i in eachindex(sys.spins)
+        s += local_pair_interactions(sys, i)
+    end
+    return -div(s, 2)
+end
+
+@inline function flip_changes(sys::IsingLatticeOptim, i)
+    s = sys.spins[i]
+    Δpair = -2 * local_pair_interactions(sys, i)
+    Δspin = -2 * s
+    return Δpair, Δspin
+end
+
+@inline delta_energy(sys::IsingLatticeOptim, Δpair, Δspin, i) = -Δpair
+
+function modify!(sys::IsingLatticeOptim, i, Δpair, Δspin)
+    sys.spins[i] = -sys.spins[i]
+    sys.sum_pair_interactions += Δpair
+    sys.sum_spins += Δspin
     return nothing
 end

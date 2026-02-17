@@ -13,7 +13,9 @@ using MonteCarloX: AbstractSystem, AbstractImportanceSampling, accept!
 
 export AbstractSpinSystem,
        Ising,
-       Ising_2Dgrid_optim,
+    IsingGraph,
+    IsingMatrix,
+    IsingLatticeOptim,
        BlumeCapel,
        # Initialization
        init!,
@@ -25,7 +27,8 @@ export AbstractSpinSystem,
        spin_flip!,
        modify!,
        # Utilities
-       pick_site
+       pick_site,
+       local_pair_interactions
 
 include("abstractions.jl")
 include("ising.jl")

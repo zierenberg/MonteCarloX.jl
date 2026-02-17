@@ -19,27 +19,26 @@ Randomly pick a site index from 1 to N.
 @inline pick_site(rng, N) = rand(rng, UInt) % N + 1
 
 """
-    local_spin_pairs(sys::AbstractSpinSystem, i)
+    local_pair_interactions(sys::AbstractSpinSystem, i)
 
 Calculate the sum of sᵢsⱼ products for site i with all its neighbors.
 
-This is a common quantity needed for computing local energy changes in
-spin models with pair interactions (Ising, Potts, Blume-Capel, etc.).
+This represents the local contribution to pair interactions.
 
 # Arguments
 - `sys::AbstractSpinSystem`: Spin system with `spins` and `nbrs` fields
 - `i`: Site index
 
 # Returns
-- Sum of spin products: ∑ⱼ∈neighbors(i) sᵢsⱼ
+- Sum of pair interactions: ∑ⱼ∈neighbors(i) sᵢsⱼ
 
 # Example
 ```julia
 system = Ising([10, 10])
-pairs = local_spin_pairs(system, 5)  # Sum for site 5
+interactions = local_pair_interactions(system, 5)
 ```
 """
-@inline function local_spin_pairs(sys::AbstractSpinSystem, i)
+@inline function local_pair_interactions(sys::AbstractSpinSystem, i)
     s = sys.spins[i]
     acc = 0
     for j in sys.nbrs[i]
