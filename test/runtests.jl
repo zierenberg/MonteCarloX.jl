@@ -3,34 +3,24 @@ using Test
 using Random
 
 @testset "MonteCarloX.jl" begin
-    # basics and helper
+    # utilities
     include("test_utils.jl")
-    @test test_histogram_set_get()
-    @test test_log_sum()
-    @test test_binary_search()
+    run_utils_testsets()
 
-    # println("rng")
+    # random number generators
     include("test_rng.jl")
-    @test test_rng_mutable()
+    run_rng_testsets()
 
-    # println("event handler")
+    # event handlers
     include("test_event_handler.jl")
-    @test test_event_handler_rate("ListEventRateSimple")
-    @test test_event_handler_rate("ListEventRateActiveMask")
+    run_event_handler_testsets()
 
-    # equilibrium
-    # println("equilibrium - Metropolis")
+    # measurements
+    include("test_measurements.jl")
+    run_measurements_testsets()
+
+    # equilibrium / Metropolis
     include("test_metropolis.jl")
-    @test test_metropolis_1d_gaussian()
-    @test test_metropolis_2d_gaussian()
-    @test test_metropolis_acceptance_tracking()
-    @test test_metropolis_temperature_effects()
-    @test test_metropolis_proposal_invariance()
-
-    # non-equilibrium
-    # test_kinetic_monte_carlo.jl
-    # include("test_kinetic_monte_carlo.jl")
-    # @test test_kmc_next()
-    # @test test_kmc_advance()
+    run_metropolis_testsets()
 
 end

@@ -3,6 +3,7 @@ using Random
 using StatsBase
 using StatsBase: normalize, kldivergence
 using Distributions
+using Test
 
 """
 Test Metropolis sampler on a 1D Gaussian with scheduled measurements and KL divergence check
@@ -398,4 +399,74 @@ function test_metropolis_proposal_invariance(; verbose=false)
     pass &= length(samples_a) == samples && length(samples_b) == samples
     
     return pass
+end
+
+"""
+Test BoltzmannLogWeight call overloads and Metropolis convenience constructor.
+"""
+function test_metropolis_boltzmann_overloads_and_constructor(; verbose=false)
+    rng = MersenneTwister(500)
+    β = 0.75
+
+    lw = BoltzmannLogWeight(β)
+
+    # Scalar overload on Real (including integer inputs)
+    e_int = 4
+    e_real = 2.5
+
+    # AbstractArray overload
+    e_vec = [1, -2, 3]
+    e_mat = [1.0 2.0; -3.0 4.0]
+
+    pass = true
+    pass &= lw(e_int) == -β * e_int
+    pass &= lw(e_real) == -β * e_real
+    pass &= lw(e_vec) == -β * sum(e_vec)
+    pass &= lw(e_mat) == -β * sum(e_mat)
+
+    # Metropolis convenience constructor with β keyword
+    alg = Metropolis(rng; β=β)
+
+    pass &= alg.rng === rng
+    pass &= alg.logweight isa BoltzmannLogWeight
+    pass &= alg.steps == 0
+    pass &= alg.accepted == 0
+    pass &= alg.logweight(e_int) == -β * e_int
+    pass &= alg.logweight(e_vec) == -β * sum(e_vec)
+
+    if verbose
+        println("Boltzmann Overloads + Constructor Test:")
+        println("  β: $(β)")
+        println("  lw(Int): $(lw(e_int))")
+        println("  lw(Real): $(lw(e_real))")
+        println("  lw(Vector): $(lw(e_vec))")
+        println("  lw(Matrix): $(lw(e_mat))")
+        println("  Constructor logweight type: $(typeof(alg.logweight))")
+    end
+
+    return pass
+end
+
+function run_metropolis_testsets(; verbose=false)
+    @testset "Metropolis" begin
+        @testset "1D Gaussian" begin
+            @test test_metropolis_1d_gaussian(verbose=verbose)
+        end
+        @testset "2D Gaussian" begin
+            @test test_metropolis_2d_gaussian(verbose=verbose)
+        end
+        @testset "Acceptance tracking" begin
+            @test test_metropolis_acceptance_tracking(verbose=verbose)
+        end
+        @testset "Temperature effects" begin
+            @test test_metropolis_temperature_effects(verbose=verbose)
+        end
+        @testset "Proposal invariance" begin
+            @test test_metropolis_proposal_invariance(verbose=verbose)
+        end
+        @testset "Boltzmann overloads and constructor" begin
+            @test test_metropolis_boltzmann_overloads_and_constructor(verbose=verbose)
+        end
+    end
+    return true
 end
