@@ -1,79 +1,68 @@
 module MonteCarloX
-# dependencies
+
+# Core dependencies
 using Random
 using StatsBase
 using LinearAlgebra
 using StaticArrays
-# TODO: ?exports that are relevant to run simulations in MonteCarloX
-# using Reexports
-# @reexport using Random
-# @reexport using StatsBase
 
+# Core abstractions (shared by all algorithms)
+include("abstractions.jl")
+
+# Utilities
 include("utils.jl")
-include("event_handler.jl")
 include("rng.jl")
 
-#TODO List
-# * Think about the interface of algorithmic structs; should they include basic
-#   elements such as weight functions or event handler?
-# * Move cluster_wolff.jl to designated SpinSystems.jl, this is an update not
-#   MonteCarlo
+# Measurement framework
+include("measurements/measurements.jl")
 
-# Equilibrium
-include("importance_sampling.jl")
-include("reweighting.jl")
+# Log weights (canonical ensemble)
+include("weights/canonical.jl")
 
-# Non-equilibrium
-include("kinetic_monte_carlo.jl")
-include("poisson_process.jl")
-include("gillespie.jl")
+# Algorithms (equilibrium)
+include("algorithms/importance_sampling.jl")  # Core importance sampling functions (accept!, etc.)
+include("algorithms/metropolis.jl")  # Metropolis importance sampling
 
-# move to external
-include("cluster_wolff.jl")
+# Algorithms (non-equilibrium)
+include("algorithms/event_handler.jl")  # Event handling for kinetic Monte Carlo
 
-# algorithms
-export  Metropolis,
-        Gillespie,
-        KineticMonteCarlo,
-        PoissonProcess,
-        InhomogeneousPoissonProcess
+# Export core abstractions
+export AbstractSystem,
+       AbstractLogWeight,
+       AbstractAlgorithm,
+       AbstractUpdate,
+       AbstractMeasurement
 
-# functions (equilibrium)
-export accept,
-       sweep
-        # update -> will be moved to test/utils.jl for now and later to SpinSystems.jl
+# Export measurement framework
+export Measurement,
+       Measurements,
+       MeasurementSchedule,
+       IntervalSchedule,
+       PreallocatedSchedule,
+       measure!,
+       is_complete
+BoltzmannLogWeight,
+       
+# Export importance sampling algorithms
+export AbstractImportanceSampling,
+       BoltzmannLogWeight,
+       Metropolis,
+       accept!,
+       acceptance_rate,
+       reset_statistics!
 
-# funtions (non-equilibrium)
-export  next_event,
-        next_time,
-        advance!,
-        next,
-        init
+# Export helper functions
+export log_sum,
+       binary_search,
+       kldivergence
 
-# reweighting (needs makeover)
-export  expectation_value_from_timeseries,
-        distribution_from_timeseries
-        
-        # reweighting
+# Export event handler types
+export AbstractEventHandlerRate,
+       ListEventRateSimple,
+       ListEventRateActiveMask
 
-# helper
-export  log_sum,
-        binary_search,
-        random_element,
-        kldivergence,
-        # event handler
-        AbstractEventHandlerRate,
-        ListEventRateSimple,
-        ListEventRateActiveMask,
-        # rng
-        MutableRandomNumbers,
-        reset
+# Export RNG utilities
+export MutableRandomNumbers,
+       reset
 
-
-
-
-end # module
-
-# Maybe embedd this into StatisticalPhysics.jl, which could include
-# SpinSystems.jl, PolymerSystems.jl, DirectedPercolation, (NeuralNetworks,)
-# ComplexSystems, ComlexNetworks etc ;)
+end # module MonteCarloX
