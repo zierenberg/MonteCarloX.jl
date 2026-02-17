@@ -1,85 +1,7 @@
-using LightGraphs
 using MonteCarloX
 using Random
 using LinearAlgebra
-
-function test_sweep_random_element(;verbose = false)
-    N = 10000000
-    function test_random_element(list_prob::Vector{Float64})
-        rng = MersenneTwister(1000)
-        sum = 0.0
-        for i in 1:N
-            id = MonteCarloX.random_element(rng, list_prob)
-            sum += id / N
-        end
-        return sum
-    end
-    function test_random_element(list_prob::ProbabilityWeights)
-        rng = MersenneTwister(1000)
-        sum = 0.0
-        for i in 1:N
-            id = StatsBase.sample(rng, list_prob)
-            sum += id / N
-        end
-        return sum
-    end
-    function test_random_element(list_freq::FrequencyWeights)
-        rng = MersenneTwister(1000)
-        sum = 0.0
-        for i in 1:N
-            id = StatsBase.sample(rng, list_freq)
-            sum += id / N
-        end
-        return sum
-    end
-    function test_binary_search(cum_prob::Vector{Float64})
-        rng = MersenneTwister(1000)
-        sum = 0.0
-        for i in 1:N
-            id = MonteCarloX.binary_search(cum_prob, rand(rng))
-            sum += id / N
-        end
-        return sum
-    end
-
-    pass = true
-
-    # list_prob = [0.1,0.1,0.4,0.2,0.2]
-    list_prob = [0.4,0.2,0.2,0.1,0.1]
-    list_freq = [4,2,2,1,1]
-    cum_prob    = cumsum(list_prob)
-    #############################################################################
-    expected_id = 0
-    for id in 1:length(list_prob)
-        expected_id += id * list_prob[id]
-    end
-    if verbose
-        println("expectation value id = $(expected_id)")
-    end
-    #############################################################################
-    # probe efficiency with @test, last time I got
-    #  0.180528 seconds (23 allocations: 20.281 KiB)
-    #  0.170262 seconds (24 allocations: 20.312 KiB)
-    #  0.163892 seconds (24 allocations: 20.312 KiB)
-    #  0.091118 seconds (23 allocations: 20.281 KiB)
-    result_re = test_random_element(list_prob)
-    result_pb = test_random_element(ProbabilityWeights(list_prob))
-    result_fr = test_random_element(FrequencyWeights(list_freq))
-    result_bs = test_binary_search(cum_prob)
-    diff1 = abs(result_re - result_bs)
-    diff2 = abs(result_pb - result_bs)
-    diff3 = abs(result_fr - result_bs)
-    if verbose
-        println("result of loop over random element (deprecated) = $(result_re) vs loop over binary_search = $(result_bs) [abs diff = $(diff)]")
-        println("result of loop over random element (prob) = $(result_pb) vs loop over binary_search = $(result_bs) [abs diff = $(diff)]")
-        println("result of loop over random element (freq) = $(result_fr) vs loop over binary_search = $(result_bs) [abs diff = $(diff)]")
-    end
-    pass &= diff1 < 0.01
-    pass &= diff2 < 0.01
-    pass &= diff3 < 0.01
-    #############################################################################
-    return pass
-end
+using StatsBase
 
 # TODO: use this also for PT and adaptive overlap stories etc
 """ Testing metropolis on unimodaL probability distribution"""
@@ -296,6 +218,29 @@ end
 mutable struct Stats
     accept::Float64
     reject::Float64
+end
+
+"""Metropolis accept/reject for symmetric proposals"""
+function accept(rng::AbstractRNG, log_weight_sampling, new_state, old_state)
+    log_new = new_state isa Tuple ? log_weight_sampling(new_state...) : log_weight_sampling(new_state)
+    log_old = old_state isa Tuple ? log_weight_sampling(old_state...) : log_weight_sampling(old_state)
+    log_ratio = log_new - log_old
+    return log_ratio > 0 || rand(rng) < exp(log_ratio)
+end
+
+"""Apply an update function a fixed number of times"""
+function sweep(update_fn::Function, rng::AbstractRNG; number_updates::Int=1)
+    for _ in 1:number_updates
+        update_fn()
+    end
+end
+
+"""Sweep over a weighted set of update functions"""
+function sweep(list_updates::Vector{Function}, list_probabilities::ProbabilityWeights, rng::AbstractRNG; number_updates::Int=1)
+    for _ in 1:number_updates
+        update_fn = StatsBase.sample(rng, list_updates, list_probabilities)
+        update_fn()
+    end
 end
 
 
