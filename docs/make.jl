@@ -14,7 +14,7 @@ makedocs(;
         "Helper" => "helper.md",
     ],
     sitename = "MonteCarloX",
-    authors = "Johannes Zierenberg",
+    authors = "Johannes Zierenberg & Martin Weigel",
 )
 
 # deploydocs(;
@@ -23,5 +23,5 @@ makedocs(;
 #     target="build"
 # )
 deploydocs(
-    repo = "github.com/USER_NAME/PACKAGE_NAME.jl.git",
+    repo = "github.com/zierenberg/MonteCarloX.jl.git",
 )
