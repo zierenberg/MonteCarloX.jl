@@ -1,7 +1,7 @@
 # tests for src/event_handler.jl
 using MonteCarloX
-using StatsBase
 using Random
+using Test
 
 function test_event_handler_rate(event_handler_type::String; verbose = false)
     pass = true
@@ -90,4 +90,16 @@ function test_event_handler_rate(event_handler_type::String; verbose = false)
     end
 
     return pass
+end
+
+function run_event_handler_testsets(; verbose=false)
+    @testset "Event Handler" begin
+        @testset "ListEventRateSimple" begin
+            @test test_event_handler_rate("ListEventRateSimple", verbose=verbose)
+        end
+        @testset "ListEventRateActiveMask" begin
+            @test test_event_handler_rate("ListEventRateActiveMask", verbose=verbose)
+        end
+    end
+    return true
 end

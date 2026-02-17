@@ -1,10 +1,9 @@
 # here tests should be written for utility functions in src/Utils.jl
 using MonteCarloX
 using StatsBase
+using Test
 
-include("./includes.jl")
-
-function test_histogram_set_get()
+function test_histogram_set_get(; verbose=false)
     pass = true
 
     # bin uniform values into histogram (each bin has 10 elements)
@@ -29,53 +28,80 @@ function test_histogram_set_get()
     for i = 1:100
         h = hist[i]
         t = target[1 + floor(Int, (i - 1) / 10)]
-        pass &= check(h == t, @sprintf("... check bin for %d: %d == %d\n", i, h, t))
+        pass &= h == t
     end
 
     # check missing API
-    pass &= check(ismissing(hist[200]), "... hist[200] == missing\n")
+    pass &= ismissing(hist[200])
 
     valid = true
     try
         hist[200] = 3
         valid = false
-    catch e
-        vlaid = true
+    catch
+        valid = true
     end
-    pass &= check(valid, "... hist[200] = 3 throws error\n")
+    pass &= valid
+
+    if verbose
+        println("Histogram set/get test pass: $(pass)")
+    end
 
     return pass
 end
 
-function test_log_sum()
+function test_log_sum(; verbose=false)
     pass = true
     a = 2.0; A = exp(a)
     b = 3.0; B = exp(b)
     C = A + B
     c = log_sum(a,b)
-    pass &= check(log(C) == c, "... test float types\n")
+    pass &= log(C) == c
 
     a = 5; A = exp(a)
     b = 5; B = exp(b)
     C = A + B
     c = log_sum(a,b)
-    pass &= check(log(C) == c, "... test integer types\n")
+    pass &= log(C) == c
 
     a = 5;   A = exp(a)
     b = 3.0; B = exp(b)
     C = A + B
     c = log_sum(a,b)
-    pass &= check(log(C) == c, "... test mixed types\n")
+    pass &= log(C) == c
+
+    if verbose
+        println("log_sum test pass: $(pass)")
+    end
 
     return pass
 end
 
-function test_binary_search()
+function test_binary_search(; verbose=false)
     pass = true
 
     pass &= (binary_search([1.,2.,3.,4.],2.5)==3)
     pass &= (binary_search([1.,2.,2.2,2.6,15.0],2.5)==4)
     pass &= (binary_search([1,2,3,4],2)==2)
 
+    if verbose
+        println("binary_search test pass: $(pass)")
+    end
+
     return pass
+end
+
+function run_utils_testsets(; verbose=false)
+    @testset "Utils" begin
+        @testset "Histogram set/get" begin
+            @test test_histogram_set_get(verbose=verbose)
+        end
+        @testset "log_sum" begin
+            @test test_log_sum(verbose=verbose)
+        end
+        @testset "binary_search" begin
+            @test test_binary_search(verbose=verbose)
+        end
+    end
+    return true
 end
