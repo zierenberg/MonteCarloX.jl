@@ -45,5 +45,6 @@ jobs:
         if: always()
         with:
           files: lcov.info
+          slug: zierenberg/MonteCarloX.jl
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
