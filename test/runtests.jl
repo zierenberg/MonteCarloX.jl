@@ -23,4 +23,8 @@ using Random
     include("test_metropolis.jl")
     run_metropolis_testsets()
 
+    # non-equilibrium / kinetic Monte Carlo
+    include("test_kinetic_monte_carlo.jl")
+    run_kinetic_monte_carlo_testsets()
+
 end

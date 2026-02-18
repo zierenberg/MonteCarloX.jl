@@ -48,7 +48,7 @@ An Algorithm:
 
 Examples:
 - Equilibrium: Metropolis, Heat Bath, Cluster updates
-- Non-equilibrium: Gillespie, Kinetic Monte Carlo, Poisson process
+- Non-equilibrium: Gillespie, Kinetic Monte Carlo, point-process models
 """
 abstract type AbstractAlgorithm end
 
