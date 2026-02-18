@@ -76,7 +76,6 @@ MonteCarloX.jl/
 │   │   ├── event_handler.jl   # Event handling for KMC
 │   │   ├── importance_sampling.jl  # Metropolis (simplest importance sampling)
 │   │   ├── kinetic_monte_carlo.jl  # Gillespie (simplest KMC) and general KMC
-│   │   ├── poisson_process.jl      # Poisson processes
 │   │   ├── multicanonical.jl       # (Placeholder) Generalized ensemble
 │   │   ├── parallel_tempering.jl   # (Placeholder) Replica exchange
 │   │   └── population_annealing.jl # (Placeholder) Population annealing
@@ -94,6 +93,7 @@ MonteCarloX.jl/
 │   ├── simple_ising.ipynb     # Equilibrium: Ising + Metropolis
 │   ├── branching_process.ipynb       # Non-equilibrium: Branching process
 │   └── birth_death_meanfield.ipynb   # Non-equilibrium: Mean-field dynamics
+│   └── poisson_kmc.ipynb       # Poisson processes via kMC primitives
 ├── SpinSystems/test/          # Model-level tests
 ├── examples/stash/            # Legacy examples (for reference)
 └── docs/                      # Documentation
@@ -106,6 +106,7 @@ See the notebooks in `notebooks/` for complete demonstrations:
 - `simple_ising.ipynb`: equilibrium Ising + Metropolis
 - `branching_process.ipynb`: non-equilibrium branching process
 - `birth_death_meanfield.ipynb`: mean-field non-equilibrium dynamics
+- `poisson_kmc.ipynb`: Poisson processes using kinetic Monte Carlo primitives
 
 ## Goal
 
@@ -117,6 +118,14 @@ MonteCarloX contains only the core algorithmic components. Models are provided b
 
 - **Core (MonteCarloX)**: Run from the repository root: `julia --project -e 'using Pkg; Pkg.test()'`
 - **Models (SpinSystems)**: Run from the SpinSystems directory: `julia --project=SpinSystems -e 'using Pkg; Pkg.test()'`
+
+## Documentation
+
+Build the docs locally and open the generated HTML:
+
+`julia --project=docs -e 'using Pkg; Pkg.instantiate(); include("docs/make.jl")'`
+
+The output is written to `docs/build/index.html`.
 
 Core tests cover algorithms, log weights, measurements, RNG utilities, and event handling. Model behavior (Ising, Blume-Capel, etc.) is validated in `SpinSystems/test/` to keep responsibilities separated.
 
