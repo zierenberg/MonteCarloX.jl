@@ -1,48 +1,67 @@
-## Kinetic Monte Carlo (continuous-time)
+# Continuous-Time Sampling Algorithms
 
-`Gillespie` is the simplest user-facing continuous-time algorithm in MonteCarloX.
-The general stepping API is:
+Non-equilibrium simulations are event-driven in MonteCarloX.
+The core primitive is kinetic Monte Carlo in continuous time.
 
-1. `dt, event = next(alg, source)`
-2. advance time by `dt`
-3. (optional) measure at the new time
-4. apply state update for `event`
+This is distinct from importance sampling:
 
-This makes it straightforward to place measurements before state modification,
-which is often required in kinetic simulations.
+- **Importance sampling** targets a stationary distribution via accept/reject updates.
+- **Continuous-time sampling** advances stochastic dynamics with sampled waiting times and events.
 
-### Sources for `next`
+## Continuous-time stepping model
+
+The standard loop is:
+
+1. start from current state,
+2. compute/provide event rates,
+3. sample `(dt, event)` (which advances simulation time),
+4. measure at the new time,
+5. apply event update to state,
+6. refresh rates/event structure if needed.
+
+`Gillespie` is the canonical user-facing algorithm for this pattern.
+
+## Sources for event sampling
+
+`next` / `step!` work with multiple backends:
 
 - raw rates (`AbstractVector`)
 - weighted rates (`AbstractWeights`)
-- event handlers (`AbstractEventHandlerRate`)
-- time-dependent rate callback with `next(alg, rates_at_time)` where `rates_at_time(alg.time)` returns rates
+- event handlers (`AbstractEventHandlerRate`, `AbstractEventHandlerTime`)
+- time-dependent rate callback (`rates_at_time(alg.time) -> rates`)
 
-### `advance!` callbacks
+## Minimal example
 
-For model systems, `advance!` supports both callbacks:
+```julia
+using Random
+using MonteCarloX
 
-- `measure!(sys, t_new, event)` called first
-- `update!(sys, event, t_new)` called second
+rng = MersenneTwister(11)
+alg = Gillespie(rng)
 
-and requires an explicit rate callback keyword:
+rates = [0.1, 0.2, 0.05]
 
-- `rates = (sys, t) -> ...`
+for _ in 1:10_000
+	t, event = step!(alg, rates)
+	# measure at time t
+	# apply event to your model state
+	# update rates if state changed
+end
+```
 
-For rates/event-handler sources, `advance!` supports:
+## Poisson process perspective
 
-- `update!(source, event, t_new)`
+Homogeneous and inhomogeneous Poisson processes can be implemented directly with
+`next_time`, `next_event`, `next`, and optional thinning callbacks.
+See `notebooks/poisson_kmc.ipynb` for a full worked notebook.
 
-### Poisson via kinetic Monte Carlo
-
-Poisson processes are implemented directly with the kinetic Monte Carlo
-primitives (`next_time`, `next_event`, `next`). See the notebook
-`notebooks/poisson_kmc.ipynb` for a complete homogeneous and inhomogeneous
-example using thinning.
+## API reference
 
 ```@docs
+AbstractKineticMonteCarlo
 Gillespie
 next
+step!
 next_time
 next_event
 advance!
