@@ -59,6 +59,21 @@ function log_sum(a::Number, b::Number)::Float64
     end
 end
 
+"""
+    logistic(x::Real)
+
+Numerically stable logistic sigmoid:
+
+`σ(x) = 1 / (1 + exp(-x))`
+"""
+@inline function logistic(x::Real)
+    if x ≥ 0
+        return inv(1 + exp(-x))
+    end
+    ex = exp(x)
+    return ex / (1 + ex)
+end
+
 
 
 

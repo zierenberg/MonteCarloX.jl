@@ -76,7 +76,7 @@ MonteCarloX.jl/
 │   │   ├── event_handler.jl   # Event handling for KMC
 │   │   ├── importance_sampling.jl  # Metropolis (simplest importance sampling)
 │   │   ├── kinetic_monte_carlo.jl  # Gillespie (simplest KMC) and general KMC
-│   │   ├── multicanonical.jl       # (Placeholder) Generalized ensemble
+│   │   ├── multicanonical.jl       # Multicanonical + Wang-Landau generalized ensembles
 │   │   ├── parallel_tempering.jl   # (Placeholder) Replica exchange
 │   │   └── population_annealing.jl # (Placeholder) Population annealing
 │   ├── rng.jl                 # Random number utilities
@@ -136,6 +136,7 @@ This branch is under active development. Current status:
 - [x] Core abstractions (AbstractSystem, AbstractLogWeight, etc.)
 - [x] Measurement framework (interval & preallocated schedules)
 - [x] Equilibrium algorithms (Metropolis with Boltzmann weight)
+- [x] Generalized ensembles (Multicanonical, Wang-Landau scaffolds)
 - [x] SpinSystems submodule (Ising, Blume-Capel)
 - [x] Working examples demonstrating the new API
 - [ ] BayesianInference submodule

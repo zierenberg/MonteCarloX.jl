@@ -23,6 +23,16 @@ using Random
     include("test_metropolis.jl")
     run_metropolis_testsets()
 
+    # weights
+    include("test_weights.jl")
+    run_weights_testsets()
+
+    # generalized ensembles
+    include("test_multicanonical.jl")
+    run_multicanonical_testsets()
+    include("test_wang_landau.jl")
+    run_wang_landau_testsets()
+
     # non-equilibrium / kinetic Monte Carlo
     include("test_kinetic_monte_carlo.jl")
     run_kinetic_monte_carlo_testsets()

@@ -9,7 +9,13 @@ concrete implementations of AbstractSystem for various spin models.
 module SpinSystems
 
 # Import required types from MonteCarloX
-using MonteCarloX: AbstractSystem, AbstractImportanceSampling, accept!
+using MonteCarloX: AbstractSystem,
+                   AbstractImportanceSampling,
+                   AbstractMetropolis,
+                   AbstractHeatBath,
+                   accept!,
+                   log_acceptance_ratio,
+                   logistic
 
 export AbstractSpinSystem,
        Ising,

@@ -177,7 +177,22 @@ function spin_flip!(sys::BlumeCapel, alg::AbstractImportanceSampling)
     
     if s_new != sys.spins[i]
         ΔE = delta_energy(sys, i, s_new)
-        log_ratio::Float64 = alg.logweight(ΔE)
+        E_old = energy(sys)
+        E_new = E_old + ΔE
+        log_ratio = log_acceptance_ratio(alg, E_new, E_old)
+        if accept!(alg, log_ratio)
+            modify!(sys, i, s_new, ΔE)
+        end
+    end
+end
+
+function spin_flip!(sys::BlumeCapel, alg::AbstractMetropolis)
+    i = pick_site(alg.rng, length(sys.spins))
+    s_new = rand(alg.rng, sys.states)
+
+    if s_new != sys.spins[i]
+        ΔE = delta_energy(sys, i, s_new)
+        log_ratio = log_acceptance_ratio(alg, ΔE)
         if accept!(alg, log_ratio)
             modify!(sys, i, s_new, ΔE)
         end
