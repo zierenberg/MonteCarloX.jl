@@ -13,6 +13,38 @@ Importance sampling algorithms:
 abstract type AbstractImportanceSampling <: AbstractAlgorithm end
 
 """
+    AbstractMetropolis <: AbstractImportanceSampling
+
+Base type for Metropolis-family samplers where acceptance is naturally
+computed from a local state difference (e.g. ΔE).
+"""
+abstract type AbstractMetropolis <: AbstractImportanceSampling end
+
+"""
+    AbstractHeatBath <: AbstractAlgorithm
+
+Base type for heat-bath style samplers.
+"""
+abstract type AbstractHeatBath <: AbstractAlgorithm end
+
+"""
+    log_acceptance_ratio(alg::AbstractMetropolis, delta_state)
+
+Default log-acceptance ratio for Metropolis-family updates from a local
+state difference.
+"""
+@inline log_acceptance_ratio(alg::AbstractMetropolis, delta_state) = alg.logweight(delta_state)
+
+"""
+    log_acceptance_ratio(alg::AbstractImportanceSampling, state_new, state_old)
+
+General log-acceptance ratio for importance sampling algorithms that require
+absolute state values.
+"""
+@inline log_acceptance_ratio(alg::AbstractImportanceSampling, state_new, state_old) =
+    alg.logweight(state_new) - alg.logweight(state_old)
+
+"""
     accept!(alg::AbstractImportanceSampling, log_ratio::Real)
 
 Evaluate acceptance criterion for importance sampling.

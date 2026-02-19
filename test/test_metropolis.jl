@@ -447,6 +447,59 @@ function test_metropolis_boltzmann_overloads_and_constructor(; verbose=false)
     return pass
 end
 
+"""
+Test Glauber basics.
+"""
+function test_glauber_basics(; verbose=false)
+    rng = MersenneTwister(777)
+    β = 0.8
+
+    glauber = Glauber(rng; β=β)
+    pass = true
+
+    pass &= glauber.rng === rng
+    pass &= glauber.steps == 0
+    pass &= glauber.accepted == 0
+
+    # Strongly favorable move should almost always be accepted
+    accepted = 0
+    for _ in 1:1_000
+        accepted += accept!(glauber, 5.0)
+    end
+    pass &= accepted > 980
+    pass &= glauber.steps == 1_000
+    pass &= 0.0 <= acceptance_rate(glauber) <= 1.0
+
+    if verbose
+        println("Glauber basics:")
+        println("  Glauber acceptance rate (log_ratio=5): $(acceptance_rate(glauber))")
+    end
+
+    return pass
+end
+
+"""
+Test HeatBath basics.
+"""
+function test_heatbath_basics(; verbose=false)
+    rng = MersenneTwister(778)
+    β = 0.8
+    pass = true
+
+    # HeatBath constructor and counters
+    hb = HeatBath(rng; β=β)
+    pass &= hb.rng === rng
+    pass &= hb.β == β
+    pass &= hb.steps == 0
+
+    if verbose
+        println("HeatBath basics:")
+        println("  HeatBath β: $(hb.β)")
+    end
+
+    return pass
+end
+
 function run_metropolis_testsets(; verbose=false)
     @testset "Metropolis" begin
         @testset "1D Gaussian" begin
@@ -466,6 +519,12 @@ function run_metropolis_testsets(; verbose=false)
         end
         @testset "Boltzmann overloads and constructor" begin
             @test test_metropolis_boltzmann_overloads_and_constructor(verbose=verbose)
+        end
+        @testset "Glauber basics" begin
+            @test test_glauber_basics(verbose=verbose)
+        end
+        @testset "HeatBath basics" begin
+            @test test_heatbath_basics(verbose=verbose)
         end
     end
     return true

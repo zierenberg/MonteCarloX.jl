@@ -1,15 +1,33 @@
+## Importance Sampling
 
-### Importance Sampling (Metropolis)
 ```@docs
-accept
-sweep
+Metropolis
+Glauber
+HeatBath
+accept!
+acceptance_rate
+reset_statistics!
+log_acceptance_ratio
 ```
 
-### Reweighting
+## Generalized Ensembles
+
+- `Multicanonical` uses `logWeight(E) = S(E) = log Ω(E)`.
+- `WangLandau` uses density-of-states notation `g(E)` with
+    `S(E) = log g(E)` and logarithmic schedule parameter `logf`.
+
 ```@docs
-expectation_value_from_timeseries
-distribution_from_timeseries
+TabulatedLogWeight
+Multicanonical
+update_weights!
+WangLandau
+update_weight!
+update_f!
 ```
+
+## Reweighting
+
+Reweighting tools are currently maintained outside the generated docs pages.
 
 <!-- ## Full Docs
 ```@autodocs

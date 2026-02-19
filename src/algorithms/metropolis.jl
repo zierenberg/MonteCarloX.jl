@@ -30,7 +30,7 @@ logweight = BoltzmannLogWeight(1.5)
 alg = Metropolis(Random.default_rng(), logweight)
 ```
 """
-mutable struct Metropolis{LW, RNG<:AbstractRNG} <: AbstractImportanceSampling
+mutable struct Metropolis{LW, RNG<:AbstractRNG} <: AbstractMetropolis
     rng::RNG
     logweight::LW
     steps::Int
@@ -64,3 +64,33 @@ This is a convenience constructor for the canonical ensemble.
 """
 Metropolis(rng::AbstractRNG; β::Real) = 
     Metropolis(rng, BoltzmannLogWeight(β))
+
+"""
+    Glauber <: AbstractMetropolis
+
+Glauber sampler with logistic acceptance rule.
+
+Uses the same proposal interface and log-ratio as Metropolis-family algorithms,
+but acceptance is:
+
+    p_accept = 1 / (1 + exp(-log_ratio))
+"""
+mutable struct Glauber{LW, RNG<:AbstractRNG} <: AbstractMetropolis
+    rng::RNG
+    logweight::LW
+    steps::Int
+    accepted::Int
+end
+
+Glauber(rng::AbstractRNG, logweight::Union{AbstractLogWeight, Function}) =
+    Glauber(rng, logweight, 0, 0)
+
+Glauber(rng::AbstractRNG; β::Real) =
+    Glauber(rng, BoltzmannLogWeight(β))
+
+function accept!(alg::Glauber, log_ratio::Real)
+    alg.steps += 1
+    accepted = rand(alg.rng) < logistic(log_ratio)
+    alg.accepted += accepted
+    return accepted
+end

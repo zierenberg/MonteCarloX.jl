@@ -1,5 +1,14 @@
 # Helper Tools
 
+## Core Helpers
+
+```@docs
+log_sum
+binary_search
+MonteCarloX.logistic
+kldivergence
+```
+
 ```@index
 Order = [:type, :function]
 Pages = ["helper.md"]

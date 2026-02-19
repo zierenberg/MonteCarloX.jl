@@ -129,7 +129,7 @@ function test_kmc_advance_and_statistics(; verbose=false)
 
     dt, event = next(alg, [0.0])
     pass &= dt == Inf
-    pass &= event == 0
+    pass &= event === nothing
 
     if verbose
         println("KMC advance/statistics test pass: $(pass)")

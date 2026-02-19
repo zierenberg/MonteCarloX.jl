@@ -26,7 +26,36 @@ function spin_flip!(sys::AbstractIsing, alg::AbstractImportanceSampling)
     i = pick_site(alg.rng, length(sys.spins))
     Δpair, Δspin = flip_changes(sys, i)
     ΔE = delta_energy(sys, Δpair, Δspin, i)
-    accept!(alg, alg.logweight(ΔE)) && modify!(sys, i, Δpair, Δspin)
+    E_old = energy(sys)
+    E_new = E_old + ΔE
+    log_ratio = log_acceptance_ratio(alg, E_new, E_old)
+    accept!(alg, log_ratio) && modify!(sys, i, Δpair, Δspin)
+    return nothing
+end
+
+function spin_flip!(sys::AbstractIsing, alg::AbstractMetropolis)
+    i = pick_site(alg.rng, length(sys.spins))
+    Δpair, Δspin = flip_changes(sys, i)
+    ΔE = delta_energy(sys, Δpair, Δspin, i)
+    log_ratio = log_acceptance_ratio(alg, ΔE)
+    accept!(alg, log_ratio) && modify!(sys, i, Δpair, Δspin)
+    return nothing
+end
+
+function spin_flip!(sys::AbstractIsing, alg::AbstractHeatBath)
+    i = pick_site(alg.rng, length(sys.spins))
+    s_old = sys.spins[i]
+    Δpair, Δspin = flip_changes(sys, i)
+    ΔE = delta_energy(sys, Δpair, Δspin, i)
+
+    p_plus = logistic(alg.β * float(s_old) * ΔE)
+    s_new = rand(alg.rng) < p_plus ? Int8(1) : Int8(-1)
+
+    if s_new != s_old
+        modify!(sys, i, Δpair, Δspin)
+    end
+
+    alg.steps += 1
     return nothing
 end
 

@@ -143,7 +143,7 @@ For zero total rate, returns `(Inf, 0)`.
 function next(alg::AbstractKineticMonteCarlo, rate::Number)
     dt = next_time(alg.rng, rate)
     if !isfinite(dt)
-        return Inf, 0
+        return Inf, nothing
     end
     return dt, 1
 end
@@ -162,7 +162,7 @@ function next(alg::AbstractKineticMonteCarlo, rates::AbstractVector)
     sum_rates = sum(rates)
     dt = next_time(alg.rng, sum_rates)
     if !isfinite(dt)
-        return Inf, 0
+        return Inf, nothing
     end
     event = next_event(alg.rng, rates)
     return dt, event
@@ -182,7 +182,7 @@ function next(alg::AbstractKineticMonteCarlo, rates::AbstractWeights)
     sum_rates = sum(rates)
     dt = next_time(alg.rng, sum_rates)
     if !isfinite(dt)
-        return Inf, 0
+        return Inf, nothing
     end
     event = next_event(alg.rng, rates)
     return dt, event
@@ -197,7 +197,7 @@ function next(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandle
     sum_rates = sum(event_handler.list_rate)
     dt = next_time(alg.rng, sum_rates)
     if !isfinite(dt)
-        return Inf, event_handler.noevent
+        return Inf, nothing
     end
     event = next_event(alg.rng, event_handler)
     return dt, event

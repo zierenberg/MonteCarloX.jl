@@ -47,13 +47,3 @@ next_time
 next_event
 advance!
 ```
-
-<!-- ## Full Docs
-
-```@autodocs
-Modules = [MonteCarloX]
-Pages   = [
-    "gillespie.jl",
-]
-Private = false
-``` -->
