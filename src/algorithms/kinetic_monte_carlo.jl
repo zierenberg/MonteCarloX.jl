@@ -29,6 +29,9 @@ end
 Draw next waiting time for a homogeneous Poisson event stream.
 """
 function next_time(rng::AbstractRNG, rate_generation::Number)::Float64
+    if !(rate_generation > 0)
+        return Inf
+    end
     return randexp(rng) / rate_generation
 end
 
@@ -38,6 +41,9 @@ end
 Draw next waiting time for an inhomogeneous Poisson stream using thinning.
 """
 function next_time(rng::AbstractRNG, rate::Function, rate_generation::Real)::Real
+    if !(rate_generation > 0)
+        return Inf
+    end
     dt = 0.0
     while true
         dt += next_time(rng, rate_generation)
@@ -134,12 +140,30 @@ Draw next event waiting time and event id from raw rates.
 
 For zero total rate, returns `(Inf, 0)`.
 """
-function next(alg::AbstractKineticMonteCarlo, rates::AbstractVector)
-    sum_rates = sum(rates)
-    if !(sum_rates > 0)
+function next(alg::AbstractKineticMonteCarlo, rate::Number)
+    dt = next_time(alg.rng, rate)
+    if !isfinite(dt)
         return Inf, 0
     end
+    return dt, 1
+end
+
+"""
+    next(alg::AbstractKineticMonteCarlo, rates::AbstractVector)
+
+Draw next event waiting time and event id from raw rates.
+
+For zero total rate, returns `(Inf, 0)`.
+"""
+function next(alg::AbstractKineticMonteCarlo, rates::AbstractVector)
+    if length(rates) == 1
+        return next(alg, rates[1])
+    end
+    sum_rates = sum(rates)
     dt = next_time(alg.rng, sum_rates)
+    if !isfinite(dt)
+        return Inf, 0
+    end
     event = next_event(alg.rng, rates)
     return dt, event
 end
@@ -152,11 +176,14 @@ Draw next event waiting time and event id from weighted rates.
 For zero total rate, returns `(Inf, 0)`.
 """
 function next(alg::AbstractKineticMonteCarlo, rates::AbstractWeights)
+    if length(rates) == 1
+        return next(alg, rates[1])
+    end
     sum_rates = sum(rates)
-    if !(sum_rates > 0)
+    dt = next_time(alg.rng, sum_rates)
+    if !isfinite(dt)
         return Inf, 0
     end
-    dt = next_time(alg.rng, sum_rates)
     event = next_event(alg.rng, rates)
     return dt, event
 end
@@ -168,10 +195,10 @@ Draw next event waiting time and event from an event handler.
 """
 function next(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerRate)
     sum_rates = sum(event_handler.list_rate)
-    if !(sum_rates > 0)
+    dt = next_time(alg.rng, sum_rates)
+    if !isfinite(dt)
         return Inf, event_handler.noevent
     end
-    dt = next_time(alg.rng, sum_rates)
     event = next_event(alg.rng, event_handler)
     return dt, event
 end
