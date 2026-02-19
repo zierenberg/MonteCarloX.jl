@@ -204,6 +204,22 @@ function next(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandle
 end
 
 """
+    next(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerTime)
+
+Draw next event from a time-ordered event queue.
+"""
+function next(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerTime)
+    if length(event_handler) > 0
+        time, event = popfirst!(event_handler)
+        dt = time - get_time(event_handler)
+        set_time!(event_handler, time)
+        return dt, event
+    else
+        return Inf, nothing
+    end
+end
+
+"""
     next(alg::AbstractKineticMonteCarlo, rates_at_time::Function)
 
 Draw next event waiting time and event from a time-dependent rates function.
@@ -253,6 +269,21 @@ Perform one kinetic Monte Carlo event from an event-handler backend.
 Updates `alg.time` and `alg.steps` internally and returns `(t_new, event)`.
 """
 function step!(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerRate)
+    dt, event = next(alg, event_handler)
+    t_new = alg.time + dt
+    alg.steps += 1
+    alg.time = t_new
+    return t_new, event
+end
+
+"""
+    step!(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerTime)
+
+Perform one kinetic Monte Carlo event from a time-event handler backend.
+
+Updates `alg.time` and `alg.steps` internally and returns `(t_new, event)`.
+"""
+function step!(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerTime)
     dt, event = next(alg, event_handler)
     t_new = alg.time + dt
     alg.steps += 1
@@ -339,6 +370,33 @@ function advance!(
     alg.time = float(t0)
     while alg.time < total_time
         t_new, event = step!(alg, event_handler)
+        update! !== nothing && update!(event_handler, event, t_new)
+    end
+    return alg.time
+end
+
+"""
+    advance!(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerTime, total_time; t0=0, update!=nothing)
+
+Advance a continuous-time process with a time-event handler until `total_time`.
+
+If `update!` is provided, it is called as
+`update!(event_handler, event, t_new)` after each sampled event.
+"""
+function advance!(
+    alg::AbstractKineticMonteCarlo,
+    event_handler::AbstractEventHandlerTime,
+    total_time;
+    t0 = 0.0,
+    update! = nothing,
+)
+    alg.time = float(t0)
+    set_time!(event_handler, alg.time)
+    while alg.time < total_time
+        t_new, event = step!(alg, event_handler)
+        if event === nothing
+            return alg.time
+        end
         update! !== nothing && update!(event_handler, event, t_new)
     end
     return alg.time

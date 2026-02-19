@@ -12,6 +12,7 @@ include("abstractions.jl")
 # Utilities
 include("utils.jl")
 include("rng.jl")
+include("tools/reweighting.jl")
 
 # Measurement framework
 include("measurements/measurements.jl")
@@ -23,10 +24,12 @@ include("weights/canonical.jl")
 include("event_handler/abstractions.jl")
 include("event_handler/list_event_rate_simple.jl")
 include("event_handler/list_event_rate_active_mask.jl")
+include("event_handler/event_queue.jl")
 
 # Algorithms (equilibrium)
 include("algorithms/importance_sampling.jl")  # Core importance sampling functions (accept!, etc.)
 include("algorithms/metropolis.jl")  # Metropolis importance sampling
+include("algorithms/multicanonical.jl")
 
 # Algorithms (non-equilibrium)
 include("algorithms/kinetic_monte_carlo.jl")
@@ -53,9 +56,13 @@ BoltzmannLogWeight,
 export AbstractImportanceSampling,
        BoltzmannLogWeight,
        Metropolis,
+    Multicanonical,
+    WangLandau,
        accept!,
        acceptance_rate,
-       reset_statistics!
+    reset_statistics!,
+    update_weights!,
+    update_weights
 
 # Export kinetic Monte Carlo algorithms
 export AbstractKineticMonteCarlo,
@@ -71,10 +78,21 @@ export log_sum,
        binary_search,
        kldivergence
 
+# Export tools
+export expectation_value_from_timeseries,
+       distribution_from_timeseries,
+       expectation_value_from_histogram,
+       log_normalization
+
 # Export event handler types
 export AbstractEventHandlerRate,
+    AbstractEventHandlerTime,
        ListEventRateSimple,
-       ListEventRateActiveMask
+    ListEventRateActiveMask,
+    EventQueue,
+    get_time,
+    set_time!,
+    add!
 
 # Export RNG utilities
 export MutableRandomNumbers,
