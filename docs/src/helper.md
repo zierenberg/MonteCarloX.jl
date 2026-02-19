@@ -1,6 +1,8 @@
 # Helper Tools
 
-## Core Helpers
+This page collects utility functions used across algorithms and model code.
+
+## Numeric helpers
 
 ```@docs
 log_sum
@@ -9,22 +11,18 @@ MonteCarloX.logistic
 kldivergence
 ```
 
-```@index
-Order = [:type, :function]
-Pages = ["helper.md"]
+## RNG utilities
+
+```@docs
+MutableRandomNumbers
+reset
 ```
 
-## Full Docs
-<!-- 
-```@autodocs
-Modules = [MonteCarloX]
-Pages   = [
-    "utils.jl",
-    "event_handler.jl",
-    "reweighting.jl",
-    "rng.jl"
+## Event handler utilities
 
-]
-Private = false
-``` -->
+```@docs
+ListEventRateSimple
+ListEventRateActiveMask
+EventQueue
+```
 
