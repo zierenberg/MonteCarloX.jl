@@ -83,6 +83,29 @@ function test_kmc_next_event_handler_consistency(; verbose=false)
     return pass
 end
 
+function test_kmc_single_rate_matches_randexp(; verbose=false)
+    seed = 2026
+    rate = 1.2
+    n_samples = 1_000
+
+    alg = Gillespie(MersenneTwister(seed))
+    rng_naive = MersenneTwister(seed)
+
+    pass = true
+    for _ in 1:n_samples
+        dt, event = next(alg, [rate])
+        dt_ref = randexp(rng_naive) / rate
+        pass &= dt == dt_ref
+        pass &= event == 1
+    end
+
+    if verbose
+        println("KMC single-rate matches randexp test pass: $(pass)")
+    end
+
+    return pass
+end
+
 function test_kmc_advance_and_statistics(; verbose=false)
     rates = [0.1, 0.2, 0.3]
     alg = Gillespie(MersenneTwister(11))
@@ -188,6 +211,9 @@ function run_kinetic_monte_carlo_testsets(; verbose=false)
         end
         @testset "event handler consistency" begin
             @test test_kmc_next_event_handler_consistency(verbose=verbose)
+        end
+        @testset "single-rate matches randexp" begin
+            @test test_kmc_single_rate_matches_randexp(verbose=verbose)
         end
         @testset "advance and statistics" begin
             @test test_kmc_advance_and_statistics(verbose=verbose)
