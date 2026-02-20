@@ -139,11 +139,13 @@ Return the measurement time points for preallocated schedules.
 times(m::Measurements{K, PreallocatedSchedule}) where K = m.schedule.times
 
 """
-    measurement_data(m::Measurements{K}, key::K)
+    data(m::Measurements{K}, key::K)
 
 Return the raw data container for a named measurement.
 """
 data(m::Measurements{K}, key::K) where K = m[key].data
+
+measurement_data(m::Measurements{K}, key::K) where K = data(m, key)
 
 """
     Measurements(measurements::Dict{K, Measurement}; interval::Real)

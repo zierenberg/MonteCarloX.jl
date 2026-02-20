@@ -95,7 +95,7 @@ function test_measurements_accessors(; verbose=false)
 
     pass = true
     pass &= times(m) == [1.0, 2.0, 3.0]
-    pass &= measurement_data(m, :x) == [7.0, 9.0, 9.0]
+    pass &= data(m, :x) == [7.0, 9.0, 9.0]
 
     if verbose
         println("Measurements accessor API test pass: $(pass)")
