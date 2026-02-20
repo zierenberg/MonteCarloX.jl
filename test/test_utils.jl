@@ -77,6 +77,24 @@ function test_log_sum(; verbose=false)
     return pass
 end
 
+function test_logistic(; verbose=false)
+    pass = true
+
+    pass &= logistic(0.0) == 0.5
+
+    pass &= isapprox(logistic(5.0), 1.0; atol = 1e-6)
+    pass &= isapprox(logistic(-5.0), 0.0; atol = 1e-6)
+
+    x = 3.7
+    pass &= isapprox(logistic(x) + logistic(-x), 1.0; atol = 1e-12)
+
+    if verbose
+        println("logistic test pass: $(pass)")
+    end
+
+    return pass
+end
+
 function test_binary_search(; verbose=false)
     pass = true
 
@@ -98,6 +116,9 @@ function run_utils_testsets(; verbose=false)
         end
         @testset "log_sum" begin
             @test test_log_sum(verbose=verbose)
+        end
+        @testset "logistic" begin
+            @test test_logistic(verbose=verbose)
         end
         @testset "binary_search" begin
             @test test_binary_search(verbose=verbose)
