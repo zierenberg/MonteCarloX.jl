@@ -22,6 +22,7 @@ jobs:
       - name: Install dependencies
         run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Build and deploy
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: julia --project=docs/ --code-coverage=user docs/make.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
