@@ -47,14 +47,14 @@ function _distribute_logweight!(
     alg::ParallelMulticanonical,
     source_logweight::TabulatedLogWeight,
 )
+    source_hist = source_logweight.histogram
     for replica in alg.parallel.replicas
-        if !(replica.logweight isa TabulatedLogWeight)
-            throw(ArgumentError("all replicas must use `TabulatedLogWeight` for distribution"))
-        end
-        target = replica.logweight
-        target.table.edges == source_logweight.table.edges ||
-            throw(ArgumentError("source and target tabulated weights must have identical bin edges"))
-        target.table.weights .= source_logweight.table.weights
+        replica.logweight isa TabulatedLogWeight ||
+            throw(ArgumentError("all replicas must use `TabulatedLogWeight`"))
+        target_hist = replica.logweight.histogram
+        _assert_same_histogram_bins(target_hist, source_hist)
+        _assert_same_shape(target_hist.weights, source_hist.weights)
+        target_hist.weights .= source_hist.weights
     end
 
     return nothing
@@ -74,10 +74,6 @@ function update_weights!(
 
     master_replica = alg.parallel.replicas[master_replica_index]
     update_weights!(master_replica, merged; mode=mode)
-
-    if !(master_replica.logweight isa TabulatedLogWeight)
-        throw(ArgumentError("master replica must use `TabulatedLogWeight`"))
-    end
 
     _distribute_logweight!(alg, master_replica.logweight)
 

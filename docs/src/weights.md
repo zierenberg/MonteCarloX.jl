@@ -28,6 +28,13 @@ edges = (collect(-10.0:1.0:10.0),)
 h = fit(Histogram, Float64[], edges)
 lw = TabulatedLogWeight(h)
 
+# or initialize directly from edges with a constant value
+lw0 = TabulatedLogWeight(-10.0:1.0:10.0, 0.0)
+
+# edges can be any sorted vector/range
+edges_vec = collect(-5.0:0.5:5.0)
+lw1 = TabulatedLogWeight(edges_vec, 0.0)
+
 lw[0.3] = 1.2
 w = lw(0.3)
 ```

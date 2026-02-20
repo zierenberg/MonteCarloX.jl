@@ -43,6 +43,20 @@ function test_wang_landau_update_f(; verbose=false)
     return pass
 end
 
+function test_wang_landau_default_rng(; verbose=false)
+    bins = 0.0:1.0:4.0
+    lw = TabulatedLogWeight(Histogram((collect(bins),), zeros(Float64, length(bins) - 1)))
+    wl = WangLandau(lw; logf=log(2.0))
+
+    pass = wl.rng === Random.GLOBAL_RNG
+
+    if verbose
+        println("Wang-Landau default RNG: $(pass)")
+    end
+
+    return pass
+end
+
 function run_wang_landau_testsets(; verbose=false)
     @testset "Wang-Landau" begin
         @testset "Local update" begin
@@ -50,6 +64,9 @@ function run_wang_landau_testsets(; verbose=false)
         end
         @testset "Update f" begin
             @test test_wang_landau_update_f(verbose=verbose)
+        end
+        @testset "Default RNG" begin
+            @test test_wang_landau_default_rng(verbose=verbose)
         end
     end
     return true

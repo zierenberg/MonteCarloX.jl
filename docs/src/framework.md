@@ -86,8 +86,8 @@ end
 
 - [Core Abstractions](@ref)
 - [Weights](@ref)
-- [Importance Sampling Algorithms](equilibrium.md)
-- [Continuous-Time Sampling Algorithms](non_equilibrium.md)
+- [Importance Sampling Algorithms](importance_sampling_algorithms.md)
+- [Continuous-Time Sampling Algorithms](continuous_time_sampling_algorithms.md)
 - [Measurements](@ref)
 - [Systems and model packages](@ref)
 - [Worked Examples](@ref)

@@ -145,8 +145,6 @@ Return the raw data container for a named measurement.
 """
 data(m::Measurements{K}, key::K) where K = m[key].data
 
-measurement_data(m::Measurements{K}, key::K) where K = data(m, key)
-
 """
     Measurements(measurements::Dict{K, Measurement}; interval::Real)
 

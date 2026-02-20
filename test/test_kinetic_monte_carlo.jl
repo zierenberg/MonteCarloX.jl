@@ -1,6 +1,7 @@
 using MonteCarloX
 using Random
 using StatsBase
+using StaticArrays
 using Test
 
 function test_gillespie_constructors(; verbose=false)
@@ -12,7 +13,7 @@ function test_gillespie_constructors(; verbose=false)
     pass &= alg.rng === rng
     pass &= alg.steps == 0
     pass &= alg.time == 0.0
-    pass &= alg_default.rng isa AbstractRNG
+    pass &= alg_default.rng === Random.GLOBAL_RNG
 
     if verbose
         println("Gillespie constructor test pass: $(pass)")
@@ -200,6 +201,195 @@ function test_step_helper_rates_callback(; verbose=false)
     return pass
 end
 
+function test_kmc_next_time_special_cases(; verbose=false)
+    rng = MersenneTwister(314)
+
+    pass = true
+    pass &= next_time(rng, t -> 1.0, 0.0) == Inf
+    pass &= next_time(rng, t -> 1.0, -1.0) == Inf
+
+    if verbose
+        println("KMC next_time special cases test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_kmc_next_event_special_cases(; verbose=false)
+    pass = true
+
+    rng_num = MersenneTwister(9)
+    pass &= next_event(rng_num, 0.7) == 1
+
+    rates = MVector{2, Float64}(0.3, 0.7)
+    rng_a = MersenneTwister(19)
+    rng_b = MersenneTwister(19)
+    draw_ref = rand(rng_b) * (rates[1] + rates[2]) < rates[1] ? 1 : 2
+    draw_mvec = next_event(rng_a, rates)
+    pass &= draw_mvec == draw_ref
+    pass &= draw_mvec in (1, 2)
+
+    if verbose
+        println("KMC next_event special cases test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_kmc_event_handler_edge_cases(; verbose=false)
+    pass = true
+
+    rng = MersenneTwister(77)
+
+    handler_many = ListEventRateActiveMask{Int}([10, 20, 30], [0.2, 0.3, 0.5], 0.0, -1)
+    event_many = next_event(rng, handler_many)
+    pass &= event_many in (1, 2, 3)
+
+    handler_one = ListEventRateActiveMask{Int}([10, 20, 30], [0.0, 0.0, 0.0], 0.0, -1; initial = "all_inactive")
+    handler_one[2] = 0.4
+    pass &= next_event(rng, handler_one) == 2
+
+    handler_none = ListEventRateActiveMask{Int}([10, 20, 30], [0.0, 0.0, 0.0], 0.0, -1; initial = "all_inactive")
+    pass &= next_event(rng, handler_none) == -1
+
+    simple = ListEventRateSimple{Int}([10, 20], [1.0, 0.0], 0.0, -1)
+    Random.seed!(2026)
+    pass &= next_event(simple) == 10
+    pass &= next_event(MersenneTwister(2026), simple) == 10
+
+    if verbose
+        println("KMC event-handler edge cases test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_kmc_step_and_advance_zero_rate_edges(; verbose=false)
+    pass = true
+
+    alg_step = Gillespie(MersenneTwister(2027))
+    t_step, event_step = step!(alg_step, [0.0])
+    pass &= t_step == Inf
+    pass &= event_step === nothing
+    pass &= alg_step.time == Inf
+    pass &= alg_step.steps == 1
+
+    alg_step_cb = Gillespie(MersenneTwister(2028))
+    t_step_cb, event_step_cb = step!(alg_step_cb, t -> [0.0])
+    pass &= t_step_cb == Inf
+    pass &= event_step_cb === nothing
+    pass &= alg_step_cb.time == Inf
+    pass &= alg_step_cb.steps == 1
+
+    alg_adv = Gillespie(MersenneTwister(2029))
+    seen_events = Any[]
+    seen_times = Float64[]
+    t_adv = advance!(alg_adv, [0.0], 10.0; update! = (r, e, t) -> begin
+        push!(seen_events, e)
+        push!(seen_times, t)
+    end)
+
+    pass &= t_adv == Inf
+    pass &= alg_adv.time == Inf
+    pass &= alg_adv.steps == 1
+    pass &= length(seen_events) == 1
+    pass &= seen_events[1] === nothing
+    pass &= seen_times[1] == Inf
+
+    if verbose
+        println("KMC step/advance zero-rate edge cases test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_kmc_two_rate_vector_and_weights_paths(; verbose=false)
+    pass = true
+
+    rates_vec = [0.2, 0.8]
+    rates_w = ProbabilityWeights(copy(rates_vec))
+
+    alg_vec = Gillespie(MersenneTwister(3030))
+    alg_w = Gillespie(MersenneTwister(3030))
+
+    dt_vec, ev_vec = next(alg_vec, rates_vec)
+    dt_w, ev_w = next(alg_w, rates_w)
+
+    pass &= dt_vec == dt_w
+    pass &= ev_vec == ev_w
+    pass &= ev_vec in (1, 2)
+
+    t_vec, ev_step_vec = step!(alg_vec, rates_vec)
+    t_w, ev_step_w = step!(alg_w, rates_w)
+
+    pass &= t_vec == t_w
+    pass &= ev_step_vec == ev_step_w
+    pass &= ev_step_vec in (1, 2)
+    pass &= alg_vec.steps == 1
+    pass &= alg_w.steps == 1
+
+    alg_w_zero = Gillespie(MersenneTwister(3031))
+    rates_w_zero = ProbabilityWeights([0.0, 0.0])
+    seen = Any[]
+    t_adv = advance!(alg_w_zero, rates_w_zero, 10.0; update! = (r, e, t) -> push!(seen, e))
+    pass &= t_adv == Inf
+    pass &= alg_w_zero.time == Inf
+    pass &= alg_w_zero.steps == 1
+    pass &= length(seen) == 1 && seen[1] === nothing
+
+    if verbose
+        println("KMC two-rate vector/weights paths test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_kmc_time_event_handler_paths(; verbose=false)
+    pass = true
+
+    queue = EventQueue{Int}(0.0)
+    add!(queue, (0.3, 11))
+    add!(queue, (0.9, 22))
+
+    alg = Gillespie(MersenneTwister(4040))
+    t1, e1 = step!(alg, queue)
+    pass &= isapprox(t1, 0.3; atol = 1e-12)
+    pass &= e1 == 11
+    pass &= isapprox(alg.time, 0.3; atol = 1e-12)
+    pass &= alg.steps == 1
+
+    t2, e2 = step!(alg, queue)
+    pass &= isapprox(t2, 0.9; atol = 1e-12)
+    pass &= e2 == 22
+    pass &= isapprox(alg.time, 0.9; atol = 1e-12)
+    pass &= alg.steps == 2
+
+    t3, e3 = step!(alg, queue)
+    pass &= t3 == Inf
+    pass &= e3 === nothing
+    pass &= alg.time == Inf
+    pass &= alg.steps == 3
+
+    queue2 = EventQueue{Int}(0.0)
+    add!(queue2, (1.2, 7))
+    alg2 = Gillespie(MersenneTwister(4041))
+    observed = Tuple{Int, Float64}[]
+
+    t_final = advance!(alg2, queue2, 10.0; t0 = 1.0, update! = (q, e, t) -> push!(observed, (e, t)))
+    pass &= t_final == Inf
+    pass &= alg2.steps == 2
+    pass &= length(observed) == 1
+    pass &= observed[1][1] == 7
+    pass &= isapprox(observed[1][2], 1.2; atol = 1e-12)
+    pass &= isapprox(get_time(queue2), 1.2; atol = 1e-12)
+
+    if verbose
+        println("KMC time-event-handler paths test pass: $(pass)")
+    end
+
+    return pass
+end
+
 
 function run_kinetic_monte_carlo_testsets(; verbose=false)
     @testset "Kinetic Monte Carlo" begin
@@ -223,6 +413,24 @@ function run_kinetic_monte_carlo_testsets(; verbose=false)
         end
         @testset "step! rates callback" begin
             @test test_step_helper_rates_callback(verbose=verbose)
+        end
+        @testset "next_time special cases" begin
+            @test test_kmc_next_time_special_cases(verbose=verbose)
+        end
+        @testset "next_event special cases" begin
+            @test test_kmc_next_event_special_cases(verbose=verbose)
+        end
+        @testset "event-handler edge cases" begin
+            @test test_kmc_event_handler_edge_cases(verbose=verbose)
+        end
+        @testset "step!/advance! zero-rate edges" begin
+            @test test_kmc_step_and_advance_zero_rate_edges(verbose=verbose)
+        end
+        @testset "two-rate vector/weights paths" begin
+            @test test_kmc_two_rate_vector_and_weights_paths(verbose=verbose)
+        end
+        @testset "time-event-handler paths" begin
+            @test test_kmc_time_event_handler_paths(verbose=verbose)
         end
     end
     return true
