@@ -73,6 +73,12 @@ end
     return nothing
 end
 
+function init!(sys::AbstractIsing, type::Symbol; rng=nothing)
+    _init_spins!(sys.spins, type; rng=rng)
+    _recompute_cached!(sys)
+    return sys
+end
+
 # -----------------------------------------------------------------------------
 # Graph Ising (global J)
 # -----------------------------------------------------------------------------
@@ -132,12 +138,6 @@ function IsingGraph(graph::SimpleGraph, J::Real; h=0)
     else
         error("h must be Real or AbstractVector{<:Real}")
     end
-end
-
-function init!(sys::IsingGraph, type::Symbol; rng=nothing)
-    _init_spins!(sys.spins, type; rng=rng)
-    _recompute_cached!(sys)
-    return sys
 end
 
 function _recompute_cached!(sys::IsingGraphCouplingNoField)
@@ -291,12 +291,6 @@ function IsingMatrix(J::SparseMatrixCSC{TJ,Int}; h=0) where {TJ<:Real}
     else
         error("h must be Real or AbstractVector{<:Real}")
     end
-end
-
-function init!(sys::IsingMatrix, type::Symbol; rng=nothing)
-    _init_spins!(sys.spins, type; rng=rng)
-    _recompute_cached!(sys)
-    return sys
 end
 
 @inline function local_pair_interactions(sys::IsingMatrix, i)
@@ -463,7 +457,9 @@ function IsingLatticeOptim(Lx::Int, Ly::Int)
         end
     end
 
-    return IsingLatticeOptim(ones(Int8, N), Lx, Ly, N, nbr4, 2N, N)
+    sys = IsingLatticeOptim(ones(Int8, N), Lx, Ly, N, nbr4, 0, 0)
+    _recompute_cached!(sys)
+    return sys
 end
 
 @inline function local_pair_interactions(sys::IsingLatticeOptim, i)
@@ -477,13 +473,15 @@ end
 @inline _cached_magnetization(sys::IsingLatticeOptim) = sys.sum_spins
 @inline _cached_energy(sys::IsingLatticeOptim) = -sys.sum_pair_interactions
 
-function _full_energy(sys::IsingLatticeOptim)
-    s = 0
+function _pair_sum(sys::IsingLatticeOptim)
+    pair_sum = 0
     for i in eachindex(sys.spins)
-        s += local_pair_interactions(sys, i)
+        pair_sum += local_pair_interactions(sys, i)
     end
-    return -div(s, 2)
+    return div(pair_sum, 2)
 end
+
+@inline _full_energy(sys::IsingLatticeOptim) = -_pair_sum(sys)
 
 @inline function flip_changes(sys::IsingLatticeOptim, i)
     s = sys.spins[i]
@@ -498,5 +496,11 @@ function modify!(sys::IsingLatticeOptim, i, Δpair, Δspin)
     sys.spins[i] = -sys.spins[i]
     sys.sum_pair_interactions += Δpair
     sys.sum_spins += Δspin
+    return nothing
+end
+
+function _recompute_cached!(sys::IsingLatticeOptim)
+    sys.sum_pair_interactions = _pair_sum(sys)
+    sys.sum_spins = sum(sys.spins)
     return nothing
 end
