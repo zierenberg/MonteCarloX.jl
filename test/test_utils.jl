@@ -1,5 +1,6 @@
 # here tests should be written for utility functions in src/Utils.jl
 using MonteCarloX
+import MonteCarloX: logistic
 using StatsBase
 using Test
 
@@ -82,8 +83,8 @@ function test_logistic(; verbose=false)
 
     pass &= logistic(0.0) == 0.5
 
-    pass &= isapprox(logistic(5.0), 1.0; atol = 1e-6)
-    pass &= isapprox(logistic(-5.0), 0.0; atol = 1e-6)
+    pass &= isapprox(logistic(20.0), 1.0; atol = 1e-8)
+    pass &= isapprox(logistic(-20.0), 0.0; atol = 1e-8)
 
     x = 3.7
     pass &= isapprox(logistic(x) + logistic(-x), 1.0; atol = 1e-12)
