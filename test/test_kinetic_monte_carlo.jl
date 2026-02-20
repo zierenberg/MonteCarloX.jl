@@ -297,6 +297,29 @@ function test_kmc_next_event_special_cases(; verbose=false)
     return pass
 end
 
+function test_kmc_next_single_rate_inf_paths(; verbose=false)
+    alg = Gillespie(MersenneTwister(5050))
+
+    dt_num, ev_num = next(alg, 0.0)
+    dt_vec, ev_vec = next(alg, [0.0])
+    dt_w, ev_w = next(alg, ProbabilityWeights([0.0]))
+
+    handler = ListEventRateSimple{Int}([1], [0.0], 0.0, -1)
+    dt_handler, ev_handler = next(alg, handler)
+
+    pass = true
+    pass &= dt_num == Inf && ev_num === nothing
+    pass &= dt_vec == Inf && ev_vec === nothing
+    pass &= dt_w == Inf && ev_w === nothing
+    pass &= dt_handler == Inf && ev_handler === nothing
+
+    if verbose
+        println("KMC next single-rate Inf paths pass: $(pass)")
+    end
+
+    return pass
+end
+
 function test_kmc_event_handler_edge_cases(; verbose=false)
     pass = true
 
@@ -483,6 +506,9 @@ function run_kinetic_monte_carlo_testsets(; verbose=false)
         end
         @testset "next_event special cases" begin
             @test test_kmc_next_event_special_cases(verbose=verbose)
+        end
+        @testset "next single-rate Inf paths" begin
+            @test test_kmc_next_single_rate_inf_paths(verbose=verbose)
         end
         @testset "event-handler edge cases" begin
             @test test_kmc_event_handler_edge_cases(verbose=verbose)

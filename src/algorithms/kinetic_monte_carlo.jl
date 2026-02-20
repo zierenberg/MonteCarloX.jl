@@ -309,14 +309,7 @@ function step!(alg::AbstractKineticMonteCarlo, rates_at_time::Function)
     return t_new, event
 end
 
-"""
-    advance!(alg::AbstractKineticMonteCarlo, rates::AbstractVector, total_time; t0=0, update!=nothing)
-
-Advance a continuous-time process with raw rates until `total_time`.
-
-If `update!` is provided, it is called as `update!(rates, event, t_new)`
-after each sampled event.
-"""
+# Internal loop shared by all `advance!` overloads (intentionally undocumented).
 function _advance_loop!(;
     alg::AbstractKineticMonteCarlo,
     total_time,
@@ -339,6 +332,14 @@ function _advance_loop!(;
     return alg.time
 end
 
+"""
+    advance!(alg::AbstractKineticMonteCarlo, rates::AbstractVector, total_time; t0=0, update!=nothing)
+
+Advance a continuous-time process with raw rates until `total_time`.
+
+If `update!` is provided, it is called as `update!(rates, event, t_new)`
+after each sampled event.
+"""
 function advance!(
     alg::AbstractKineticMonteCarlo,
     rates::AbstractVector,
