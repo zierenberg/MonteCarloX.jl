@@ -285,6 +285,9 @@ Updates `alg.time` and `alg.steps` internally and returns `(t_new, event)`.
 """
 function step!(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerTime)
     dt, event = next(alg, event_handler)
+    if event === nothing || !isfinite(dt)
+        return Inf, event
+    end
     t_new = alg.time + dt
     alg.steps += 1
     alg.time = t_new
@@ -314,6 +317,28 @@ Advance a continuous-time process with raw rates until `total_time`.
 If `update!` is provided, it is called as `update!(rates, event, t_new)`
 after each sampled event.
 """
+function _advance_loop!(;
+    alg::AbstractKineticMonteCarlo,
+    total_time,
+    t0::Real,
+    setup!::Union{Nothing,Function}=nothing,
+    step_fn::Function,
+    on_event!::Union{Nothing,Function}=nothing,
+)
+    alg.time = float(t0)
+    setup! !== nothing && setup!()
+
+    while alg.time < total_time
+        t_new, event = step_fn()
+        if event === nothing || !isfinite(t_new)
+            return t_new
+        end
+        on_event! !== nothing && on_event!(event, t_new)
+    end
+
+    return alg.time
+end
+
 function advance!(
     alg::AbstractKineticMonteCarlo,
     rates::AbstractVector,
@@ -321,12 +346,13 @@ function advance!(
     t0 = 0.0,
     update! = nothing,
 )
-    alg.time = float(t0)
-    while alg.time < total_time
-        t_new, event = step!(alg, rates)
-        update! !== nothing && update!(rates, event, t_new)
-    end
-    return alg.time
+    return _advance_loop!(;
+        alg=alg,
+        total_time=total_time,
+        t0=t0,
+        step_fn=() -> step!(alg, rates),
+        on_event! = update! === nothing ? nothing : (event, t_new) -> update!(rates, event, t_new),
+    )
 end
 
 """
@@ -344,12 +370,13 @@ function advance!(
     t0 = 0.0,
     update! = nothing,
 )
-    alg.time = float(t0)
-    while alg.time < total_time
-        t_new, event = step!(alg, rates)
-        update! !== nothing && update!(rates, event, t_new)
-    end
-    return alg.time
+    return _advance_loop!(;
+        alg=alg,
+        total_time=total_time,
+        t0=t0,
+        step_fn=() -> step!(alg, rates),
+        on_event! = update! === nothing ? nothing : (event, t_new) -> update!(rates, event, t_new),
+    )
 end
 
 """
@@ -367,12 +394,13 @@ function advance!(
     t0 = 0.0,
     update! = nothing,
 )
-    alg.time = float(t0)
-    while alg.time < total_time
-        t_new, event = step!(alg, event_handler)
-        update! !== nothing && update!(event_handler, event, t_new)
-    end
-    return alg.time
+    return _advance_loop!(;
+        alg=alg,
+        total_time=total_time,
+        t0=t0,
+        step_fn=() -> step!(alg, event_handler),
+        on_event! = update! === nothing ? nothing : (event, t_new) -> update!(event_handler, event, t_new),
+    )
 end
 
 """
@@ -390,16 +418,15 @@ function advance!(
     t0 = 0.0,
     update! = nothing,
 )
-    alg.time = float(t0)
-    set_time!(event_handler, alg.time)
-    while alg.time < total_time
-        t_new, event = step!(alg, event_handler)
-        if event === nothing
-            return alg.time
-        end
-        update! !== nothing && update!(event_handler, event, t_new)
-    end
-    return alg.time
+    setup! = () -> set_time!(event_handler, alg.time)
+    return _advance_loop!(;
+        alg=alg,
+        total_time=total_time,
+        t0=t0,
+        setup! = setup!,
+        step_fn=() -> step!(alg, event_handler),
+        on_event! = update! === nothing ? nothing : (event, t_new) -> update!(event_handler, event, t_new),
+    )
 end
 
 """
@@ -423,11 +450,16 @@ function advance!(
     measure! = nothing,
     update! = nothing,
 )
-    alg.time = float(t0)
-    while alg.time < total_time
-        t_new, event = step!(alg, t -> rates(sys, t))
+    on_event! = (event, t_new) -> begin
         measure! !== nothing && measure!(sys, t_new, event)
         update! !== nothing && update!(sys, event, t_new)
     end
-    return alg.time
+
+    return _advance_loop!(;
+        alg=alg,
+        total_time=total_time,
+        t0=t0,
+        step_fn=() -> step!(alg, t -> rates(sys, t)),
+        on_event! = on_event!,
+    )
 end

@@ -22,6 +22,32 @@ function test_gillespie_constructors(; verbose=false)
     return pass
 end
 
+function test_next_time_thinning(; verbose=false)
+    rng = MersenneTwister(77)
+    rate_generation = 2.0
+    rate = t -> 0.5 * rate_generation  # always accepts with probability 0.5
+
+    samples = [next_time(rng, rate, rate_generation) for _ in 1:1_000]
+    pass = all(isfinite, samples) && all(>(0), samples)
+
+    if verbose
+        println("Next time thinning mean: $(mean(samples))")
+    end
+
+    return pass
+end
+
+function test_next_event_scalar_rates(; verbose=false)
+    rng = MersenneTwister(78)
+    pass = next_event(rng, 5.0) == 1
+
+    if verbose
+        println("Next event scalar rates pass: $(pass)")
+    end
+
+    return pass
+end
+
 function test_kmc_next_distribution(; verbose=false)
     rng = MersenneTwister(1234)
     alg = Gillespie(rng)
@@ -134,6 +160,41 @@ function test_kmc_advance_and_statistics(; verbose=false)
 
     if verbose
         println("KMC advance/statistics test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_advance_time_event_queue_empty(; verbose=false)
+    rng = MersenneTwister(79)
+    alg = Gillespie(rng)
+    q = EventQueue{Int}()
+
+    t_final = advance!(alg, q, 5.0)
+
+    pass = t_final == Inf && alg.time == 0.0 && alg.steps == 0
+
+    if verbose
+        println("Advance empty time-queue pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_advance_time_event_queue_progress(; verbose=false)
+    rng = MersenneTwister(80)
+    alg = Gillespie(rng)
+    q = EventQueue{Int}()
+    add!(q, (1.0, 1))
+    add!(q, (2.5, 2))
+
+    seen = Int[]
+    t_final = advance!(alg, q, 3.0; update! = (handler, event, t) -> push!(seen, event))
+
+    pass = t_final == Inf && isapprox(alg.time, 2.5; atol = 1e-12) && alg.steps == 2 && seen == [1, 2]
+
+    if verbose
+        println("Advance populated time-queue pass: $(pass)")
     end
 
     return pass
@@ -292,9 +353,8 @@ function test_kmc_step_and_advance_zero_rate_edges(; verbose=false)
     pass &= t_adv == Inf
     pass &= alg_adv.time == Inf
     pass &= alg_adv.steps == 1
-    pass &= length(seen_events) == 1
-    pass &= seen_events[1] === nothing
-    pass &= seen_times[1] == Inf
+    pass &= isempty(seen_events)
+    pass &= isempty(seen_times)
 
     if verbose
         println("KMC step/advance zero-rate edge cases test pass: $(pass)")
@@ -335,7 +395,7 @@ function test_kmc_two_rate_vector_and_weights_paths(; verbose=false)
     pass &= t_adv == Inf
     pass &= alg_w_zero.time == Inf
     pass &= alg_w_zero.steps == 1
-    pass &= length(seen) == 1 && seen[1] === nothing
+    pass &= isempty(seen)
 
     if verbose
         println("KMC two-rate vector/weights paths test pass: $(pass)")
@@ -367,8 +427,8 @@ function test_kmc_time_event_handler_paths(; verbose=false)
     t3, e3 = step!(alg, queue)
     pass &= t3 == Inf
     pass &= e3 === nothing
-    pass &= alg.time == Inf
-    pass &= alg.steps == 3
+    pass &= isapprox(alg.time, 0.9; atol = 1e-12)
+    pass &= alg.steps == 2
 
     queue2 = EventQueue{Int}(0.0)
     add!(queue2, (1.2, 7))
@@ -377,7 +437,7 @@ function test_kmc_time_event_handler_paths(; verbose=false)
 
     t_final = advance!(alg2, queue2, 10.0; t0 = 1.0, update! = (q, e, t) -> push!(observed, (e, t)))
     pass &= t_final == Inf
-    pass &= alg2.steps == 2
+    pass &= alg2.steps == 1
     pass &= length(observed) == 1
     pass &= observed[1][1] == 7
     pass &= isapprox(observed[1][2], 1.2; atol = 1e-12)
@@ -395,6 +455,10 @@ function run_kinetic_monte_carlo_testsets(; verbose=false)
     @testset "Kinetic Monte Carlo" begin
         @testset "Gillespie constructors" begin
             @test test_gillespie_constructors(verbose=verbose)
+        end
+        @testset "Core helpers" begin
+            @test test_next_time_thinning(verbose=verbose)
+            @test test_next_event_scalar_rates(verbose=verbose)
         end
         @testset "next distribution" begin
             @test test_kmc_next_distribution(verbose=verbose)
@@ -431,6 +495,10 @@ function run_kinetic_monte_carlo_testsets(; verbose=false)
         end
         @testset "time-event-handler paths" begin
             @test test_kmc_time_event_handler_paths(verbose=verbose)
+        end
+        @testset "time-event advance" begin
+            @test test_advance_time_event_queue_empty(verbose=verbose)
+            @test test_advance_time_event_queue_progress(verbose=verbose)
         end
     end
     return true
