@@ -1,7 +1,7 @@
 # tests for src/event_handler.jl
 using MonteCarloX
-using StatsBase
 using Random
+using Test
 
 function test_event_handler_rate(event_handler_type::String; verbose = false)
     pass = true
@@ -90,4 +90,60 @@ function test_event_handler_rate(event_handler_type::String; verbose = false)
     end
 
     return pass
+end
+
+function test_event_queue(; verbose = false)
+    pass = true
+
+    event_1 = (1.0, 1)
+    event_2 = (2.0, 2)
+    event_3 = (3.0, 3)
+
+    queue = EventQueue{Int}()
+    add!(queue, event_1)
+    add!(queue, event_3)
+    add!(queue, event_2)
+
+    pass &= length(queue) == 3
+    pass &= queue[1] == event_1
+    pass &= popfirst!(queue) == event_1
+    pass &= popfirst!(queue) == event_2
+    pass &= popfirst!(queue) == event_3
+
+    queue = EventQueue{Int}(nextfloat(1.0))
+    pass &= get_time(queue) == nextfloat(1.0)
+    add!(queue, event_3)
+    add!(queue, event_2)
+    @test_throws ErrorException add!(queue, event_1)
+    pass &= popfirst!(queue) == event_2
+    pass &= popfirst!(queue) == event_3
+
+    queue = EventQueue{Int}(0.5)
+    add!(queue, (1.2, 7))
+    alg = Gillespie(MersenneTwister(1))
+    dt, ev = next(alg, queue)
+    pass &= dt == 0.7
+    pass &= ev == 7
+    pass &= get_time(queue) == 1.2
+
+    if verbose
+        println("EventQueue test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function run_event_handler_testsets(; verbose=false)
+    @testset "Event Handler" begin
+        @testset "ListEventRateSimple" begin
+            @test test_event_handler_rate("ListEventRateSimple", verbose=verbose)
+        end
+        @testset "ListEventRateActiveMask" begin
+            @test test_event_handler_rate("ListEventRateActiveMask", verbose=verbose)
+        end
+        @testset "EventQueue" begin
+            @test test_event_queue(verbose=verbose)
+        end
+    end
+    return true
 end

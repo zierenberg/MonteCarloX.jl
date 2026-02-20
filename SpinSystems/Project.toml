@@ -1,0 +1,21 @@
+name = "SpinSystems"
+uuid = "8a5c3c8d-1234-5678-9abc-def012345678"
+version = "0.1.0"
+authors = ["Johannes Zierenberg", "Martin Weigel"]
+
+[deps]
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+
+[compat]
+Graphs = "1"
+MonteCarloX = "0.1"
+julia = "1"
+
+[extras]
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test", "Random"]
