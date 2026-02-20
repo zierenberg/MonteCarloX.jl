@@ -58,6 +58,7 @@ alg = WangLandau(rng)
 
 ```@docs
 AbstractImportanceSampling
+AbstractGeneralizedEnsemble
 AbstractMetropolis
 AbstractHeatBath
 Metropolis

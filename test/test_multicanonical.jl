@@ -36,6 +36,20 @@ function test_multicanonical_weight_update_inplace(; verbose=false)
     return pass
 end
 
+function test_multicanonical_default_rng(; verbose=false)
+    bins = 0.0:1.0:4.0
+    lw = TabulatedLogWeight(Histogram((collect(bins),), zeros(Float64, length(bins) - 1)))
+    alg = Multicanonical(lw)
+
+    pass = alg.rng === Random.GLOBAL_RNG
+
+    if verbose
+        println("Multicanonical default RNG: $(pass)")
+    end
+
+    return pass
+end
+
 function test_multicanonical_bin_compatibility(; verbose=false)
     rng = MersenneTwister(902)
     bins_lw = 0.0:1.0:4.0
@@ -69,6 +83,9 @@ function run_multicanonical_testsets(; verbose=false)
         end
         @testset "Bin compatibility" begin
             @test test_multicanonical_bin_compatibility(verbose=verbose)
+        end
+        @testset "Default RNG" begin
+            @test test_multicanonical_default_rng(verbose=verbose)
         end
     end
     return true

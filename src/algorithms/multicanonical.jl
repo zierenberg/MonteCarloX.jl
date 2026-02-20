@@ -22,17 +22,15 @@ mutable struct Multicanonical{LW,RNG<:AbstractRNG} <: AbstractGeneralizedEnsembl
     accepted::Int
 end
 
-Multicanonical(rng::AbstractRNG, logweight) = Multicanonical(rng, logweight, 0, 0)
+function Multicanonical(rng::AbstractRNG, logweight)
+    logweight isa TabulatedLogWeight ||
+        throw(ArgumentError("`logweight` must be a `TabulatedLogWeight`"))
+    return Multicanonical{typeof(logweight),typeof(rng)}(rng, logweight, 0, 0)
+end
 Multicanonical(logweight) = Multicanonical(Random.GLOBAL_RNG, logweight)
 
-Multicanonical(rng::AbstractRNG, logweight::TabulatedLogWeight) =
-    Multicanonical{typeof(logweight),typeof(rng)}(rng, logweight, 0, 0)
-
-Multicanonical(logweight::TabulatedLogWeight) =
-    Multicanonical(Random.GLOBAL_RNG, logweight)
-
-@inline function _assert_same_bins(log_weight::TabulatedLogWeight, histogram::Histogram)
-    if log_weight.table.edges != histogram.edges
+@inline function _assert_same_bins(log_weight::Histogram, histogram::Histogram)
+    if log_weight.edges != histogram.edges
         throw(ArgumentError("`log_weight` and `histogram` must have identical bin edges"))
     end
     return nothing
@@ -58,7 +56,7 @@ function update_weights!(
         throw(ArgumentError("`alg.logweight` must be a TabulatedLogWeight"))
     end
 
-    log_weight = alg.logweight
+    log_weight = alg.logweight.histogram
 
     if mode != :simple
         throw(ArgumentError("unsupported mode=$(mode), currently only :simple"))
@@ -66,13 +64,13 @@ function update_weights!(
 
     _assert_same_bins(log_weight, histogram)
 
-    log_hist = similar(log_weight.table.weights, Float64)
+    log_hist = similar(log_weight.weights, Float64)
     @inbounds for idx in eachindex(histogram.weights)
         h = histogram.weights[idx]
         log_hist[idx] = h > 0 ? log(h) : 0.0
     end
 
-    log_weight.table.weights .-= log_hist
+    log_weight.weights .-= log_hist
 
     return nothing
 end

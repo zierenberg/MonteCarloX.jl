@@ -2,6 +2,8 @@ using MonteCarloX
 using Test
 using StatsBase
 
+struct UnsupportedContainer end
+
 function test_preallocated_schedule_constructor(; verbose=false)
     times = [3.0, 1.0, 2.0]
     schedule = PreallocatedSchedule(times)
@@ -12,6 +14,51 @@ function test_preallocated_schedule_constructor(; verbose=false)
 
     if verbose
         println("PreallocatedSchedule constructor test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_measurement_pair_constructor(; verbose=false)
+    m = Measurement((s -> s^2) => Float64[])
+
+    pass = true
+    pass &= m isa Measurement
+    measure!(m, 3.0)
+    pass &= m.data == [9.0]
+
+    if verbose
+        println("Measurement(pair) constructor test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_measurements_interval_constructors(; verbose=false)
+    dict_measurements = Dict{Symbol, Measurement}(
+        :x => Measurement((s -> s), Float64[]),
+        :y => Measurement((s -> 2s), Float64[]),
+    )
+    m_dict = Measurements(dict_measurements; interval = 0.5)
+
+    pairs = [
+        :x => ((s -> s) => Float64[]),
+        :y => ((s -> 2s) => Float64[]),
+    ]
+    m_pairs = Measurements(pairs; interval = 0.25)
+
+    pass = true
+    pass &= m_dict.schedule isa IntervalSchedule
+    pass &= m_dict.schedule.interval == 0.5
+    pass &= m_dict.schedule._checkpoint == 0.0
+
+    pass &= m_pairs.schedule isa IntervalSchedule
+    pass &= m_pairs.schedule.interval == 0.25
+    pass &= haskey(m_pairs.measurements, :x)
+    pass &= haskey(m_pairs.measurements, :y)
+
+    if verbose
+        println("Measurements interval constructors test pass: $(pass)")
     end
 
     return pass
@@ -99,6 +146,38 @@ function test_measurements_accessors(; verbose=false)
 
     if verbose
         println("Measurements accessor API test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_measurements_interval_cadence(; verbose=false)
+    m = Measurements(
+        [
+            :x => ((s -> s) => Float64[]),
+        ],
+        interval = 1.0,
+    )
+
+    pass = true
+
+    # below first checkpoint (0.0) does not measure
+    measure!(m, 5.0, -0.1)
+    pass &= isempty(m[:x].data)
+    pass &= m.schedule._checkpoint == 0.0
+
+    # exactly at checkpoint measures once
+    measure!(m, 7.0, 0.0)
+    pass &= m[:x].data == [7.0]
+    pass &= m.schedule._checkpoint == 1.0
+
+    # if t jumps, interval schedule still measures at most once per call
+    measure!(m, 9.0, 3.5)
+    pass &= m[:x].data == [7.0, 9.0]
+    pass &= m.schedule._checkpoint == 2.0
+
+    if verbose
+        println("Measurements interval cadence test pass: $(pass)")
     end
 
     return pass
@@ -195,6 +274,36 @@ function test_measurement_reset_single(; verbose=false)
     return pass
 end
 
+function test_measurement_reset_special_cases(; verbose=false)
+    # schedule reset! returns schedule and restores initial state
+    interval_schedule = IntervalSchedule(0.3)
+    interval_schedule._checkpoint = 1.2
+    preallocated_schedule = PreallocatedSchedule([1.0, 2.0])
+    preallocated_schedule.checkpoint_idx = 3
+
+    pass = true
+    pass &= reset!(interval_schedule) === interval_schedule
+    pass &= interval_schedule._checkpoint == 0.0
+
+    pass &= reset!(preallocated_schedule) === preallocated_schedule
+    pass &= preallocated_schedule.checkpoint_idx == 1
+
+    # unsupported container throws informative ArgumentError
+    m_bad = Measurement((s -> s), UnsupportedContainer())
+    pass &= try
+        reset!(m_bad)
+        false
+    catch err
+        err isa ArgumentError
+    end
+
+    if verbose
+        println("Measurement reset! special-cases test pass: $(pass)")
+    end
+
+    return pass
+end
+
 function test_measurements_reset_container(; verbose=false)
     m_interval = Measurements(
         [
@@ -239,6 +348,12 @@ function run_measurements_testsets(; verbose=false)
         @testset "PreallocatedSchedule constructor" begin
             @test test_preallocated_schedule_constructor(verbose=verbose)
         end
+        @testset "Measurement(pair) constructor" begin
+            @test test_measurement_pair_constructor(verbose=verbose)
+        end
+        @testset "Measurements interval constructors" begin
+            @test test_measurements_interval_constructors(verbose=verbose)
+        end
         @testset "Measurements(dict, times)" begin
             @test test_measurements_dict_preallocated_constructor(verbose=verbose)
         end
@@ -251,6 +366,9 @@ function run_measurements_testsets(; verbose=false)
         @testset "accessor API" begin
             @test test_measurements_accessors(verbose=verbose)
         end
+        @testset "interval cadence" begin
+            @test test_measurements_interval_cadence(verbose=verbose)
+        end
         @testset "measure! event skipping" begin
             @test test_measurements_preallocated_measure_event_skipping(verbose=verbose)
         end
@@ -259,6 +377,9 @@ function run_measurements_testsets(; verbose=false)
         end
         @testset "reset! single measurement" begin
             @test test_measurement_reset_single(verbose=verbose)
+        end
+        @testset "reset! special cases" begin
+            @test test_measurement_reset_special_cases(verbose=verbose)
         end
         @testset "reset! measurements container" begin
             @test test_measurements_reset_container(verbose=verbose)

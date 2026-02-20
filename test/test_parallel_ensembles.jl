@@ -70,6 +70,23 @@ function test_parallel_tempering_templates(; verbose=false)
     return pass
 end
 
+function test_parallel_tempering_default_rng(; verbose=false)
+    replicas = [
+        Metropolis(MersenneTwister(1); β=0.5),
+        Metropolis(MersenneTwister(2); β=1.0),
+    ]
+
+    pt = ParallelTempering(replicas)
+
+    pass = pt.rng === Random.GLOBAL_RNG
+
+    if verbose
+        println("ParallelTempering default RNG: $(pass)")
+    end
+
+    return pass
+end
+
 function test_parallel_multicanonical_templates(; verbose=false)
     bins = 0.0:1.0:4.0
 
@@ -103,6 +120,23 @@ function test_parallel_multicanonical_templates(; verbose=false)
     return pass
 end
 
+function test_replica_exchange_default_rng(; verbose=false)
+    replicas = [
+        Metropolis(MersenneTwister(10), x -> -0.5 * x^2),
+        Metropolis(MersenneTwister(11), x -> -0.5 * x^2),
+    ]
+
+    re = ReplicaExchange(replicas)
+
+    pass = re.rng === Random.GLOBAL_RNG
+
+    if verbose
+        println("ReplicaExchange default RNG: $(pass)")
+    end
+
+    return pass
+end
+
 function run_parallel_ensembles_testsets(; verbose=false)
     @testset "Parallel ensembles" begin
         @testset "Replica exchange template" begin
@@ -110,6 +144,10 @@ function run_parallel_ensembles_testsets(; verbose=false)
         end
         @testset "Parallel tempering template" begin
             @test test_parallel_tempering_templates(verbose=verbose)
+        end
+        @testset "Default RNGs" begin
+            @test test_parallel_tempering_default_rng(verbose=verbose)
+            @test test_replica_exchange_default_rng(verbose=verbose)
         end
         @testset "Parallel multicanonical template" begin
             @test test_parallel_multicanonical_templates(verbose=verbose)

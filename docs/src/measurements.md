@@ -43,5 +43,10 @@ MeasurementSchedule
 IntervalSchedule
 PreallocatedSchedule
 measure!
+reset!(measurement::Measurement)
+reset!(schedule::IntervalSchedule)
+reset!(measurements::Measurements)
+times(m::Measurements{K, PreallocatedSchedule}) where K
+data(m::Measurements{K}, key::K) where K
 is_complete
 ```

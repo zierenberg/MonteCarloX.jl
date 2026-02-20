@@ -57,7 +57,6 @@ export Measurement,
        PreallocatedSchedule,
        times,
        data,
-       measurement_data,
        measure!,
        reset!,
        is_complete
