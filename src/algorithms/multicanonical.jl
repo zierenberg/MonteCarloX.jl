@@ -15,7 +15,7 @@ Notation used here:
 - `S(E) = log Ω(E)`: microcanonical entropy estimate
 - `logWeight(E) = S(E)` stored in `alg.logweight`
 """
-mutable struct Multicanonical{LW,RNG<:AbstractRNG} <: AbstractImportanceSampling
+mutable struct Multicanonical{LW,RNG<:AbstractRNG} <: AbstractGeneralizedEnsemble
     rng::RNG
     logweight::LW
     steps::Int

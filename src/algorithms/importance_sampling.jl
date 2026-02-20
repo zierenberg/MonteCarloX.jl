@@ -13,6 +13,13 @@ Importance sampling algorithms:
 abstract type AbstractImportanceSampling <: AbstractAlgorithm end
 
 """
+    AbstractGeneralizedEnsemble <: AbstractImportanceSampling
+
+Base type for generalized-ensemble samplers (e.g. multicanonical, Wang-Landau).
+"""
+abstract type AbstractGeneralizedEnsemble <: AbstractImportanceSampling end
+
+"""
     AbstractMetropolis <: AbstractImportanceSampling
 
 Base type for Metropolis-family samplers where acceptance is naturally

@@ -35,6 +35,32 @@ function measure!(measurement::Measurement, sys; kwargs...)
     push!(measurement.data, value)
 end
 
+"""
+    reset!(measurement::Measurement)
+
+Reset a single measurement to its initial state by clearing its data container.
+For histogram-backed measurements this zeros the bin counts while preserving binning.
+"""
+function reset!(measurement::Measurement)
+    _reset_data!(measurement.data)
+    return measurement
+end
+
+@inline _reset_data!(data::AbstractVector) = (empty!(data); data)
+
+function _reset_data!(data::Histogram)
+    fill!(data.weights, zero(eltype(data.weights)))
+    return data
+end
+
+function _reset_data!(data)
+    if hasmethod(empty!, Tuple{typeof(data)})
+        empty!(data)
+        return data
+    end
+    throw(ArgumentError("unsupported measurement data container $(typeof(data)); define `reset!` support for this container"))
+end
+
 # Measurement schedules
 
 """
@@ -72,6 +98,21 @@ mutable struct PreallocatedSchedule <: MeasurementSchedule
     times::Vector{Float64}
     checkpoint_idx::Int
     PreallocatedSchedule(times) = new(sort(times), 1)
+end
+
+"""
+    reset!(schedule::MeasurementSchedule)
+
+Reset schedule counters/checkpoints back to their initial state.
+"""
+function reset!(schedule::IntervalSchedule)
+    schedule._checkpoint = 0.0
+    return schedule
+end
+
+function reset!(schedule::PreallocatedSchedule)
+    schedule.checkpoint_idx = 1
+    return schedule
 end
 
 # Main measurements container
@@ -168,6 +209,19 @@ function measure!(measurements::Measurements{K, PreallocatedSchedule}, sys, t; k
         
         schedule.checkpoint_idx += 1
     end
+end
+
+"""
+    reset!(measurements::Measurements)
+
+Reset all measurement data containers and schedule state in-place.
+"""
+function reset!(measurements::Measurements)
+    for measurement in values(measurements.measurements)
+        reset!(measurement)
+    end
+    reset!(measurements.schedule)
+    return measurements
 end
 
 """
