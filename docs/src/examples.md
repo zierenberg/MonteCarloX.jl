@@ -13,7 +13,7 @@ This page maps common goals to runnable examples.
 
 **Goal:** simulate non-equilibrium stochastic population dynamics.
 
-- See notebooks: `notebooks/branching_process.ipynb`, `notebooks/birth_death_meanfield.ipynb`
+- See notebook: `notebooks/birth_death_process.ipynb`
 - Main pieces: state variables + rates + `Gillespie` + time-based measurements
 
 ## 3) Poisson process with kinetic Monte Carlo primitives

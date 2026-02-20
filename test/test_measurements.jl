@@ -82,6 +82,28 @@ function test_measurements_setindex(; verbose=false)
     return pass
 end
 
+function test_measurements_accessors(; verbose=false)
+    m = Measurements(
+        [
+            :x => ((s -> s) => Float64[]),
+        ],
+        [1.0, 2.0, 3.0],
+    )
+
+    measure!(m, 7.0, 1.1)
+    measure!(m, 9.0, 3.2)
+
+    pass = true
+    pass &= times(m) == [1.0, 2.0, 3.0]
+    pass &= measurement_data(m, :x) == [7.0, 9.0, 9.0]
+
+    if verbose
+        println("Measurements accessor API test pass: $(pass)")
+    end
+
+    return pass
+end
+
 function test_measurements_preallocated_measure_event_skipping(; verbose=false)
     m = Measurements(
         [
@@ -225,6 +247,9 @@ function run_measurements_testsets(; verbose=false)
         end
         @testset "Measurements setindex!" begin
             @test test_measurements_setindex(verbose=verbose)
+        end
+        @testset "accessor API" begin
+            @test test_measurements_accessors(verbose=verbose)
         end
         @testset "measure! event skipping" begin
             @test test_measurements_preallocated_measure_event_skipping(verbose=verbose)

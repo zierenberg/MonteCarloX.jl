@@ -132,6 +132,20 @@ mutable struct Measurements{K,S<:MeasurementSchedule}
 end
 
 """
+    times(m::Measurements)
+
+Return the measurement time points for preallocated schedules.
+"""
+times(m::Measurements{K, PreallocatedSchedule}) where K = m.schedule.times
+
+"""
+    measurement_data(m::Measurements{K}, key::K)
+
+Return the raw data container for a named measurement.
+"""
+data(m::Measurements{K}, key::K) where K = m[key].data
+
+"""
     Measurements(measurements::Dict{K, Measurement}; interval::Real)
 
 Create Measurements with an interval-based schedule.

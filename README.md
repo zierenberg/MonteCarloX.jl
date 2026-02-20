@@ -91,8 +91,7 @@ MonteCarloX.jl/
 ├── notebooks/                 # Jupyter notebooks with examples
 │   ├── api.ipynb              # API development notebook
 │   ├── simple_ising.ipynb     # Equilibrium: Ising + Metropolis
-│   ├── branching_process.ipynb       # Non-equilibrium: Branching process
-│   └── birth_death_meanfield.ipynb   # Non-equilibrium: Mean-field dynamics
+│   ├── birth_death_process.ipynb     # Non-equilibrium: branching + mean-field dynamics
 │   └── poisson_kmc.ipynb       # Poisson processes via kMC primitives
 ├── SpinSystems/test/          # Model-level tests
 ├── examples/stash/            # Legacy examples (for reference)
@@ -104,8 +103,7 @@ MonteCarloX.jl/
 See the notebooks in `notebooks/` for complete demonstrations:
 - `api.ipynb`: end-to-end API walkthrough
 - `simple_ising.ipynb`: equilibrium Ising + Metropolis
-- `branching_process.ipynb`: non-equilibrium branching process
-- `birth_death_meanfield.ipynb`: mean-field non-equilibrium dynamics
+- `birth_death_process.ipynb`: branching and mean-field non-equilibrium dynamics
 - `poisson_kmc.ipynb`: Poisson processes using kinetic Monte Carlo primitives
 
 ## Goal
