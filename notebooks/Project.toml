@@ -1,5 +1,6 @@
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"

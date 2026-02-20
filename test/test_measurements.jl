@@ -1,5 +1,6 @@
 using MonteCarloX
 using Test
+using StatsBase
 
 function test_preallocated_schedule_constructor(; verbose=false)
     times = [3.0, 1.0, 2.0]
@@ -150,6 +151,67 @@ function test_measurements_is_complete(; verbose=false)
     return pass
 end
 
+function test_measurement_reset_single(; verbose=false)
+    m_vec = Measurement((s -> s), Float64[])
+    measure!(m_vec, 1.0)
+    measure!(m_vec, 2.0)
+    reset!(m_vec)
+
+    bins = 0.0:1.0:4.0
+    hist = fit(Histogram, [0.2, 1.4, 2.6], bins)
+    m_hist = Measurement((s -> s), hist)
+    reset!(m_hist)
+
+    pass = true
+    pass &= isempty(m_vec.data)
+    pass &= all(iszero, m_hist.data.weights)
+
+    if verbose
+        println("Measurement reset! (single) test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_measurements_reset_container(; verbose=false)
+    m_interval = Measurements(
+        [
+            :x => ((s -> s) => Float64[]),
+            :h => ((s -> Int(s)) => fit(Histogram, Int[], 0:1:4)),
+        ],
+        interval=1.0,
+    )
+    measure!(m_interval, 1.0, 0.0)
+    measure!(m_interval, 2.0, 1.0)
+    pass = true
+    pass &= m_interval.schedule._checkpoint > 0.0
+    pass &= !isempty(m_interval[:x].data)
+
+    reset!(m_interval)
+    pass &= m_interval.schedule._checkpoint == 0.0
+    pass &= isempty(m_interval[:x].data)
+    pass &= all(iszero, m_interval[:h].data.weights)
+
+    m_preallocated = Measurements(
+        [
+            :x => ((s -> s) => Float64[]),
+        ],
+        [1.0, 2.0],
+    )
+    measure!(m_preallocated, 7.0, 5.0)
+    pass &= m_preallocated.schedule.checkpoint_idx == 3
+
+    reset!(m_preallocated)
+    pass &= m_preallocated.schedule.checkpoint_idx == 1
+    pass &= isempty(m_preallocated[:x].data)
+
+    if verbose
+        println("Measurements reset! (container) test pass: $(pass)")
+    end
+
+    return pass
+end
+
 function run_measurements_testsets(; verbose=false)
     @testset "Measurements" begin
         @testset "PreallocatedSchedule constructor" begin
@@ -169,6 +231,12 @@ function run_measurements_testsets(; verbose=false)
         end
         @testset "is_complete" begin
             @test test_measurements_is_complete(verbose=verbose)
+        end
+        @testset "reset! single measurement" begin
+            @test test_measurement_reset_single(verbose=verbose)
+        end
+        @testset "reset! measurements container" begin
+            @test test_measurements_reset_container(verbose=verbose)
         end
     end
     return true

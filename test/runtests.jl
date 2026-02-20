@@ -32,6 +32,8 @@ using Random
     run_multicanonical_testsets()
     include("test_wang_landau.jl")
     run_wang_landau_testsets()
+    include("test_parallel_ensembles.jl")
+    run_parallel_ensembles_testsets()
 
     # non-equilibrium / kinetic Monte Carlo
     include("test_kinetic_monte_carlo.jl")

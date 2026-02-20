@@ -32,6 +32,10 @@ include("algorithms/importance_sampling.jl")  # Core importance sampling functio
 include("algorithms/metropolis.jl")  # Metropolis importance sampling
 include("algorithms/heat_bath.jl")
 include("algorithms/multicanonical.jl")
+include("algorithms/parallel_sampling.jl")
+include("algorithms/replica_exchange.jl")
+include("algorithms/parallel_tempering.jl")
+include("algorithms/parallel_multicanonical.jl")
 include("algorithms/wang_landau.jl")
 
 # Algorithms (non-equilibrium)
@@ -52,10 +56,12 @@ export Measurement,
        IntervalSchedule,
        PreallocatedSchedule,
        measure!,
+  reset!,
        is_complete
 
 # Export importance sampling algorithms
 export AbstractImportanceSampling,
+         AbstractGeneralizedEnsemble,
          AbstractMetropolis,
          AbstractHeatBath,
        BoltzmannLogWeight,
@@ -64,11 +70,19 @@ export AbstractImportanceSampling,
          Glauber,
          HeatBath,
          Multicanonical,
+         ParallelSampling,
+         ReplicaExchange,
+         ParallelTempering,
+         ParallelMulticanonical,
          WangLandau,
        accept!,
        acceptance_rate,
          reset_statistics!,
+         reset_exchange_statistics!,
          log_acceptance_ratio,
+         sweep_exchanges!,
+         attempt_exchange!,
+         exchange_rate,
          update_weight!,
          update_f!,
          update_weights!,
@@ -87,12 +101,6 @@ export AbstractKineticMonteCarlo,
 export log_sum,
        binary_search,
        kldivergence
-
-# Export tools
-export expectation_value_from_timeseries,
-       distribution_from_timeseries,
-       expectation_value_from_histogram,
-       log_normalization
 
 # Export event handler types
 export AbstractEventHandlerRate,
