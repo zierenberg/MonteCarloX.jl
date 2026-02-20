@@ -1,21 +1,28 @@
 # Helper Tools
 
-```@index
-Order = [:type, :function]
-Pages = ["helper.md"]
+This page collects utility functions used across algorithms and model code.
+
+## Numeric helpers
+
+```@docs
+log_sum
+binary_search
+MonteCarloX.logistic
+kldivergence
 ```
 
-## Full Docs
-<!-- 
-```@autodocs
-Modules = [MonteCarloX]
-Pages   = [
-    "utils.jl",
-    "event_handler.jl",
-    "reweighting.jl",
-    "rng.jl"
+## RNG utilities
 
-]
-Private = false
-``` -->
+```@docs
+MutableRandomNumbers
+reset
+```
+
+## Event handler utilities
+
+```@docs
+ListEventRateSimple
+ListEventRateActiveMask
+EventQueue
+```
 

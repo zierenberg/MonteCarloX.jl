@@ -1,80 +1,121 @@
 module MonteCarloX
-# dependencies
+
+# Core dependencies
 using Random
 using StatsBase
 using LinearAlgebra
 using StaticArrays
-# TODO: ?exports that are relevant to run simulations in MonteCarloX
-# using Reexports
-# @reexport using Random
-# @reexport using StatsBase
 
+# Core abstractions (shared by all algorithms)
+include("abstractions.jl")
+
+# Utilities
 include("utils.jl")
-include("event_handler.jl")
 include("rng.jl")
+# include("tools/reweighting.jl")
 
-#TODO List
-# * Think about the interface of algorithmic structs; should they include basic
-#   elements such as weight functions or event handler?
-# * Move cluster_wolff.jl to designated SpinSystems.jl, this is an update not
-#   MonteCarlo
+# Measurement framework
+include("measurements/measurements.jl")
 
-# Equilibrium
-include("importance_sampling.jl")
-include("reweighting.jl")
+# Log weights (canonical ensemble)
+include("weights/canonical.jl")
+include("weights/mutable.jl")
 
-# Non-equilibrium
-include("kinetic_monte_carlo.jl")
-include("poisson_process.jl")
-include("gillespie.jl")
+# Event handlers (non-equilibrium)
+include("event_handler/abstractions.jl")
+include("event_handler/list_event_rate_simple.jl")
+include("event_handler/list_event_rate_active_mask.jl")
+include("event_handler/event_queue.jl")
 
-# move to external
-include("cluster_wolff.jl")
+# Algorithms (equilibrium)
+include("algorithms/importance_sampling.jl")  # Core importance sampling functions (accept!, etc.)
+include("algorithms/metropolis.jl")  # Metropolis importance sampling
+include("algorithms/heat_bath.jl")
+include("algorithms/multicanonical.jl")
+include("algorithms/parallel_sampling.jl")
+include("algorithms/replica_exchange.jl")
+include("algorithms/parallel_tempering.jl")
+include("algorithms/parallel_multicanonical.jl")
+include("algorithms/wang_landau.jl")
 
-# algorithms
-export  Metropolis,
-        Gillespie,
-        KineticMonteCarlo,
-        InhomogeneousPoisson,
-        InhomogeneousPoissonPiecewiseDecreasing
+# Algorithms (non-equilibrium)
+include("algorithms/kinetic_monte_carlo.jl")
+include("algorithms/gillespie.jl")
 
-# functions
-export  # base
-        # equilibrium
-        accept,
-        sweep,
-        # update -> will be moved to test/utils.jl for now and later to SpinSystems.jl
-        # non-equilibrium
-        next_event,
-        next_time,
-        next,
-        advance!,
-        initialize,
-        init
+# Export core abstractions
+export AbstractSystem,
+       AbstractLogWeight,
+       AbstractAlgorithm,
+       AbstractUpdate,
+       AbstractMeasurement
 
-# reweighting (needs makeover)
-export  # reweighting
-        expectation_value_from_timeseries,
-        distribution_from_timeseries
+# Export measurement framework
+export Measurement,
+       Measurements,
+       MeasurementSchedule,
+       IntervalSchedule,
+       PreallocatedSchedule,
+       times,
+       data,
+       measure!,
+       reset!,
+       is_complete
 
-# helper
-export  log_sum,
-        binary_search,
-        random_element,
-        kldivergence,
-        # event handler
-        AbstractEventHandlerRate,
-        ListEventRateSimple,
-        ListEventRateActiveMask,
-        # rng
-        MutableRandomNumbers,
-        reset
+# Export importance sampling algorithms
+export AbstractImportanceSampling,
+       AbstractGeneralizedEnsemble,
+       AbstractMetropolis,
+       AbstractHeatBath,
+       BoltzmannLogWeight,
+       TabulatedLogWeight,
+       Metropolis,
+       Glauber,
+       HeatBath,
+       Multicanonical,
+       ParallelSampling,
+       ReplicaExchange,
+       ParallelTempering,
+       ParallelMulticanonical,
+       WangLandau,
+       accept!,
+       acceptance_rate,
+       reset_statistics!,
+       reset_exchange_statistics!,
+       log_acceptance_ratio,
+       sweep_exchanges!,
+       attempt_exchange!,
+       exchange_rate,
+       update_weight!,
+       update_f!,
+       update_weights!,
+       update_weights
 
+# Export kinetic Monte Carlo algorithms
+export AbstractKineticMonteCarlo,
+       Gillespie,
+       next,
+       step!,
+       next_time,
+       next_event,
+       advance!
 
+# Export helper functions
+export log_sum,
+       binary_search,
+       kldivergence
 
+# Export event handler types
+export AbstractEventHandlerRate,
+       AbstractEventHandlerTime,
+       ListEventRateSimple,
+       ListEventRateActiveMask,
+       EventQueue,
+       get_time,
+       set_time!,
+       add!
 
-end # module
+# Export RNG utilities
+export MutableRandomNumbers,
+       reset
 
-# Maybe embedd this into StatisticalPhysics.jl, which could include
-# SpinSystems.jl, PolymerSystems.jl, DirectedPercolation, (NeuralNetworks,)
-# ComplexSystems, ComlexNetworks etc ;)
+end # module MonteCarloX

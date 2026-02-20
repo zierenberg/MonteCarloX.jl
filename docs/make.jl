@@ -9,12 +9,18 @@ makedocs(;
     format = Documenter.HTML(),
     pages = [
         "Getting Started" => "index.md",
-        "Equilibrium Tools" => "equilibrium.md",
-        "Non-Equilibrium Tools" => "non_equilibrium.md",
+        "Framework" => "framework.md",
+        "Core Abstractions" => "core_abstractions.md",
+        "Weights" => "weights.md",
+        "Importance Sampling Algorithms" => "importance_sampling_algorithms.md",
+        "Continuous-Time Sampling Algorithms" => "continuous_time_sampling_algorithms.md",
+        "Measurements" => "measurements.md",
+        "Systems" => "systems.md",
+        "Worked Examples" => "examples.md",
         "Helper" => "helper.md",
     ],
     sitename = "MonteCarloX",
-    authors = "Johannes Zierenberg",
+    authors = "Johannes Zierenberg & Martin Weigel",
 )
 
 # deploydocs(;
@@ -23,5 +29,5 @@ makedocs(;
 #     target="build"
 # )
 deploydocs(
-    repo = "github.com/USER_NAME/PACKAGE_NAME.jl.git",
+    repo = "github.com/zierenberg/MonteCarloX.jl.git",
 )
