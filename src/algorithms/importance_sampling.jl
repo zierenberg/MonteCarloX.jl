@@ -36,32 +36,9 @@ abstract type AbstractHeatBath <: AbstractAlgorithm end
 
 """
     accept!(alg::AbstractImportanceSampling, x_new, x_old)
-
-Compute the log-acceptance ratio from state coordinates (canonical stat. mech typically x = energy) and perform the
-accept/reject step. This forwards to `_accept!(alg, log_ratio::Real)`.
-"""
-function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T<:Union{Real, Vector{<:Real}}
-    log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
-    return _accept!(alg, log_ratio)
-end
-
-"""
     accept!(alg::AbstractMetropolis, delta_x)
 
-Compute the log-acceptance ratio from a local state difference `delta_x`
-for Metropolis-family updates and perform the accept/reject step. Forwards
-to `accept!(alg, log_ratio::Real)` so that specialized `accept!` methods
-(e.g. Glauber) for `log_ratio` are used when available.
-"""
-function accept!(alg::AbstractMetropolis, delta_x::Union{Real, Vector{<:Real}})
-    log_ratio = alg.logweight(delta_x)
-    return _accept!(alg, log_ratio)
-end
-
-"""
-    accept!(alg::AbstractImportanceSampling, log_ratio::Real)
-
-Evaluate acceptance criterion for importance sampling.
+Evaluate acceptance criterion for importance sampling with differences.
 
 Updates step and acceptance counters in the algorithm.
 Returns true if the move is accepted based on the Metropolis criterion:
@@ -70,6 +47,15 @@ Returns true if the move is accepted based on the Metropolis criterion:
 
 This is the core accept/reject step used by all importance sampling algorithms.
 """
+function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T<:Union{Real, Vector{<:Real}}
+    log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
+    return _accept!(alg, log_ratio)
+end
+function accept!(alg::AbstractMetropolis, delta_x::Union{Real, Vector{<:Real}})
+    log_ratio = alg.logweight(delta_x)
+    return _accept!(alg, log_ratio)
+end
+# core function to evaluate acceptance and update counters
 function _accept!(alg::AbstractImportanceSampling, log_ratio::Real)
     alg.steps += 1
     accepted = log_ratio > 0 || rand(alg.rng) < exp(log_ratio)
