@@ -1,7 +1,7 @@
 using Random
 
 import Random: rand, SamplerTrivial, CloseOpen12_64, CloseOpen01_64, BitInteger, UInt52Raw, CloseOpen12, SamplerUnion, SamplerType
-import Base.reset
+# import Base.reset
 
 """
     MutableRandomNumbers([rng_base=GLOBAL_RNG], size, mode:=static)
@@ -44,10 +44,10 @@ julia> rand(rng)
 0.2
 ```
 
-Use `reset` in order to rerun the (manipulated) `random` number sequence.
+Use `reset!` in order to rerun the (manipulated) `random` number sequence.
 
 ```julia
-julia> reset(rng)
+julia> reset!(rng)
 
 ```
 
@@ -70,15 +70,15 @@ MutableRandomNumbers(rng; mode=:dynamic) = MutableRandomNumbers(rng, 0, mode=mod
 MutableRandomNumbers(; mode=:dynamic) = MutableRandomNumbers(Random.GLOBAL_RNG, 0, mode=mode)
 
 """
-    reset(rng::MutableRandomNumbers, [index::Int=0])
+    reset!(rng::MutableRandomNumbers, [index::Int=0])
 
 Reset the state of a MutableRandomNumbers object `rng` to `index`. Default
 resets the RNG object to the pre-initial index (0)
 """
-function reset(r::MutableRandomNumbers, index::Int)
+function reset!(r::MutableRandomNumbers, index::Int)
     r.index_current = index
 end
-reset(r::MutableRandomNumbers) = reset(r,0)
+reset!(r::MutableRandomNumbers) = reset!(r,0)
 
 # easy access overloads
 Base.length(r::MutableRandomNumbers) = Base.length(r.random_numbers)

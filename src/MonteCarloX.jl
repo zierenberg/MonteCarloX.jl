@@ -32,9 +32,6 @@ include("algorithms/importance_sampling.jl")  # Core importance sampling functio
 include("algorithms/metropolis.jl")  # Metropolis importance sampling
 include("algorithms/heat_bath.jl")
 include("algorithms/multicanonical.jl")
-include("algorithms/parallel_sampling.jl")
-include("algorithms/replica_exchange.jl")
-include("algorithms/parallel_tempering.jl")
 include("algorithms/parallel_multicanonical.jl")
 include("algorithms/wang_landau.jl")
 
@@ -72,23 +69,17 @@ export AbstractImportanceSampling,
        Glauber,
        HeatBath,
        Multicanonical,
-       ParallelSampling,
-       ReplicaExchange,
-       ParallelTempering,
        ParallelMulticanonical,
        WangLandau,
        accept!,
        acceptance_rate,
-       reset_statistics!,
-       reset_exchange_statistics!,
-       log_acceptance_ratio,
-       sweep_exchanges!,
-       attempt_exchange!,
-       exchange_rate,
+       reset!,
+       is_root,
+       merge_histograms!,
        update_weight!,
-       update_f!,
-       update_weights!,
-       update_weights
+       distribute_logweight!,
+       update_f! # TODO: rename this later to a common convention.
+
 
 # Export kinetic Monte Carlo algorithms
 export AbstractKineticMonteCarlo,
@@ -116,6 +107,6 @@ export AbstractEventHandlerRate,
 
 # Export RNG utilities
 export MutableRandomNumbers,
-       reset
+       reset!
 
 end # module MonteCarloX

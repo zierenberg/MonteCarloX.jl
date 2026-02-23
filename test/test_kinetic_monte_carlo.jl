@@ -150,7 +150,7 @@ function test_kmc_advance_and_statistics(; verbose=false)
     pass &= callback_count[] == alg.steps
     pass &= alg.time == t_final
 
-    reset_statistics!(alg)
+    reset!(alg)
     pass &= alg.steps == 0
     pass &= alg.time == 0.0
 

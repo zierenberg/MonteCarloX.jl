@@ -32,6 +32,19 @@ WangLandau(rng::AbstractRNG, logweight::TabulatedLogWeight; logf::Real = 1.0) =
 WangLandau(logweight::TabulatedLogWeight; logf::Real = 1.0) =
     WangLandau(Random.GLOBAL_RNG, logweight; logf=logf)
 
+# dispatch accept! to add Wang-Landau specific bookkeeping
+function accept!(alg::WangLandau, x_new::Real, x_old::Real)
+    log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
+    accepted = _accept!(alg, log_ratio)
+    if accepted
+        alg.logweight[x_new] -= alg.logf
+    else
+        alg.logweight[x_old] -= alg.logf
+    end
+    return accepted
+end
+
+
 """
     update_weight!(alg::WangLandau, x)
 

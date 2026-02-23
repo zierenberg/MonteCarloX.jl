@@ -35,21 +35,28 @@ Base type for heat-bath style samplers.
 abstract type AbstractHeatBath <: AbstractAlgorithm end
 
 """
-    log_acceptance_ratio(alg::AbstractMetropolis, delta_state)
+    accept!(alg::AbstractImportanceSampling, x_new, x_old)
 
-Default log-acceptance ratio for Metropolis-family updates from a local
-state difference.
+Compute the log-acceptance ratio from state coordinates (canonical stat. mech typically x = energy) and perform the
+accept/reject step. This forwards to `_accept!(alg, log_ratio::Real)`.
 """
-@inline log_acceptance_ratio(alg::AbstractMetropolis, delta_state) = alg.logweight(delta_state)
+function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T<:Union{Real, Vector{<:Real}}
+    log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
+    return _accept!(alg, log_ratio)
+end
 
 """
-    log_acceptance_ratio(alg::AbstractImportanceSampling, state_new, state_old)
+    accept!(alg::AbstractMetropolis, delta_x)
 
-General log-acceptance ratio for importance sampling algorithms that require
-absolute state values.
+Compute the log-acceptance ratio from a local state difference `delta_x`
+for Metropolis-family updates and perform the accept/reject step. Forwards
+to `accept!(alg, log_ratio::Real)` so that specialized `accept!` methods
+(e.g. Glauber) for `log_ratio` are used when available.
 """
-@inline log_acceptance_ratio(alg::AbstractImportanceSampling, state_new, state_old) =
-    alg.logweight(state_new) - alg.logweight(state_old)
+function accept!(alg::AbstractMetropolis, delta_x::Union{Real, Vector{<:Real}})
+    log_ratio = alg.logweight(delta_x)
+    return _accept!(alg, log_ratio)
+end
 
 """
     accept!(alg::AbstractImportanceSampling, log_ratio::Real)
@@ -63,7 +70,7 @@ Returns true if the move is accepted based on the Metropolis criterion:
 
 This is the core accept/reject step used by all importance sampling algorithms.
 """
-function accept!(alg::AbstractImportanceSampling, log_ratio::Real)
+function _accept!(alg::AbstractImportanceSampling, log_ratio::Real)
     alg.steps += 1
     accepted = log_ratio > 0 || rand(alg.rng) < exp(log_ratio)
     alg.accepted += accepted 
@@ -82,14 +89,14 @@ acceptance_rate(alg::AbstractImportanceSampling) =
     alg.steps > 0 ? alg.accepted / alg.steps : 0.0
 
 """
-    reset_statistics!(alg::AbstractImportanceSampling)
+    reset!(alg::AbstractImportanceSampling)
 
 Reset step and acceptance counters to zero.
 
 Useful when you want to measure acceptance rate for a specific
 run phase without previous history.
 """
-function reset_statistics!(alg::AbstractImportanceSampling)
+function reset!(alg::AbstractImportanceSampling)
     alg.steps = 0
     alg.accepted = 0
 end

@@ -28,26 +28,7 @@ if !MPI.Initialized()
     end
 end
 
-comm = MPI.COMM_WORLD
-rank = MPI.Comm_rank(comm)
-nprocs_mpi = MPI.Comm_size(comm)
-mpi_thread_level = MPI.Query_thread()
-
-if rank == 0
-    println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    println("MPI Multicanonical (MUCA) Ising Simulation")
-    println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    println("MPI ranks: ", nprocs_mpi)
-    println("MPI thread level: ", mpi_thread_level)
-end
-
-# Problem setup
-L = 8
-N = L * L
-bins = collect((-2N - 2):4:(2N + 2))
-E_axis = Int.(bins[1:end-1] .+ 2)
-
-# Reference exact log-DOS for validation (Beale solution for 8×8 Ising)
+# Exact Beale logDOS for RMSE reference
 log_dos_beale_8x8 = [
     (-128, 0.6931471805599453), (-120, 4.852030263919617), (-116, 5.545177444479562),
     (-112, 8.449342524508063), (-108, 9.793672686528922), (-104, 11.887298863200714),
@@ -72,85 +53,72 @@ log_dos_beale_8x8 = [
     (116, 5.545177444479562), (120, 4.852030263919617), (128, 0.6931471805599453),
 ]
 exact_logdos = Dict(log_dos_beale_8x8)
+# make a logweight out of the exact log-DOS for RMSE calculation
+exact_logdos = TabulatedLogWeight(Histogram(push!([e for (e, _) in log_dos_beale_8x8],132), [w for (_, w) in log_dos_beale_8x8]))
 
 function rmse_exact(lw::TabulatedLogWeight)
-    est = -Float64.(lw.table.weights)
-    ref = [haskey(exact_logdos, E) ? exact_logdos[E] : NaN for E in E_axis]
-    i0 = findfirst(==(0), E_axis)
+    @assert lw.histogram.edges[1] == exact_logdos.histogram.edges[1] "Energy bins of logweight and exact log-DOS do not match."
+    est = -Float64.(lw.histogram.weights)
+    ref = Float64.(exact_logdos.histogram.weights)
+    energies = lw.histogram.edges[1][1:end-1]
+    i0 = findfirst(==(0), energies)
     if i0 !== nothing && isfinite(ref[i0])
         est .-= est[i0]
         ref .-= ref[i0]
     end
-    idx = findall(i -> isfinite(ref[i]) && isfinite(est[i]), eachindex(E_axis))
+    idx = findall(i -> isfinite(ref[i]) && isfinite(est[i]), eachindex(energies))
     return sqrt(mean((est[idx] .- ref[idx]).^2))
 end
 
+# Problem setup
+L = 8
+N = L * L
+
 # Simulation parameters
 n_iter = 10
-sweeps_therm = 80
-sweeps_record = 1000
+sweeps_therm = 100
+sweeps_record = 10_000
 
-# Per-rank initialization
-sys_local = IsingLatticeOptim(L, L)
-init!(sys_local, :random, rng=MersenneTwister(1000 + rank))
+pmuca = ParallelMulticanonical(MPI.COMM_WORLD, root=0)
+sys = IsingLatticeOptim(L, L)
+init!(sys, :random, rng=MersenneTwister(1000 + pmuca.rank))
+alg = Multicanonical(MersenneTwister(1000 + pmuca.rank), TabulatedLogWeight(exact_logdos.histogram.edges[1], 0.0))
 
-lw_local = TabulatedLogWeight(Histogram((collect(bins),), zeros(Float64, length(bins)-1)))
-rep_local = Multicanonical(MersenneTwister(2000 + rank), lw_local)
+if is_root(pmuca)
+    println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    println("MPI Multicanonical (MUCA) Ising Simulation")
+    println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    println("MPI ranks: ", pmuca.size)
+end
 
-meas_local = Measurements([:energy_hist => (s -> Int(energy(s))) => fit(Histogram, Int[], bins)], interval=1)
-
-# Storage
-mpi_hists = Histogram[]
-mpi_lws = TabulatedLogWeight[]
-
-w_local = zeros(Float64, length(bins)-1)
-w_global = similar(w_local)
-
-if rank == 0
+if is_root(pmuca)
     println("\nStarting MUCA simulation...")
 end
 
 # Main iteration loop
 for iter in 1:n_iter
     # Thermalization
-    for _ in 1:(sweeps_therm * length(sys_local.spins))
-        spin_flip!(sys_local, rep_local)
+    for _ in 1:(sweeps_therm * length(sys.spins))
+        spin_flip!(sys, alg)
+    end
+    reset!(alg)
+    # each rank does 1/nprocs of the total sweeps
+    for i in 1:(sweeps_record * length(sys.spins)/pmuca.size) 
+        spin_flip!(sys, alg)
     end
 
-    # Measurement
-    reset!(meas_local)
-    for i in 1:(sweeps_record * length(sys_local.spins))
-        spin_flip!(sys_local, rep_local)
-        measure!(meas_local, sys_local, i)
+    merge_histograms!(pmuca, alg.histogram)
+    if is_root(pmuca)
+        update_weight!(alg; mode=:simple)
+        print("Iteration $iter/$n_iter, RMSE (exact) = $(round(rmse_exact(alg.logweight), digits=4))\r")
     end
-
-    h_local = meas_local[:energy_hist].data
-
-    # Global histogram reduction via MPI
-    w_local .= Float64.(h_local.weights)
-    MPI.Allreduce!(w_local, w_global, MPI.SUM, comm)
-
-    h_global = deepcopy(h_local)
-    h_global.weights .= w_global
-
-    # Update weights on master, then broadcast to all ranks
-    update_weights!(rep_local, h_global; mode=:simple)
-    MPI.Bcast!(rep_local.logweight.table.weights, 0, comm)
-
-    # Store results
-    push!(mpi_hists, deepcopy(h_global))
-    push!(mpi_lws, deepcopy(rep_local.logweight))
-
-    if rank == 0
-        rmse = rmse_exact(rep_local.logweight)
-        println("iter $(iter): RMSE = $(round(rmse, digits=4))")
-    end
+    distribute_logweight!(pmuca, alg.logweight)
 end
 
-MPI.Barrier(comm)
+MPI.Barrier(pmuca.comm)
 
-if rank == 0
-    final_rmse = rmse_exact(mpi_lws[end])
+if is_root(pmuca)
+    final_rmse = rmse_exact(alg.logweight)
     println("\n✓ Simulation complete!")
     println("Final RMSE (vs exact Beale): $(round(final_rmse, digits=4))")
 end
