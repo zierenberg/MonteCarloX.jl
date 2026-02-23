@@ -28,8 +28,7 @@ function spin_flip!(sys::AbstractIsing, alg::AbstractImportanceSampling)
     ΔE = delta_energy(sys, Δpair, Δspin, i)
     E_old = energy(sys)
     E_new = E_old + ΔE
-    log_ratio = log_acceptance_ratio(alg, E_new, E_old)
-    accept!(alg, log_ratio) && modify!(sys, i, Δpair, Δspin)
+    accept!(alg, E_new, E_old) && modify!(sys, i, Δpair, Δspin)
     return nothing
 end
 
@@ -37,8 +36,7 @@ function spin_flip!(sys::AbstractIsing, alg::AbstractMetropolis)
     i = pick_site(alg.rng, length(sys.spins))
     Δpair, Δspin = flip_changes(sys, i)
     ΔE = delta_energy(sys, Δpair, Δspin, i)
-    log_ratio = log_acceptance_ratio(alg, ΔE)
-    accept!(alg, log_ratio) && modify!(sys, i, Δpair, Δspin)
+    accept!(alg, ΔE) && modify!(sys, i, Δpair, Δspin)
     return nothing
 end
 

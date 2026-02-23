@@ -1,6 +1,5 @@
 # Metropolis Algorithm
 # Classic importance sampling with Metropolis-Hastings acceptance criterion
-
 using Random
 
 """
@@ -88,7 +87,8 @@ Glauber(rng::AbstractRNG, logweight::Union{AbstractLogWeight, Function}) =
 Glauber(rng::AbstractRNG; β::Real) =
     Glauber(rng, BoltzmannLogWeight(β))
 
-function accept!(alg::Glauber, log_ratio::Real)
+function accept!(alg::Glauber, delta_state::Real)
+    log_ratio = alg.logweight(delta_state)
     alg.steps += 1
     accepted = rand(alg.rng) < logistic(log_ratio)
     alg.accepted += accepted

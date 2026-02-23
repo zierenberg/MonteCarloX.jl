@@ -14,14 +14,13 @@ using MonteCarloX: AbstractSystem,
                    AbstractMetropolis,
                    AbstractHeatBath,
                    accept!,
-                   log_acceptance_ratio,
                    logistic
 
 export AbstractSpinSystem,
        Ising,
-    IsingGraph,
-    IsingMatrix,
-    IsingLatticeOptim,
+       IsingGraph,
+       IsingMatrix,
+       IsingLatticeOptim,
        BlumeCapel,
        # Initialization
        init!,

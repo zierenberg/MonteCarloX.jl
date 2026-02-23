@@ -1,7 +1,5 @@
 # Multicanonical / generalized-ensemble scaffolding
-
 using Random
-
 """
     Multicanonical <: AbstractImportanceSampling
 
@@ -11,13 +9,14 @@ The algorithm tracks standard acceptance statistics and stores a tabulated
 log-weight estimate.
 
 Notation used here:
-- `Ω(E)`: density of states
-- `S(E) = log Ω(E)`: microcanonical entropy estimate
-- `logWeight(E) = S(E)` stored in `alg.logweight`
+- `Ω(x)`: density of states
+- `S(x) = log Ω(x)`: microcanonical entropy estimate
+- `logWeight(x) = -S(x)` stored in `alg.logweight`
 """
-mutable struct Multicanonical{LW,RNG<:AbstractRNG} <: AbstractGeneralizedEnsemble
+mutable struct Multicanonical{RNG<:AbstractRNG} <: AbstractGeneralizedEnsemble
     rng::RNG
-    logweight::LW
+    logweight::TabulatedLogWeight
+    histogram::Histogram
     steps::Int
     accepted::Int
 end
@@ -25,19 +24,35 @@ end
 function Multicanonical(rng::AbstractRNG, logweight)
     logweight isa TabulatedLogWeight ||
         throw(ArgumentError("`logweight` must be a `TabulatedLogWeight`"))
-    return Multicanonical{typeof(logweight),typeof(rng)}(rng, logweight, 0, 0)
+    histogram = zero(logweight.histogram)
+    return Multicanonical{typeof(rng)}(rng, logweight, histogram, 0, 0)
 end
 Multicanonical(logweight) = Multicanonical(Random.GLOBAL_RNG, logweight)
 
-@inline function _assert_same_bins(log_weight::Histogram, histogram::Histogram)
-    if log_weight.edges != histogram.edges
-        throw(ArgumentError("`log_weight` and `histogram` must have identical bin edges"))
+# dispatch the accept function so that histogram is updated on every call to `accept`
+function accept!(alg::Multicanonical, x_new::Real, x_old::Real)
+    log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
+    accepted = _accept!(alg, log_ratio)
+    if accepted
+        alg.histogram[x_new] += 1
+    else
+        alg.histogram[x_old] += 1
     end
+    return accepted
+end
+
+function reset!(alg::Multicanonical)
+    fill!(alg.histogram.weights, 0.0)
+    alg.steps = 0
+    alg.accepted = 0
     return nothing
 end
 
 """
-    update_weights!(alg::Multicanonical, histogram::Histogram; mode=:simple)
+    update_weights!(
+    alg::Multicanonical,
+    mode::Symbol = :simple,
+)
 
 Update multicanonical log-weights from a sampling histogram in-place.
 
@@ -47,32 +62,19 @@ Currently implemented mode:
 
 This mutates `alg.logweight` and returns `nothing`.
 """
-function update_weights!(
-    alg::Multicanonical,
-    histogram::Histogram;
+function update_weight!(
+    alg::Multicanonical;
     mode::Symbol = :simple,
 )
-    if !(alg.logweight isa TabulatedLogWeight)
-        throw(ArgumentError("`alg.logweight` must be a TabulatedLogWeight"))
-    end
-
-    log_weight = alg.logweight.histogram
-
     if mode != :simple
         throw(ArgumentError("unsupported mode=$(mode), currently only :simple"))
     end
 
-    _assert_same_bins(log_weight, histogram)
-
-    log_hist = similar(log_weight.weights, Float64)
-    @inbounds for idx in eachindex(histogram.weights)
-        h = histogram.weights[idx]
-        log_hist[idx] = h > 0 ? log(h) : 0.0
+    @inbounds for idx in eachindex(alg.histogram.weights)
+        h = alg.histogram.weights[idx]
+        logh = h > 0 ? log(h) : 0.0
+        alg.logweight.histogram.weights[idx] -= logh
     end
-
-    log_weight.weights .-= log_hist
 
     return nothing
 end
-
-update_weights(args...; kwargs...) = update_weights!(args...; kwargs...)

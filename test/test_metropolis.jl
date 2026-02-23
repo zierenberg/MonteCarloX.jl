@@ -29,8 +29,7 @@ function test_metropolis_1d_gaussian(; verbose=false)
     step = σ
     function update(x::Float64, alg::Metropolis)::Float64
         x_new = x + randn(alg.rng) * step
-        log_ratio = alg.logweight(x_new) - alg.logweight(x)
-        if accept!(alg, log_ratio)
+        if accept!(alg, x_new, x)
             return x_new
         else
             return x
@@ -42,7 +41,7 @@ function test_metropolis_1d_gaussian(; verbose=false)
     for _ in 1:Int(1e3)
         x = update(x, alg)
     end
-    reset_statistics!(alg)
+    reset!(alg)
     
     # Production run - collect samples using Measurement framework
     for i in 1:Int(1e6)
@@ -99,8 +98,8 @@ function test_metropolis_2d_gaussian(; verbose=false)
     rng = MersenneTwister(100)
     
     # Target: 2D Gaussian centered at (1.0, 2.0)
-    μx, μy = 1.0, 2.0
-    logweight(x, y) = -0.5 * ((x - μx)^2 + (y - μy)^2)
+    μ = [1.0, 2.0]
+    logweight(x) = -0.5 * ((x[1] - μ[1])^2 + (x[2] - μ[2])^2)
     
     alg = Metropolis(rng, logweight)
     
@@ -111,29 +110,27 @@ function test_metropolis_2d_gaussian(; verbose=false)
     ], interval=1)
     
     # Local update function - only depends on x, y and alg
-    function update(x::Float64, y::Float64, alg::Metropolis)::Tuple{Float64, Float64}
-        x_new = x + randn(alg.rng)
-        y_new = y + randn(alg.rng)
-        log_ratio = alg.logweight(x_new, y_new) - alg.logweight(x, y)
-        if accept!(alg, log_ratio)
-            return (x_new, y_new)
+    function update(x::Vector{Float64}, alg::Metropolis)::Vector{Float64}
+        x_new = x + randn(alg.rng, length(x))
+        if accept!(alg, x_new, x)
+            return x_new
         else
-            return (x, y)
+            return x
         end
     end
     
     # Thermalization
-    x, y = μx, μy
+    x = μ
     for _ in 1:1000
-        x, y = update(x, y, alg)
+        x = update(x, alg)
     end
-    reset_statistics!(alg)
+    reset!(alg)
     
     # Production run using scheduled measurements
     samples = 50000
     for i in 1:samples
-        x, y = update(x, y, alg)
-        measure!(measurements, (x, y), i)
+        x = update(x, alg)
+        measure!(measurements, x, i)
     end
     
     # Create histograms for each dimension
@@ -149,8 +146,8 @@ function test_metropolis_2d_gaussian(; verbose=false)
     hist_y = normalize(hist_y)
     
     # Theoretical marginal distributions
-    dist_x = Normal(μx, 1.0)
-    dist_y = Normal(μy, 1.0)
+    dist_x = Normal(μ[1], 1.0)
+    dist_y = Normal(μ[2], 1.0)
     theoretical_pdf_x(x) = pdf(dist_x, x)
     theoretical_pdf_y(y) = pdf(dist_y, y)
     
@@ -163,7 +160,7 @@ function test_metropolis_2d_gaussian(; verbose=false)
     
     if verbose
         println("2D Gaussian Test:")
-        println("  Target: μ=($(μx), $(μy))")
+        println("  Target: μ=($(μ[1]), $(μ[2]))")
         println("  Sampled: μ=($(mean_x), $(mean_y))")
         println("  KL divergence X: $(kld_x)")
         println("  KL divergence Y: $(kld_y)")
@@ -171,8 +168,8 @@ function test_metropolis_2d_gaussian(; verbose=false)
     end
     
     pass = true
-    pass &= abs(mean_x - μx) < 0.1
-    pass &= abs(mean_y - μy) < 0.1
+    pass &= abs(mean_x - μ[1]) < 0.1
+    pass &= abs(mean_y - μ[2]) < 0.1
     pass &= acceptance_rate(alg) > 0.4
     pass &= kld_x < 0.5  # KL divergence should be small
     pass &= kld_y < 0.5
@@ -199,8 +196,7 @@ function test_metropolis_acceptance_tracking(; verbose=false)
     # Local update function - only depends on x and alg
     function update(x::Float64, alg::Metropolis)::Float64
         x_new = x + randn(alg.rng) * 1.0
-        log_ratio = alg.logweight(x_new) - alg.logweight(x)
-        if accept!(alg, log_ratio)
+        if accept!(alg, x_new, x)
             return x_new
         else
             return x
@@ -230,7 +226,7 @@ function test_metropolis_acceptance_tracking(; verbose=false)
     pass &= length(measurements[:timeseries].data) == 10000  # All samples collected
     
     # Test reset
-    reset_statistics!(alg)
+    reset!(alg)
     pass &= alg.steps == 0
     pass &= alg.accepted == 0
     pass &= acceptance_rate(alg) == 0.0
@@ -261,8 +257,7 @@ function test_metropolis_temperature_effects(; verbose=false)
         # Local update function - only depends on x and alg
         function update(x::Float64, alg::Metropolis)::Float64
             x_new = x + randn(alg.rng) * 0.5
-            log_ratio = alg.logweight(x_new) - alg.logweight(x)
-            if accept!(alg, log_ratio)
+            if accept!(alg, x_new, x)
                 return x_new
             else
                 return x
@@ -317,8 +312,7 @@ function test_metropolis_proposal_invariance(; verbose=false)
     
     function update_a(x::Float64, alg::Metropolis)::Float64
         x_new = x + randn(alg.rng) * 0.5  # Narrow proposal
-        log_ratio = alg.logweight(x_new) - alg.logweight(x)
-        if accept!(alg, log_ratio)
+        if accept!(alg, x_new, x)
             return x_new
         else
             return x
@@ -341,8 +335,7 @@ function test_metropolis_proposal_invariance(; verbose=false)
     
     function update_b(x::Float64, alg::Metropolis)::Float64
         x_new = x + randn(alg.rng) * 2.0  # Wide proposal
-        log_ratio = alg.logweight(x_new) - alg.logweight(x)
-        if accept!(alg, log_ratio)
+        if accept!(alg, x_new, x)
             return x_new
         else
             return x
@@ -464,15 +457,15 @@ function test_glauber_basics(; verbose=false)
     # Strongly favorable move should almost always be accepted
     accepted = 0
     for _ in 1:1_000
-        accepted += accept!(glauber, 5.0)
+        accepted += accept!(glauber, -8.0)  # Large negative ΔE should have high acceptance
     end
-    pass &= accepted > 980
+    pass &= accepted > 990
     pass &= glauber.steps == 1_000
     pass &= 0.0 <= acceptance_rate(glauber) <= 1.0
 
     if verbose
         println("Glauber basics:")
-        println("  Glauber acceptance rate (log_ratio=5): $(acceptance_rate(glauber))")
+        println("  Glauber acceptance rate (delta_E=-8, β=0.8 -> p=0.998>0.99): $(acceptance_rate(glauber))")
     end
 
     return pass
