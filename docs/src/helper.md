@@ -15,7 +15,7 @@ kldivergence
 
 ```@docs
 MutableRandomNumbers
-reset
+reset!(rng::MutableRandomNumbers, [index::Int=0])
 ```
 
 ## Event handler utilities

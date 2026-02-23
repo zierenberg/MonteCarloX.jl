@@ -65,4 +65,5 @@ step!
 next_time
 next_event
 advance!
+reset!(alg::AbstractKineticMonteCarlo)
 ```

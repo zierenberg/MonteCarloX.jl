@@ -66,11 +66,9 @@ Glauber
 HeatBath
 accept!
 acceptance_rate
-reset_statistics!
-log_acceptance_ratio
+reset!(alg::AbstractImportanceSampling)
 Multicanonical
 WangLandau
 update_weight!
 update_f!
-update_weights!
 ```
