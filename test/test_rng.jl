@@ -46,7 +46,7 @@ function test_rng_mutable_dynamic_sequence_and_reset(; verbose=false)
     end
     length_final = length(rng)
     pass &= length_final == 20
-    reset(rng)
+    reset!(rng)
     pass &= rng.index_current == 0
 
     rand_number = rand(rng)
@@ -115,10 +115,10 @@ function test_rng_rand_inbounds_closeopen01_mapping(; verbose=false)
         println("\nRNG rand_inbounds mapping")
     end
     rng = MutableRandomNumbers(MersenneTwister(seed), 2)
-    reset(rng)
+    reset!(rng)
     r01 = MonteCarloX.rand_inbounds(rng, Random.CloseOpen01())
     pass &= r01 == rng[1]
-    reset(rng)
+    reset!(rng)
     r12 = MonteCarloX.rand_inbounds(rng, Random.CloseOpen12())
     pass &= r01 == r12 - 1.0
 

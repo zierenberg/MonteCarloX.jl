@@ -14,11 +14,11 @@ Kinetic Monte Carlo algorithms:
 abstract type AbstractKineticMonteCarlo <: AbstractAlgorithm end
 
 """
-    reset_statistics!(alg::AbstractKineticMonteCarlo)
+    reset!(alg::AbstractKineticMonteCarlo)
 
 Reset kinetic Monte Carlo statistics (`steps`, `time`) to zero.
 """
-function reset_statistics!(alg::AbstractKineticMonteCarlo)
+function reset!(alg::AbstractKineticMonteCarlo)
     alg.steps = 0
     alg.time = 0.0
 end

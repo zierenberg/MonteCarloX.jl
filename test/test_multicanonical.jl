@@ -8,29 +8,36 @@ function test_multicanonical_weight_update_inplace(; verbose=false)
     pass = true
 
     bins = 0.0:1.0:4.0
-    lw_hist = Histogram((collect(bins),), zeros(Float64, length(bins) - 1))
-    lw = TabulatedLogWeight(lw_hist)
+    lw = TabulatedLogWeight(bins, 0.0)
     alg = Multicanonical(rng, lw)
 
-    hist = fit(Histogram, [0.2, 0.8, 1.1, 2.5, 2.7], bins)
+    w_before = copy(lw.histogram.weights)
+    alg.histogram.weights = [0.2, 0.8, 1.1, 2.5]
 
-    w_before = copy(lw.table.weights)
-    pass &= update_weights!(alg, hist; mode=:simple) === nothing
+    if verbose
+        # print the indices of the bins that are being updated
+        println("logweight edges:", alg.logweight.histogram.edges)
+        println("logweight weights:", alg.logweight.histogram.weights)
+        println("histogram edges:", alg.histogram.edges)
+        println("histogram weights:", alg.histogram.weights)
+    end
+
+    pass &= update_weight!(alg) === nothing
 
     expected = copy(w_before)
     for i in eachindex(expected)
-        h = hist.weights[i]
+        h = alg.histogram.weights[i]
         if h > 0
             expected[i] -= log(h)
         end
     end
 
-    pass &= all(isapprox.(lw.table.weights, expected))
+    pass &= all(isapprox.(lw.histogram.weights, expected))
 
     if verbose
         println("Multicanonical in-place update:")
         println("  before: $(w_before)")
-        println("  after:  $(lw.table.weights)")
+        println("  after:  $(lw.histogram.weights)")
     end
 
     return pass
@@ -50,27 +57,23 @@ function test_multicanonical_default_rng(; verbose=false)
     return pass
 end
 
-function test_multicanonical_bin_compatibility(; verbose=false)
+function test_multicanonical_mode(; verbose=false)
     rng = MersenneTwister(902)
     bins_lw = 0.0:1.0:4.0
-    bins_h = 0.0:0.5:4.0
 
-    lw_hist = Histogram((collect(bins_lw),), zeros(Float64, length(bins_lw) - 1))
-    lw = TabulatedLogWeight(lw_hist)
+    lw = TabulatedLogWeight(bins_lw, 0.0)
     alg = Multicanonical(rng, lw)
 
-    hist_bad = fit(Histogram, [0.25, 1.25, 2.75], bins_h)
-
-    pass = true
+    pass = true    
     pass &= try
-        update_weights!(alg, hist_bad; mode=:simple)
+        update_weight!(alg; mode=:notavail)  # unsupported mode should throw
         false
     catch err
         err isa ArgumentError
     end
 
     if verbose
-        println("Multicanonical bin compatibility: $(pass)")
+        println("Multicanonical mode compatibility: $(pass)")
     end
 
     return pass
@@ -81,8 +84,8 @@ function run_multicanonical_testsets(; verbose=false)
         @testset "In-place update" begin
             @test test_multicanonical_weight_update_inplace(verbose=verbose)
         end
-        @testset "Bin compatibility" begin
-            @test test_multicanonical_bin_compatibility(verbose=verbose)
+        @testset "Mode compatibility" begin
+            @test test_multicanonical_mode(verbose=verbose)
         end
         @testset "Default RNG" begin
             @test test_multicanonical_default_rng(verbose=verbose)
