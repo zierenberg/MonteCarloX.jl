@@ -22,7 +22,6 @@ function test_tabulated_logweight_basics(; verbose=false)
     pass &= lw[2] == -0.3
 
     pass &= lw.histogram === hist
-    pass &= lw.table === hist
 
     if verbose
         println("TabulatedLogWeight basics:")
@@ -37,14 +36,9 @@ function test_tabulated_logweight_properties(; verbose=false)
 
     edges = [0.0, 1.0, 2.0]
     lw = TabulatedLogWeight(edges, -1.0)
-
-    pass &= propertynames(lw) == (:histogram, :table)
-    pass &= propertynames(lw, true) == (:histogram, :table)
-
     new_hist = Histogram((collect(edges),), fill(0.5, length(edges) - 1))
-    lw.table = new_hist
+    lw.histogram = new_hist
     pass &= lw.histogram === new_hist
-    pass &= lw.table === new_hist
 
     pass &= size(lw) == size(new_hist.weights)
 
@@ -65,6 +59,16 @@ function test_tabulated_logweight_invalid_edges(; verbose=false)
     valid = false
     try
         TabulatedLogWeight([0.0], 0.0)
+    catch err
+        valid = err isa ArgumentError
+    end
+    pass &= valid
+
+    lw1 = TabulatedLogWeight(0.0:1.0:3.0, 0.0)
+    lw2 = TabulatedLogWeight(0.0:0.5:3.0, 0.0)
+    valid = false
+    try
+        MonteCarloX._assert_same_domain(lw1, lw2)
     catch err
         valid = err isa ArgumentError
     end

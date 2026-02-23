@@ -3,6 +3,44 @@ using Random
 using StatsBase
 using Test
 
+function test_multicanonical_accept(; verbose=false)
+    rng = MersenneTwister(42)
+    pass = true
+
+    bins = 0.0:1.0:4.0
+    lw = TabulatedLogWeight(bins, 0.0)
+    alg = Multicanonical(rng, lw)
+
+    step = 0.1
+    function update!(x::Float64, alg::Multicanonical)::Float64
+        x_new = x + randn(alg.rng) * step
+        if accept!(alg, x_new, x)
+            return x_new
+        else
+            return x
+        end
+    end
+
+    # updates
+    x = 2.0  # start in bin 2
+    for _ in 1:10
+        x = update!(x, alg)
+    end
+    
+    # test num_accepts
+    pass &= alg.accepted >= 0 && alg.accepted <= 10
+    # test acceptance rate (log_weight is zero, so acceptance should be 1)
+    pass &= acceptance_rate(alg) == 1.0
+
+    # reset
+    reset!(alg)
+    pass &= alg.accepted == 0
+    pass &= all(iszero, alg.histogram.weights)
+    
+    return pass
+end
+
+
 function test_multicanonical_weight_update_inplace(; verbose=false)
     rng = MersenneTwister(901)
     pass = true
