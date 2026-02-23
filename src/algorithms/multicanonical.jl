@@ -12,6 +12,9 @@ Notation used here:
 - `Ω(x)`: density of states
 - `S(x) = log Ω(x)`: microcanonical entropy estimate
 - `logWeight(x) = -S(x)` stored in `alg.logweight`
+
+TODO: 
+- implement check that new state is within the domain of the log-weight table and define behavior if not (e.g. reject move)
 """
 mutable struct Multicanonical{RNG<:AbstractRNG} <: AbstractGeneralizedEnsemble
     rng::RNG
@@ -34,6 +37,7 @@ function accept!(alg::Multicanonical, x_new::Real, x_old::Real)
     log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
     accepted = _accept!(alg, log_ratio)
     if accepted
+        # attention: this could possibly fail if x_new is out of bounds of the histogram
         alg.histogram[x_new] += 1
     else
         alg.histogram[x_old] += 1

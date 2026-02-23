@@ -245,7 +245,7 @@ function test_metropolis_temperature_effects(; verbose=false)
         
         # Energy landscape: quadratic potential E(x) = x^2
         energy(x) = x^2
-        logweight(x) = -β_inv * energy(x)
+        logweight(E) = -β_inv * E
         
         alg = Metropolis(rng, logweight)
         
@@ -257,7 +257,8 @@ function test_metropolis_temperature_effects(; verbose=false)
         # Local update function - only depends on x and alg
         function update(x::Float64, alg::Metropolis)::Float64
             x_new = x + randn(alg.rng) * 0.5
-            if accept!(alg, x_new, x)
+            delta_E = energy(x_new) - energy(x)
+            if accept!(alg, delta_E)
                 return x_new
             else
                 return x
