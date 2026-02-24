@@ -53,9 +53,10 @@ function test_tabulated_logweight_properties(; verbose=false)
     return pass
 end
 
-function test_tabulated_logweight_invalid_edges(; verbose=false)
+function test_tabulated_logweight_domain(; verbose=false)
     pass = true
 
+    # check too small domain
     valid = false
     try
         TabulatedLogWeight([0.0], 0.0)
@@ -64,6 +65,7 @@ function test_tabulated_logweight_invalid_edges(; verbose=false)
     end
     pass &= valid
 
+    # check error if domain missmatch
     lw1 = TabulatedLogWeight(0.0:1.0:3.0, 0.0)
     lw2 = TabulatedLogWeight(0.0:0.5:3.0, 0.0)
     valid = false
@@ -73,6 +75,9 @@ function test_tabulated_logweight_invalid_edges(; verbose=false)
         valid = err isa ArgumentError
     end
     pass &= valid
+
+    # check test works for same domain
+    pass &= MonteCarloX._assert_same_domain(lw1, lw1) == nothing
 
     if verbose
         println("TabulatedLogWeight invalid edges test pass: $(pass)")
@@ -86,7 +91,7 @@ function run_weights_testsets(; verbose=false)
         @testset "TabulatedLogWeight" begin
             @test test_tabulated_logweight_basics(verbose=verbose)
             @test test_tabulated_logweight_properties(verbose=verbose)
-            @test test_tabulated_logweight_invalid_edges(verbose=verbose)
+            @test test_tabulated_logweight_domain(verbose=verbose)
         end
     end
     return true
