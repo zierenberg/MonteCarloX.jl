@@ -20,6 +20,7 @@ include("measurements/measurements.jl")
 # Log weights (canonical ensemble)
 include("weights/canonical.jl")
 include("weights/mutable.jl")
+include("weights/binned.jl")
 
 # Event handlers (non-equilibrium)
 include("event_handler/abstractions.jl")
