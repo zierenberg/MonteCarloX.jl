@@ -5,6 +5,9 @@ Mutable tabulated log weight backed by a histogram.
 
 Calling with a scalar state value returns the current tabulated log weight
 at the corresponding histogram bin.
+
+TODO: 
+this will be replaced with a more general object that still needs to be developed.
 """
 mutable struct TabulatedLogWeight{T<:AbstractFloat,N,E} <: AbstractLogWeight
     histogram::Histogram{T,N,E}
@@ -20,8 +23,6 @@ end
 @inline (lw::TabulatedLogWeight)(x::Real) = lw.histogram[x]
 @inline Base.getindex(lw::TabulatedLogWeight, x::Real) = lw.histogram[x]
 @inline Base.setindex!(lw::TabulatedLogWeight, value::Real, x::Real) = (lw.histogram[x] = value)
-@inline Base.getindex(lw::TabulatedLogWeight, idx...) = lw.histogram.weights[idx...]
-@inline Base.setindex!(lw::TabulatedLogWeight, value::Real, idx...) = (lw.histogram.weights[idx...] = value)
 
 @inline Base.size(lw::TabulatedLogWeight) = size(lw.histogram.weights)
 
