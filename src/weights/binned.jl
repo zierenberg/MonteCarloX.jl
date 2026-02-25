@@ -1,219 +1,167 @@
-export BinnedLogWeight
+# binned log weights for discrete and continuous variables 
+# (designed for histogram-based methods like multicanonical sampling and Wang-Landau)
 
-abstract type AbstractBinnedLogWeight <: AbstractLogWeight end
-
-############################
-# Discrete bins (1D)
-############################
-
-"""
-    BinnedLogWeight(domain::AbstractRange{<:Integer}, init)
-
-Discrete binned log weight with arbitrary step size.
-
-Examples:
-- `-128:4:128`
-- `0:2:100`
-
-Optimized for O(1) lookup.
-"""
-mutable struct BinnedLogWeight{T} <: AbstractBinnedLogWeight
-    weights :: Vector{T}
-    start   :: Int
-    step    :: Int
+abstract type AbstractBin end
+@inline function _binindex(bins::NTuple{N,AbstractBin}, xs::NTuple{N,Real}) where N
+    ntuple(i -> _binindex(bins[i], xs[i]), N)
 end
 
-@inline function BinnedLogWeight(domain::AbstractRange{<:Integer},
-                                 init::T) where T
-    _step = Int(step(domain))
-    BinnedLogWeight(fill(init, length(domain)),
-                    first(domain),
-                    _step)
+# TODO: final adaptation may be to make the Binning high-dimensional instead of the bins
+
+struct DiscreteBinning{T<:Real} <: AbstractBin
+    start :: T
+    step  :: T
+    num   :: Int
 end
-
-@inline function binindex(lw::BinnedLogWeight, x::Integer)
-    @inbounds Int((x - lw.start) ÷ lw.step) + 1
+@inline function _binindex(b::DiscreteBinning, x)
+    @inbounds Int(round((x - b.start) / b.step)) + 1
 end
-
-@inline (lw::BinnedLogWeight)(x::Integer) =
-    @inbounds lw.weights[binindex(lw, x)]
-
-@inline function Base.setindex!(lw::BinnedLogWeight, v, x::Integer)
-    @inbounds lw.weights[binindex(lw, x)] = v
+# special case for integer
+@inline function _binindex(b::DiscreteBinning{T}, x::T) where T<:Integer
+    div(x - b.start, b.step) + 1
 end
+@inline Base.collect(b::DiscreteBinning) = Base.collect(b.start:b.step:b.start + b.step*(b.num-1))
 
-############################
-# Discrete bins (ND)
-############################
-
-"""
-    BinnedLogWeight(domains::NTuple{N,AbstractRange{<:Integer}}, init)
-
-N-dimensional discrete binned log weight with arbitrary steps.
-"""
-mutable struct BinnedLogWeightND{T,N} <: AbstractBinnedLogWeight
-    weights :: Array{T,N}
-    start   :: NTuple{N,Int}
-    step    :: NTuple{N,Int}
-end
-
-function BinnedLogWeight(domains::NTuple{N,AbstractRange{<:Integer}},
-                         init::T) where {N,T}
-    sizes = map(length, domains)
-    start = ntuple(i -> first(domains[i]), N)
-    _step  = ntuple(i -> Int(step(domains[i])), N)
-    weights = fill(init, sizes...)
-    BinnedLogWeightND(weights, start, _step)
-end
-
-@inline function binindex(lw::BinnedLogWeightND{T,N},
-                          xs::NTuple{N,Integer}) where {T,N}
-    CartesianIndex(ntuple(i ->
-        Int((xs[i] - lw.start[i]) ÷ lw.step[i]) + 1, N))
-end
-
-@inline (lw::BinnedLogWeightND{T,N})(xs::Vararg{Integer,N}) where {T,N} =
-    @inbounds lw.weights[binindex(lw, xs)]
-
-############################
-# Continuous bins (1D)
-############################
-
-"""
-    BinnedLogWeight(edges::AbstractVector{<:Real}, init)
-
-One-dimensional continuous binned log weight.
-Histogram-style semantics.
-"""
-mutable struct BinnedLogWeight1D{T} <: AbstractBinnedLogWeight
-    weights :: Vector{T}
-    edges   :: Vector{T}
+struct ContinuousBinning{T<:Real} <: AbstractBin
+    edges :: Vector{T}
     centers :: Vector{T}
 end
-
-function BinnedLogWeight(edges::AbstractVector{T},
-                         init::T) where T<:Real
-    nbins = length(edges) - 1
-    weights = fill(init, nbins)
-    centers = @inbounds (edges[1:end-1] .+ edges[2:end]) .* T(0.5)
-    BinnedLogWeight1D(weights, collect(edges), centers)
+@inline function _binindex(b::ContinuousBinning, x::Real)
+    searchsortedlast(b.edges, x)
 end
+@inline Base.collect(b::ContinuousBinning) = b.centers
 
-@inline function (lw::BinnedLogWeight1D)(x::Real)
-    i = searchsortedlast(lw.edges, x)
-    @inbounds lw.weights[clamp(i, 1, length(lw.weights))]
-end
-
-@inline function Base.setindex!(lw::BinnedLogWeight1D, v, x::Real)
-    i = searchsortedlast(lw.edges, x)
-    @inbounds lw.weights[clamp(i, 1, length(lw.weights))] = v
-end
-
-############################
-# Continuous bins (ND)
-############################
+# struct ExplicitBinning{B}
+#     labels :: B
+# end
 
 """
-    BinnedLogWeight(edges::NTuple{N,AbstractVector{<:Real}}, init)
+    BinnedLogWeight(domain::AbstractRange, init)
 
-N-dimensional continuous binned log weight.
+Construct a binned log weight object for the given domain and initial value.
+The type of `domain` determines the specific binned log weight type:
+
+# Examples
+```julia
+# Discrete 1D
+lw1d = BinnedLogWeight(0:10, 0.0)
+# Discrete ND
+lw2d = BinnedLogWeight((0:5, 0:5), 0.0)
+# Continuous 1D
+lw1d_cont = BinnedLogWeight(0.0:0.5:5.0, 0.0)
+# Continuous ND
+lw2d_cont = BinnedLogWeight((0.0:0.5:5.0, 0.0:0.5:5.0), 0.0)
+``` 
 """
-mutable struct BinnedLogWeightContinuousND{T,N} <: AbstractBinnedLogWeight
-    weights :: Array{T,N}
-    edges   :: NTuple{N,Vector{T}}
-    centers :: NTuple{N,Vector{T}}
+struct BinnedLogWeight{N,B<:AbstractBin} <: AbstractLogWeight
+    weights :: Array{Float64,N}
+    bins :: NTuple{N,B}
 end
 
-function BinnedLogWeight(edges::NTuple{N,AbstractVector{T}},
-                         init::T) where {N,T<:Real}
-    sizes   = ntuple(i -> length(edges[i]) - 1, N)
-    weights = fill(init, sizes)
-    centers = ntuple(i ->
-        @inbounds (edges[i][1:end-1] .+ edges[i][2:end]) .* T(0.5), N)
-    BinnedLogWeightContinuousND(weights, map(collect, edges), centers)
+function BinnedLogWeight(domain::AbstractRange{T}, init::S) where {T<:Real, S}
+    return BinnedLogWeight((domain,), init)
 end
 
-@inline function (lw::BinnedLogWeightContinuousND{T,N})(
-    xs::Vararg{Real,N}) where {T,N}
-
-    I = CartesianIndex(ntuple(i ->
-        clamp(searchsortedlast(lw.edges[i], xs[i]),
-              1, size(lw.weights, i)), N))
-    @inbounds lw.weights[I]
+function BinnedLogWeight(domain::AbstractVector{T}, init::S) where {T<:Real, S}
+    return BinnedLogWeight((domain,), init)
 end
 
-############################
-# Functional assignment
-############################
+function BinnedLogWeight(domains::NTuple{N,Union{AbstractRange{T},AbstractVector{T}}}, init::Real) where {N,T<:Real}
+    bins = ntuple(i -> begin
+        d = domains[i]
+        if eltype(d) <: Integer
+            if d isa AbstractRange
+                DiscreteBinning(first(d), T(step(d)), length(d))
+            elseif d isa AbstractVector
+                n = length(d)
+                if n < 2
+                    DiscreteBinning(d, zero(T), 1)
+                else
+                    steps = diff(d)
+                    if all(steps .== steps[1])
+                        DiscreteBinning(d, steps[1], n)
+                    else
+                        error("Non-equidistant discrete bins not supported without ExplicitBinning.")
+                    end
+                end
+            end
+        else
+            edges = collect(d)
+            centers = @inbounds (edges[1:end-1] .+ edges[2:end]) .* T(0.5)
+            ContinuousBinning(edges, centers)
+        end
+    end, N)
+    # Check all bins are of the same type
+    @assert all(map(b -> typeof(b) == typeof(bins[1]), bins)) "All bins must be of the same type for NTuple type stability."
+    sizes = ntuple(i -> bins[i] isa DiscreteBinning ? bins[i].num : length(bins[i].edges)-1, N)
+    weights = fill(init, sizes...)
+    return BinnedLogWeight{N,typeof(bins[1])}(weights, bins)
+end
+# catch for invalid domain types
+function BinnedLogWeight(domain, init)
+    throw(ArgumentError("Invalid domain type for BinnedLogWeight: Expected AbstractRange or AbstractVector of Real numbers, or a tuple of such (**but with identical types**)."))
+end
+# default constructor
+@inline BinnedLogWeight(domain) = BinnedLogWeight(domain, 0.0)
+
+# size of the weights array
+@inline Base.size(lw::BinnedLogWeight) = size(lw.weights)
+
+# access via lw() syntax
+@inline function (lw::BinnedLogWeight{1,B})(x::Real) where B
+    idx = _binindex(lw.bins[1], x)
+    @inbounds lw.weights[idx]
+end
+@inline function (lw::BinnedLogWeight{N,B})(xs::Vararg{Real,N}) where {N,B}
+    idxs = _binindex(lw.bins, xs)
+    @inbounds lw.weights[CartesianIndex(idxs)]
+end
+
+# access via lw[] syntax
+@inline function Base.getindex(lw::BinnedLogWeight{1,B}, x::Real) where B
+    idx = _binindex(lw.bins[1], x)
+    @inbounds lw.weights[idx]
+end
+@inline function Base.setindex!(lw::BinnedLogWeight{1,B}, v, x::Real) where B
+    idx = _binindex(lw.bins[1], x)
+    @inbounds lw.weights[idx] = v
+end
+@inline function Base.getindex(lw::BinnedLogWeight{N,B}, xs::Vararg{Real,N}) where {N,B}
+    #TODO: this can be very likely be optimized
+    idxs = [_binindex(lw.bins[i], xs[i]) for i in 1:N]
+    @inbounds lw.weights[idxs...]
+end
+@inline function Base.setindex!(lw::BinnedLogWeight{N,B}, v, xs::Vararg{Real,N}) where {N,B}
+    #TODO: this can be very likely be optimized
+    idxs = [_binindex(lw.bins[i], xs[i]) for i in 1:N]
+    @inbounds lw.weights[idxs...] = v
+end
 
 """
-    lw[xs] = f
+    zero(lw::BinnedLogWeight)
 
-Assign weights by evaluating `f` at:
-- discrete bins: `f(x)`
-- continuous bins: `f(bin center)`
+Return a new `BinnedLogWeight` of the same bins as `lw` but with all weights set to zero.
 """
+function Base.zero(lw::BinnedLogWeight)
+    new_weights = fill(0.0, size(lw.weights))
+    return BinnedLogWeight{length(lw.bins),typeof(lw.bins[1])}(new_weights, lw.bins)
+end
 
-@inline function Base.setindex!(lw::BinnedLogWeight,
-                               f::Function, xs)
-    @inbounds for x in xs
-        lw[x] = f(x)
+# helper to check if two BinnedLogWeight objects have the same binning structure
+@inline function _assert_same_domain(lw1::BinnedLogWeight, lw2::BinnedLogWeight)
+    @assert length(lw1.bins) == length(lw2.bins) "BinnedLogWeight objects must have the same number of dimensions."
+    for i in 1:length(lw1.bins)
+        b1, b2 = lw1.bins[i], lw2.bins[i]
+        @assert typeof(b1) == typeof(b2) "Bin types must match in each dimension."
+        if b1 isa DiscreteBinning
+            @assert b1.start == b2.start "Discrete bins must have the same start."
+            @assert b1.step == b2.step "Discrete bins must have the same step."
+            @assert b1.num == b2.num "Discrete bins must have the same num."
+        elseif b1 isa ContinuousBinning
+            @assert b1.edges == b2.edges "Continuous bins must have the same edges."
+        else
+            error("Unknown bin type: $(typeof(b1))")
+        end
     end
-    lw
-end
-
-@inline function Base.setindex!(lw::BinnedLogWeightND,
-                               f::Function, xs)
-    for x in xs
-        I = binindex(lw, x)
-        @inbounds lw.weights[I] = f(x...)
-    end
-    lw
-end
-
-@inline function Base.setindex!(lw::BinnedLogWeight1D,
-                               f::Function, xs)
-    for x in xs
-        i = clamp(searchsortedlast(lw.edges, x),
-                  1, length(lw.weights))
-        @inbounds lw.weights[i] = f(lw.centers[i])
-    end
-    lw
-end
-
-@inline function Base.setindex!(lw::BinnedLogWeightContinuousND{T,N},
-                               f::Function, xs) where {T,N}
-    for x in xs
-        I = CartesianIndex(ntuple(i ->
-            clamp(searchsortedlast(lw.edges[i], x[i]),
-                  1, size(lw.weights, i)), N))
-        @inbounds lw.weights[I] =
-            f(ntuple(i -> lw.centers[i][I[i]], N)...)
-    end
-    lw
-end
-
-# 1D continuous indexing via []
-@inline function Base.getindex(lw::BinnedLogWeight1D, x::Real)
-    i = clamp(searchsortedlast(lw.edges, x), 1, length(lw.weights))
-    @inbounds lw.weights[i]
-end
-
-@inline function Base.setindex!(lw::BinnedLogWeight1D, v::T, x::Real) where T
-    i = clamp(searchsortedlast(lw.edges, x), 1, length(lw.weights))
-    @inbounds lw.weights[i] = v
-end
-
-@inline function Base.getindex(lw::BinnedLogWeightContinuousND{T,N}, xs::Vararg{Real,N}) where {T,N}
-    I = CartesianIndex(ntuple(i ->
-        clamp(searchsortedlast(lw.edges[i], xs[i]),
-              1, size(lw.weights, i)), N))
-    @inbounds lw.weights[I]
-end
-
-@inline function Base.setindex!(lw::BinnedLogWeightContinuousND{T,N}, v::T, xs::Vararg{Real,N}) where {T,N}
-    I = CartesianIndex(ntuple(i ->
-        clamp(searchsortedlast(lw.edges[i], xs[i]),
-              1, size(lw.weights, i)), N))
-    @inbounds lw.weights[I] = v
+    return nothing
 end

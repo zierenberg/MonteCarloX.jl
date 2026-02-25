@@ -17,10 +17,11 @@ include("rng.jl")
 # Measurement framework
 include("measurements/measurements.jl")
 
-# Log weights (canonical ensemble)
+# Log weights (canonical, binned, etc)
 include("weights/canonical.jl")
-include("weights/mutable.jl")
+export BoltzmannLogWeight   
 include("weights/binned.jl")
+export  BinnedLogWeight
 
 # Event handlers (non-equilibrium)
 include("event_handler/abstractions.jl")
@@ -64,8 +65,6 @@ export AbstractImportanceSampling,
        AbstractGeneralizedEnsemble,
        AbstractMetropolis,
        AbstractHeatBath,
-       BoltzmannLogWeight,
-       TabulatedLogWeight,
        Metropolis,
        Glauber,
        HeatBath,

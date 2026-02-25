@@ -25,10 +25,11 @@ This page maps common goals to runnable examples.
 
 ## 4) Generalized ensemble (multicanonical / Wang–Landau)
 
+
 **Goal:** adapt weights online to flatten histogram / estimate DOS.
 
-- Main pieces: `TabulatedLogWeight`, `Multicanonical` or `WangLandau`, `update_weight!`, `update_f!`
-- Start from equilibrium example and replace canonical weight with tabulated weight updates
+- Main pieces: `Multicanonical` or `WangLandau`, `update_weight!`, `update_f!`
+- Start from equilibrium example and replace canonical weight with binned or mutable weight updates
 
 ## Suggested reading order
 

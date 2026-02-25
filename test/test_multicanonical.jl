@@ -8,7 +8,7 @@ function test_multicanonical_accept(; verbose=false)
     pass = true
 
     bins = 0.0:1.0:4.0
-    lw = TabulatedLogWeight(bins, 0.0)
+    lw = BinnedLogWeight(bins, 0.0)
     alg = Multicanonical(rng, lw)
 
     step = 0.1
@@ -46,16 +46,16 @@ function test_multicanonical_weight_update_inplace(; verbose=false)
     pass = true
 
     bins = 0.0:1.0:4.0
-    lw = TabulatedLogWeight(bins, 0.0)
+    lw = BinnedLogWeight(bins, 0.0)
     alg = Multicanonical(rng, lw)
 
-    w_before = copy(lw.histogram.weights)
-    alg.histogram.weights = [0.2, 0.8, 1.1, 2.5]
+    w_before = copy(lw.weights)
+    alg.histogram.weights .= [0.2, 0.8, 1.1, 2.5]
 
     if verbose
         # print the indices of the bins that are being updated
-        println("logweight edges:", alg.logweight.histogram.edges)
-        println("logweight weights:", alg.logweight.histogram.weights)
+        println("logweight edges:", alg.logweight.edges)
+        println("logweight weights:", alg.logweight.weights)
         println("histogram edges:", alg.histogram.edges)
         println("histogram weights:", alg.histogram.weights)
     end
@@ -70,26 +70,12 @@ function test_multicanonical_weight_update_inplace(; verbose=false)
         end
     end
 
-    pass &= all(isapprox.(lw.histogram.weights, expected))
+    pass &= all(isapprox.(lw.weights, expected))
 
     if verbose
         println("Multicanonical in-place update:")
         println("  before: $(w_before)")
-        println("  after:  $(lw.histogram.weights)")
-    end
-
-    return pass
-end
-
-function test_multicanonical_default_rng(; verbose=false)
-    bins = 0.0:1.0:4.0
-    lw = TabulatedLogWeight(Histogram((collect(bins),), zeros(Float64, length(bins) - 1)))
-    alg = Multicanonical(lw)
-
-    pass = alg.rng === Random.GLOBAL_RNG
-
-    if verbose
-        println("Multicanonical default RNG: $(pass)")
+        println("  after:  $(lw.weights)")
     end
 
     return pass
@@ -99,7 +85,7 @@ function test_multicanonical_mode(; verbose=false)
     rng = MersenneTwister(902)
     bins_lw = 0.0:1.0:4.0
 
-    lw = TabulatedLogWeight(bins_lw, 0.0)
+    lw = BinnedLogWeight(bins_lw, 0.0)
     alg = Multicanonical(rng, lw)
 
     pass = true    
@@ -112,6 +98,20 @@ function test_multicanonical_mode(; verbose=false)
 
     if verbose
         println("Multicanonical mode compatibility: $(pass)")
+    end
+
+    return pass
+end
+
+function test_multicanonical_default_rng(; verbose=false)
+    bins = 0.0:1.0:4.0
+    lw = BinnedLogWeight(bins, 0.0)
+    alg = Multicanonical(lw)
+
+    pass = alg.rng === Random.GLOBAL_RNG
+
+    if verbose
+        println("Multicanonical default RNG: $(pass)")
     end
 
     return pass

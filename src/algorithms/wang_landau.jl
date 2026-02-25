@@ -26,10 +26,10 @@ mutable struct WangLandau{LW,RNG<:AbstractRNG} <: AbstractGeneralizedEnsemble
     accepted::Int
 end
 
-WangLandau(rng::AbstractRNG, logweight::TabulatedLogWeight; logf::Real = 1.0) =
+WangLandau(rng::AbstractRNG, logweight::BinnedLogWeight; logf::Real = 1.0) =
     WangLandau(rng, logweight, Float64(logf), 0, 0)
 
-WangLandau(logweight::TabulatedLogWeight; logf::Real = 1.0) =
+WangLandau(logweight::BinnedLogWeight; logf::Real = 1.0) =
     WangLandau(Random.GLOBAL_RNG, logweight; logf=logf)
 
 # dispatch accept! to add Wang-Landau specific bookkeeping

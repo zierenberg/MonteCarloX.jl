@@ -18,7 +18,7 @@ alg = Metropolis(rng; β=0.5)
 ## Mutable/tabulated weight
 
 For generalized ensembles (multicanonical, Wang–Landau),
-`TabulatedLogWeight` stores a histogram-backed table that can be updated.
+`BinnedLogWeight` or `MutableLogWeight` (if available) store histogram-backed tables that can be updated.
 
 ```julia
 using MonteCarloX
@@ -26,14 +26,14 @@ using StatsBase
 
 edges = (collect(-10.0:1.0:10.0),)
 h = fit(Histogram, Float64[], edges)
-lw = TabulatedLogWeight(h)
+lw = BinnedLogWeight(edges, 0.0)
 
 # or initialize directly from edges with a constant value
-lw0 = TabulatedLogWeight(-10.0:1.0:10.0, 0.0)
+lw0 = BinnedLogWeight(-10.0:1.0:10.0, 0.0)
 
 # edges can be any sorted vector/range
 edges_vec = collect(-5.0:0.5:5.0)
-lw1 = TabulatedLogWeight(edges_vec, 0.0)
+lw1 = BinnedLogWeight(edges_vec, 0.0)
 
 lw[0.3] = 1.2
 w = lw(0.3)
@@ -43,5 +43,6 @@ w = lw(0.3)
 
 ```@docs
 BoltzmannLogWeight
-TabulatedLogWeight
+BinnedLogWeight
+Base.zero(::BinnedLogWeight)
 ```
