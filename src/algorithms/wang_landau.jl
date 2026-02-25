@@ -18,9 +18,9 @@ Each visit to an energy bin `E_i` applies the local update
 In this API convention this appears as
 `alg.logweight[E_i] -= logf`.
 """
-mutable struct WangLandau{LW,RNG<:AbstractRNG} <: AbstractGeneralizedEnsemble
+mutable struct WangLandau{RNG<:AbstractRNG} <: AbstractGeneralizedEnsemble
     rng::RNG
-    logweight::LW
+    logweight::BinnedLogWeight
     logf::Float64
     steps::Int
     accepted::Int

@@ -42,23 +42,16 @@ Reset a single measurement to its initial state by clearing its data container.
 For histogram-backed measurements this zeros the bin counts while preserving binning.
 """
 function reset!(measurement::Measurement)
-    _reset_data!(measurement.data)
-    return measurement
+    if hasmethod(empty!, Tuple{typeof(measurement.data)})
+        empty!(measurement.data)
+        return measurement.data
+    end
+    throw(ArgumentError("unsupported measurement data container $(typeof(measurement.data)); define `empty!` support for this container"))
 end
 
-@inline _reset_data!(data::AbstractVector) = (empty!(data); data)
-
-function _reset_data!(data::Histogram)
+function Base.empty!(data::Histogram)
     fill!(data.weights, zero(eltype(data.weights)))
     return data
-end
-
-function _reset_data!(data)
-    if hasmethod(empty!, Tuple{typeof(data)})
-        empty!(data)
-        return data
-    end
-    throw(ArgumentError("unsupported measurement data container $(typeof(data)); define `reset!` support for this container"))
 end
 
 # Measurement schedules
