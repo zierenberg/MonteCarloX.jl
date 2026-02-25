@@ -28,9 +28,9 @@ end
 # Distribute logweight from root to all ranks
 function distribute_logweight!(pmuca::ParallelMulticanonical, logweight)
     # Only root rank has the updated logweight, broadcast to all ranks
-    values = logweight.histogram.weights
+    values = logweight.weights
     MPI.Bcast!(values, pmuca.root, pmuca.comm)
-    logweight.histogram.weights .= values
+    logweight.weights .= values
     MPI.Barrier(pmuca.comm)
     return nothing
 end

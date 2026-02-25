@@ -2,85 +2,220 @@ using MonteCarloX
 using StatsBase
 using Test
 
-function test_tabulated_logweight_basics(; verbose=false)
-    pass = true
+# test for BinnedLogWeight
+function test_binned_logweight_discrete(; verbose=false)
+    pass = true 
 
-    bins = 0.0:1.0:4.0
-    lw_init = TabulatedLogWeight(bins, 0.0)
-    pass &= lw_init isa TabulatedLogWeight
-    pass &= size(lw_init) == (4,)
-    pass &= all(iszero, lw_init.histogram.weights)
+    # 1D
+    bins = 0:2:10
+    lw = BinnedLogWeight(bins) # default constructor with init=0.0
+    pass &= lw isa BinnedLogWeight{1,MonteCarloX.DiscreteBinning{Int64}}
+    pass &= all(iszero, lw.weights)
+    pass &= size(lw) == (6,)
+    pass &= size(lw.weights) == (6,)
+    pass &= lw.bins[1].start == 0
+    pass &= lw.bins[1].step == 2
 
-    hist = Histogram((collect(bins),), zeros(Float64, length(bins) - 1))
-    lw = TabulatedLogWeight(hist)
+    binvals = collect(lw.bins[1])
+    pass &= length(binvals) == 6
+    pass &= binvals == [0, 2, 4, 6, 8, 10]
 
-    lw[1.2] = 0.7
-    pass &= lw[1.2] == 0.7
+    lw[4] = 1.5
+    pass &= lw[4] == 1.5
+    pass &= lw(4) == lw[4]
+    lw[6] = -0.5
+    pass &= lw(6) == -0.5
+
+    # test out of bounds
+    valid = false
+    try
+        lw[11] = 0.0
+    catch err
+        valid = err isa BoundsError
+    end
+    try
+        lw[-1] = 0.0
+    catch err
+        valid &= err isa BoundsError
+    end
+
+    # test constructor with vector domain
+    bins_vec = [0, 2, 4, 6, 8, 10]
+    lw_vec = BinnedLogWeight(bins_vec, 0.0)
+    pass &= lw_vec isa BinnedLogWeight{1,MonteCarloX.DiscreteBinning{Int64}}
+    pass &= all(iszero, lw_vec.weights)
+    pass &= size(lw_vec) == (6,)
+    pass &= size(lw_vec.weights) == (6,)
+    pass &= lw_vec.bins[1].start == 0
+    pass &= lw_vec.bins[1].step == 2
+    pass &= collect(lw_vec.bins[1]) == bins_vec
+
+    # test special case of single-bin vector domain to throw an error
+    valid = false
+    try
+        BinnedLogWeight([0], 0.0)
+    catch err
+        valid = err isa ArgumentError
+    end
+    pass &= valid
+
+    # error for non-equidistant bins
+    valid = false
+    try      
+        BinnedLogWeight([0, 1, 3], 0.0)
+    catch err
+        valid = err isa ArgumentError
+    end
+    pass &= valid
+
+    # error when domain types is not supported
+    valid = false
+    try
+        BinnedLogWeight("invalid domain", 0.0)
+    catch err
+        valid = err isa ArgumentError
+    end
+    pass &= valid
+
+    # test non-integer DiscreteBinning (even though not used by the Framework)
+    bins_float = 0.0:2.0:10.0
+    b = MonteCarloX.DiscreteBinning(first(bins_float), step(bins_float), length(bins_float))
+    pass &= b isa MonteCarloX.DiscreteBinning{Float64}
+    pass &= collect(b) == collect(bins_float)
+    pass &= MonteCarloX._binindex(b, 4.0) == 3
+
+    # test _assert_same_domain
+    lw2 = BinnedLogWeight(0:2:10, 0.0)
+    pass &= MonteCarloX._assert_same_domain(lw, lw2) == nothing
+    lw3 = BinnedLogWeight(0:1:10, 0.0)
+    valid = false
+    try
+        MonteCarloX._assert_same_domain(lw, lw3)
+    catch err
+        valid = err isa AssertionError
+    end
+    pass &= valid
+
+    if verbose
+        println("BinnedLogWeight discrete 1D test pass: $(pass)")
+    end
+
+    # 2D
+    bins2d = (0:1:5, 0:2:10)
+    lw2d = BinnedLogWeight(bins2d, 0.0)
+    pass &= lw2d isa BinnedLogWeight{2, MonteCarloX.DiscreteBinning{Int64}}
+    pass &= all(iszero, lw2d.weights)
+    pass &= size(lw2d) == (6, 6)
+    pass &= size(lw2d.weights) == (6, 6)
+    pass &= lw2d.bins[1].start == 0 
+    pass &= lw2d.bins[2].start == 0 
+    pass &= lw2d.bins[1].step == 1
+    pass &= lw2d.bins[2].step == 2
+
+    lw2d[3, 4] = -0.5
+    pass &= lw2d[3, 4] == -0.5
+    pass &= lw2d(3, 4) == lw2d[3, 4]
+
+    # return test result
+    if verbose
+        println("BinnedLogWeight discrete 2D test pass: $(pass)")
+    end
+
+    return pass
+end
+
+function test_binned_logweight_continuous(; verbose=false)
+    pass = true 
+
+    # 1D
+    edges = 0.0:1.0:4.0
+    lw = BinnedLogWeight(edges, 0.0)
+    pass &= lw isa BinnedLogWeight{1,MonteCarloX.ContinuousBinning{Float64}}
+    pass &= all(iszero, lw.weights)
+    pass &= size(lw) == (4,)
+    pass &= size(lw.weights) == (4,)
+    pass &= size(lw.bins[1].edges) == (5,)
+    pass &= size(lw.bins[1].centers) == (4,)
+    pass &= lw.bins[1].edges == edges
+    pass &= lw.bins[1].centers == [0.5, 1.5, 2.5, 3.5]
+
+    lw[1.2] = 1.5
+    pass &= lw.weights[2] == 1.5 
+    pass &= lw[1.2] == 1.5
     pass &= lw(1.2) == lw[1.2]
 
-    lw[2] = -0.3
-    pass &= lw[2] == -0.3
+    binvals = collect(lw.bins[1])
+    pass &= length(binvals) == length(edges) - 1
 
-    pass &= lw.histogram === hist
+    # out-of-bounds for continous are stored at the boundaries
+    # valid = false
+    # try
+    #     lw[4.5] = 0.0
+    #     valid = false # should not be reached if out of bounds is properly handled
+    #     @warn "Expected BoundsError but none was raised"
+    # catch err
+    #     valid = err isa BoundsError
+    #     @debug "Caught expected error: $err"
+    # end
+    # try
+    #     lw[-0.5] = 0.0
+    #     valid &= false # should not be reached if out of bounds is properly handled
+    #     @warn "Expected BoundsError but none was raised"
+    # catch err
+    #     valid &= err isa BoundsError
+    #     @debug "Caught expected error: $err"
+    # end
 
-    if verbose
-        println("TabulatedLogWeight basics:")
-        println("  lw[1.2] = $(lw[1.2])")
-    end
-
-    return pass
-end
-
-function test_tabulated_logweight_properties(; verbose=false)
-    pass = true
-
-    edges = [0.0, 1.0, 2.0]
-    lw = TabulatedLogWeight(edges, -1.0)
-    new_hist = Histogram((collect(edges),), fill(0.5, length(edges) - 1))
-    lw.histogram = new_hist
-    pass &= lw.histogram === new_hist
-
-    pass &= size(lw) == size(new_hist.weights)
-
-    pass &= lw[1] == 0.5
-    lw[1] = 1.25
-    pass &= lw[1] == 1.25
-
-    if verbose
-        println("TabulatedLogWeight properties test pass: $(pass)")
-    end
-
-    return pass
-end
-
-function test_tabulated_logweight_domain(; verbose=false)
-    pass = true
-
-    # check too small domain
-    valid = false
-    try
-        TabulatedLogWeight([0.0], 0.0)
+    # test _assert_same_domain
+    lw2 = BinnedLogWeight(edges, 0.0)
+    pass &= MonteCarloX._assert_same_domain(lw, lw2) == nothing
+    lw3 = BinnedLogWeight(0.0:0.5:4.0, 0.0)
+    valid=false
+    try        
+        MonteCarloX._assert_same_domain(lw, lw3)
+        @warn "Expected AssertionError but none was raised"
     catch err
-        valid = err isa ArgumentError
+        valid = err isa AssertionError
     end
     pass &= valid
-
-    # check error if domain missmatch
-    lw1 = TabulatedLogWeight(0.0:1.0:3.0, 0.0)
-    lw2 = TabulatedLogWeight(0.0:0.5:3.0, 0.0)
-    valid = false
+    lw_discrete = BinnedLogWeight(0:1:4, 0.0)
+    valid=false
     try
-        MonteCarloX._assert_same_domain(lw1, lw2)
+        MonteCarloX._assert_same_domain(lw, lw_discrete)
+        @warn "Expected AssertionError but none was raised"
     catch err
-        valid = err isa ArgumentError
-    end
+        valid = err isa AssertionError
+    end 
     pass &= valid
 
-    # check test works for same domain
-    pass &= MonteCarloX._assert_same_domain(lw1, lw1) == nothing
-
     if verbose
-        println("TabulatedLogWeight invalid edges test pass: $(pass)")
+        println("BinnedLogWeight continuous 1D test pass: $(pass)")
+    end
+
+    # 2D
+    edges2d = (0.0:1.0:3.0, 0.0:2.0:6.0)
+    lw2d = BinnedLogWeight(edges2d, 0.0)
+    pass &= lw2d isa BinnedLogWeight{2,MonteCarloX.ContinuousBinning{Float64}}
+    pass &= all(iszero, lw2d.weights)
+    pass &= size(lw2d) == (3, 3)
+    pass &= size(lw2d.weights) == (3, 3)
+    pass &= size(lw2d.bins[1].edges) == (4,)
+    pass &= size(lw2d.bins[2].edges) == (4,) 
+    pass &= size(lw2d.bins[1].centers) == (3,)
+    pass &= size(lw2d.bins[2].centers) == (3,)
+    pass &= lw2d.bins[1].edges == edges2d[1]
+    pass &= lw2d.bins[2].edges == edges2d[2]
+    pass &= lw2d.bins[1].centers == [0.5, 1.5, 2.5]
+    pass &= lw2d.bins[2].centers == [1.0, 3.0, 5.0]
+
+    lw2d[1.2, 2.5] -= 0.5
+    pass &= lw2d.weights[2,2] == -0.5 
+    pass &= lw2d[1.2, 2.5] == -0.5
+    pass &= lw2d(1.2, 2.5) == lw2d[1.2, 2.5]
+
+    # return test result
+    if verbose
+        println("BinnedLogWeight continuous 2D test pass: $(pass)") 
     end
 
     return pass
@@ -88,10 +223,9 @@ end
 
 function run_weights_testsets(; verbose=false)
     @testset "Weights" begin
-        @testset "TabulatedLogWeight" begin
-            @test test_tabulated_logweight_basics(verbose=verbose)
-            @test test_tabulated_logweight_properties(verbose=verbose)
-            @test test_tabulated_logweight_domain(verbose=verbose)
+        @testset "BinnedLogWeight" begin
+            @test test_binned_logweight_discrete(verbose=verbose)
+            @test test_binned_logweight_continuous(verbose=verbose)
         end
     end
     return true
