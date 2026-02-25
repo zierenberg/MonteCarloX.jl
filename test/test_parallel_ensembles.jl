@@ -15,24 +15,36 @@ function test_parallel_multicanonical(; verbose=false)
     pass &= pmuca.root == 0
 
     bins = 0.0:1.0:4.0
-    h_local = Histogram((collect(bins),), [1.0, 2.0, 3.0, 4.0])
-    # Simulate one rank merging histograms (COMM_SELF)
-    pmuca = ParallelMulticanonical(MPI.COMM_SELF, root=0)
-    merge_histograms!(pmuca, h_local)
+    muca = Multicanonical(MersenneTwister(1234), BinnedLogWeight(bins, 0.0))
+    muca.histogram.weights .= [1.0, 2.0, 3.0, 4.0]
+    merge_histograms!(pmuca, muca.histogram)
     # Since only one rank, h_local should be unchanged 
     # TODO: how can this be tested with MPI?
-    @test all(h_local.weights .== [1.0, 2.0, 3.0, 4.0])
+    @test all(muca.histogram.weights .== [1.0, 2.0, 3.0, 4.0])
 
     # Test logweight distribution (broadcast)
-    lw = TabulatedLogWeight(bins, 0.0)
-    lw.histogram.weights .= [10.0, 20.0, 30.0, 40.0]
-    distribute_logweight!(pmuca, lw)
+    muca.logweight.weights .= [10.0, 20.0, 30.0, 40.0]
+    distribute_logweight!(pmuca, muca.logweight)
     # Should remain unchanged in COMM_SELF
-    @test all(lw.histogram.weights .== [10.0, 20.0, 30.0, 40.0])
-
+    @test all(muca.logweight.weights .== [10.0, 20.0, 30.0, 40.0])
 
     if verbose
-        println("ParallelMulticanonical template checks: $(pass)")
+        println("ParallelMulticanonical with Multicanonical: $(pass)")
+    end
+
+    # implement version also with general histogram of BinnedLogWeight and test that
+    hist = Histogram((collect(bins),), zeros(Float64, length(bins) - 1))
+    hist.weights .= [1.0, 2.0, 3.0, 4.0]
+    merge_histograms!(pmuca, hist)
+    @test all(hist.weights .== [1.0, 2.0, 3.0, 4.0])
+
+    lw = BinnedLogWeight(bins, 0.0)
+    lw.weights .= [10.0, 20.0, 30.0, 40.0]
+    distribute_logweight!(pmuca, lw)
+    @test all(lw.weights .== [10.0, 20.0, 30.0, 40.0])
+
+    if verbose
+        println("ParallelMulticanonical with BinnedLogWeight: $(pass)")
     end
 
     return pass

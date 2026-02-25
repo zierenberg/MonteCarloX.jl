@@ -8,8 +8,7 @@ function test_wang_landau_local_update(; verbose=false)
     pass = true
 
     bins = 0.0:1.0:4.0
-    logw_hist = Histogram((collect(bins),), zeros(Float64, length(bins) - 1))
-    lw = TabulatedLogWeight(logw_hist)
+    lw = BinnedLogWeight(bins, 0.0)
     wl = WangLandau(rng, lw; logf=log(2.0))
 
     x = 1.2
@@ -30,7 +29,7 @@ function test_wang_landau_update_f(; verbose=false)
     rng = MersenneTwister(781)
 
     bins = 0.0:1.0:4.0
-    lw = TabulatedLogWeight(0.0:1.0:4.0, 0.0)
+    lw = BinnedLogWeight(bins, 0.0)
     wl = WangLandau(rng, lw; logf=1.0)
 
     logf0 = wl.logf
@@ -45,7 +44,7 @@ end
 
 function test_wang_landau_default_rng(; verbose=false)
     bins = 0.0:1.0:4.0
-    lw = TabulatedLogWeight(bins, 0.0)
+    lw = BinnedLogWeight(bins, 0.0)
     wl = WangLandau(lw; logf=log(2.0))
 
     pass = wl.rng === Random.GLOBAL_RNG
