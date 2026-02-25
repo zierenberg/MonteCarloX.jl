@@ -8,10 +8,11 @@ Each MPI rank runs one independent replica and exchanges histograms via Allreduc
 """
 
 using Pkg
+Pkg.activate(@__DIR__)
 Pkg.instantiate()
 
 # Add local dev packages to load path
-push!(LOAD_PATH, joinpath(dirname(@__DIR__), "SpinSystems", "src"))
+# push!(LOAD_PATH, joinpath(dirname(@__DIR__), "SpinSystems", "src"))
 
 using Random
 using StatsBase
@@ -53,21 +54,30 @@ log_dos_beale_8x8 = [
     (116, 5.545177444479562), (120, 4.852030263919617), (128, 0.6931471805599453),
 ]
 exact_logdos = Dict(log_dos_beale_8x8)
-# make a logweight out of the exact log-DOS for RMSE calculation
-exact_logdos = TabulatedLogWeight(Histogram(push!([e for (e, _) in log_dos_beale_8x8],132), [w for (_, w) in log_dos_beale_8x8]))
-
-function rmse_exact(lw::TabulatedLogWeight)
-    @assert lw.histogram.edges[1] == exact_logdos.histogram.edges[1] "Energy bins of logweight and exact log-DOS do not match."
-    est = -Float64.(lw.histogram.weights)
-    ref = Float64.(exact_logdos.histogram.weights)
-    energies = lw.histogram.edges[1][1:end-1]
-    i0 = findfirst(==(0), energies)
-    if i0 !== nothing && isfinite(ref[i0])
-        est .-= est[i0]
-        ref .-= ref[i0]
+domain = sort([e for (e, _) in log_dos_beale_8x8])
+# TODO: make this work with arbitrary domains and not just the discrete steps
+exact_logdos = BinnedLogWeight(domain[1]:4:domain[end], 0.0)
+# fill the exact_logdos with the values from log_dos_beale_8x8
+for (e, logdos) in log_dos_beale_8x8
+    if e in domain
+        exact_logdos[e] = logdos
     end
-    idx = findall(i -> isfinite(ref[i]) && isfinite(est[i]), eachindex(energies))
-    return sqrt(mean((est[idx] .- ref[idx]).^2))
+end
+# normalize
+exact_logdos.weights .-= exact_logdos[0]
+# mask to only those values that are in the raw_domain
+full_domain = collect(domain[1]:4:domain[end])
+mask_rmse = full_domain .∈ Ref(domain)
+#mask to only compute RMSE on the domain points that are in the exact_logdos
+exact_masked = exact_logdos.weights[mask_rmse]
+
+function rmse_exact(lw)
+    MonteCarloX._assert_same_domain(lw, exact_logdos)
+    est = -deepcopy(lw.weights)
+    est .+= lw[0]  # shift to match exact at E=0
+    # implement the mask to only compute RMSE on the domain points that are in the exact_logdos
+    est_masked = est[mask_rmse]
+    return sqrt(mean((est_masked .- exact_masked).^2))
 end
 
 # Problem setup
@@ -82,7 +92,7 @@ sweeps_record = 10_000
 pmuca = ParallelMulticanonical(MPI.COMM_WORLD, root=0)
 sys = IsingLatticeOptim(L, L)
 init!(sys, :random, rng=MersenneTwister(1000 + pmuca.rank))
-alg = Multicanonical(MersenneTwister(1000 + pmuca.rank), TabulatedLogWeight(exact_logdos.histogram.edges[1], 0.0))
+alg = Multicanonical(MersenneTwister(1000 + pmuca.rank), zero(exact_logdos))
 
 if is_root(pmuca)
     println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

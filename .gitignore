@@ -9,5 +9,5 @@
 
 settings.json
 .vscode/
-notebooks/Manifest.toml
+examples/Manifest.toml
 docs/Manifest.toml

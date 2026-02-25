@@ -18,16 +18,16 @@ TODO:
 """
 mutable struct Multicanonical{RNG<:AbstractRNG} <: AbstractGeneralizedEnsemble
     rng::RNG
-    logweight::TabulatedLogWeight
-    histogram::Histogram
+    logweight::BinnedLogWeight
+    histogram::BinnedLogWeight # highjack logweight type for histogram, but should be compatible with logweight type
     steps::Int
     accepted::Int
 end
 
 function Multicanonical(rng::AbstractRNG, logweight)
-    logweight isa TabulatedLogWeight ||
-        throw(ArgumentError("`logweight` must be a `TabulatedLogWeight`"))
-    histogram = zero(logweight.histogram)
+    logweight isa BinnedLogWeight ||
+        throw(ArgumentError("`logweight` must be a `BinnedLogWeight`"))
+    histogram = zero(logweight)
     return Multicanonical{typeof(rng)}(rng, logweight, histogram, 0, 0)
 end
 Multicanonical(logweight) = Multicanonical(Random.GLOBAL_RNG, logweight)
@@ -77,7 +77,7 @@ function update_weight!(
     @inbounds for idx in eachindex(alg.histogram.weights)
         h = alg.histogram.weights[idx]
         logh = h > 0 ? log(h) : 0.0
-        alg.logweight.histogram.weights[idx] -= logh
+        alg.logweight.weights[idx] -= logh
     end
 
     return nothing
