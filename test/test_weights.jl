@@ -8,7 +8,7 @@ function test_binned_logweight_discrete(; verbose=false)
 
     # 1D
     bins = 0:2:10
-    lw = BinnedLogWeight(bins, 0.0)
+    lw = BinnedLogWeight(bins) # default constructor with init=0.0
     pass &= lw isa BinnedLogWeight{1,MonteCarloX.DiscreteBinning{Int64}}
     pass &= all(iszero, lw.weights)
     pass &= size(lw) == (6,)
@@ -38,6 +38,51 @@ function test_binned_logweight_discrete(; verbose=false)
     catch err
         valid &= err isa BoundsError
     end
+
+    # test constructor with vector domain
+    bins_vec = [0, 2, 4, 6, 8, 10]
+    lw_vec = BinnedLogWeight(bins_vec, 0.0)
+    pass &= lw_vec isa BinnedLogWeight{1,MonteCarloX.DiscreteBinning{Int64}}
+    pass &= all(iszero, lw_vec.weights)
+    pass &= size(lw_vec) == (6,)
+    pass &= size(lw_vec.weights) == (6,)
+    pass &= lw_vec.bins[1].start == 0
+    pass &= lw_vec.bins[1].step == 2
+    pass &= collect(lw_vec.bins[1]) == bins_vec
+
+    # test special case of single-bin vector domain to throw an error
+    valid = false
+    try
+        BinnedLogWeight([0], 0.0)
+    catch err
+        valid = err isa ArgumentError
+    end
+    pass &= valid
+
+    # error for non-equidistant bins
+    valid = false
+    try      
+        BinnedLogWeight([0, 1, 3], 0.0)
+    catch err
+        valid = err isa ArgumentError
+    end
+    pass &= valid
+
+    # error when domain types is not supported
+    valid = false
+    try
+        BinnedLogWeight("invalid domain", 0.0)
+    catch err
+        valid = err isa ArgumentError
+    end
+    pass &= valid
+
+    # test non-integer DiscreteBinning (even though not used by the Framework)
+    bins_float = 0.0:2.0:10.0
+    b = MonteCarloX.DiscreteBinning(first(bins_float), step(bins_float), length(bins_float))
+    pass &= b isa MonteCarloX.DiscreteBinning{Float64}
+    pass &= collect(b) == collect(bins_float)
+    pass &= MonteCarloX._binindex(b, 4.0) == 3
 
     # test _assert_same_domain
     lw2 = BinnedLogWeight(0:2:10, 0.0)

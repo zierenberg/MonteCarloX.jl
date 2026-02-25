@@ -74,14 +74,14 @@ function BinnedLogWeight(domains::NTuple{N,Union{AbstractRange{T},AbstractVector
                 DiscreteBinning(first(d), T(step(d)), length(d))
             elseif d isa AbstractVector
                 n = length(d)
-                if n < 2
-                    DiscreteBinning(d, zero(T), 1)
+                if n == 1
+                    throw(ArgumentError("Cannot create bins from a single value."))
                 else
                     steps = diff(d)
                     if all(steps .== steps[1])
-                        DiscreteBinning(d, steps[1], n)
+                        DiscreteBinning(d[1], steps[1], n)
                     else
-                        error("Non-equidistant discrete bins not supported without ExplicitBinning.")
+                        throw(ArgumentError("Non-equidistant discrete bins not supported without ExplicitBinning."))
                     end
                 end
             end
