@@ -288,6 +288,16 @@ function test_measurement_reset_special_cases(; verbose=false)
     pass &= reset!(preallocated_schedule) === preallocated_schedule
     pass &= preallocated_schedule.checkpoint_idx == 1
 
+    # supported but non-explicitly-handled container (e.g. empty! method exists but it is not an AbstractVector or Histogram) throws no error and empties container 
+    custom_container = [1, 2, 3]
+    m_custom = Measurement((s -> s), custom_container)
+    pass &= try
+        reset!(m_custom)
+        isempty(custom_container)
+    catch err
+        false
+    end
+
     # unsupported container throws informative ArgumentError
     m_bad = Measurement((s -> s), UnsupportedContainer())
     pass &= try
