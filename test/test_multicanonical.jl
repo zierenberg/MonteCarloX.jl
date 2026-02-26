@@ -119,6 +119,9 @@ end
 
 function run_multicanonical_testsets(; verbose=false)
     @testset "Multicanonical" begin
+        @testset "Accept/reject" begin
+            @test test_multicanonical_accept(verbose=verbose)
+        end
         @testset "In-place update" begin
             @test test_multicanonical_weight_update_inplace(verbose=verbose)
         end
