@@ -157,10 +157,9 @@ end
             @assert b1.start == b2.start "Discrete bins must have the same start."
             @assert b1.step == b2.step "Discrete bins must have the same step."
             @assert b1.num == b2.num "Discrete bins must have the same num."
-        elseif b1 isa ContinuousBinning
+        end
+        if b1 isa ContinuousBinning
             @assert b1.edges == b2.edges "Continuous bins must have the same edges."
-        else
-            error("Unknown bin type: $(typeof(b1))")
         end
     end
     return nothing
