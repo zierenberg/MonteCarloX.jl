@@ -59,6 +59,52 @@ function reset!(alg::Multicanonical)
 end
 
 """
+    set_logweight!(alg::Multicanonical, range, f)
+
+Set multicanonical log-weights in a selected value range by evaluating `f`
+on each bin center.
+
+`range` can be either `(left, right)` or any `AbstractRange` whose endpoints
+define the interval.
+
+For each center `x` in the selected interval, this applies
+`alg.logweight[x] = f(x)`.
+"""
+function set_logweight!(
+    alg::Multicanonical,
+    xrange::Union{Tuple{<:Real,<:Real},AbstractRange{<:Real}},
+    f::Function,
+)
+    length(size(alg.logweight.weights)) == 1 ||
+        throw(ArgumentError("`set_logweight!` currently supports only 1D binned log-weights"))
+
+    centers = alg.logweight.bins[1].centers
+    n = length(centers)
+
+    xleft, xright = if xrange isa Tuple
+        Float64(min(xrange[1], xrange[2])), Float64(max(xrange[1], xrange[2]))
+    else
+        Float64(min(first(xrange), last(xrange))), Float64(max(first(xrange), last(xrange)))
+    end
+
+    idx_left = clamp(searchsortedfirst(centers, xleft), 1, n)
+    idx_right = clamp(searchsortedlast(centers, xright), 1, n)
+    idx_left <= idx_right ||
+        throw(ArgumentError("selected range does not overlap any bin centers"))
+
+    if centers[idx_left] > xright || centers[idx_right] < xleft
+        throw(ArgumentError("selected range does not overlap any bin centers"))
+    end
+
+    @inbounds for i in idx_left:idx_right
+        x = centers[i]
+        alg.logweight.weights[i] = Float64(f(x))
+    end
+
+    return nothing
+end
+
+"""
     update_weights!(
     alg::Multicanonical,
     mode::Symbol = :simple,
