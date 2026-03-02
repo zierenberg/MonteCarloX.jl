@@ -77,6 +77,7 @@ export AbstractImportanceSampling,
        is_root,
        merge_histograms!,
        update_weight!,
+         set_logweight!,
        distribute_logweight!,
        update_f! # TODO: rename this later to a common convention.
 

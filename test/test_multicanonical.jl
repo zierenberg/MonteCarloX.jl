@@ -117,6 +117,53 @@ function test_multicanonical_default_rng(; verbose=false)
     return pass
 end
 
+function test_multicanonical_set_logweight_range_function(; verbose=false)
+    rng = MersenneTwister(903)
+    bins = 0.0:1.0:6.0
+    lw = BinnedLogWeight(bins, 0.0)
+    alg = Multicanonical(rng, lw)
+
+    pass = true
+
+    fill!(alg.logweight.weights, 0.0)
+
+    pass &= set_logweight!(alg, (1.0, 4.0), x -> 10.0 + x) === nothing
+    expected = [0.0, 11.5, 12.5, 13.5, 0.0, 0.0]
+    pass &= all(isapprox.(alg.logweight.weights, expected))
+
+    pass &= set_logweight!(alg, 0.0:1.0:6.0, x -> -x^2) === nothing
+    centers = collect(alg.histogram.bins[1])
+    pass &= all(isapprox.(alg.logweight.weights, -centers.^2))
+
+    if verbose
+        println("Multicanonical set-logweight range/function API: $(pass)")
+    end
+
+    return pass
+end
+
+function test_multicanonical_set_logweight_range_errors(; verbose=false)
+    rng = MersenneTwister(904)
+    bins = 0.0:1.0:5.0
+    lw = BinnedLogWeight(bins, 0.0)
+    alg = Multicanonical(rng, lw)
+
+    pass = true
+
+    pass &= try
+        set_logweight!(alg, (100.0, 200.0), x -> x)
+        false
+    catch err
+        err isa ArgumentError
+    end
+
+    if verbose
+        println("Multicanonical set-logweight range errors: $(pass)")
+    end
+
+    return pass
+end
+
 function run_multicanonical_testsets(; verbose=false)
     @testset "Multicanonical" begin
         @testset "Accept/reject" begin
@@ -130,6 +177,12 @@ function run_multicanonical_testsets(; verbose=false)
         end
         @testset "Default RNG" begin
             @test test_multicanonical_default_rng(verbose=verbose)
+        end
+        @testset "Set logweight range/function" begin
+            @test test_multicanonical_set_logweight_range_function(verbose=verbose)
+        end
+        @testset "Set logweight range errors" begin
+            @test test_multicanonical_set_logweight_range_errors(verbose=verbose)
         end
     end
     return true
