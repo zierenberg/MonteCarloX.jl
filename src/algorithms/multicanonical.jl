@@ -34,10 +34,16 @@ Multicanonical(logweight) = Multicanonical(Random.GLOBAL_RNG, logweight)
 
 # dispatch the accept function so that histogram is updated on every call to `accept`
 function accept!(alg::Multicanonical, x_new::Real, x_old::Real)
+    # catch outside-of-domain moves and reject them (not efficient but simple to implement for now)
+    # this should could be handled within the logweight type?
+    if x_new < alg.histogram.bins[1].edges[1] || x_new > alg.histogram.bins[1].edges[end]
+        alg.histogram[x_old] += 1
+        alg.steps += 1
+        return false
+    end
     log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
     accepted = _accept!(alg, log_ratio)
     if accepted
-        # attention: this could possibly fail if x_new is out of bounds of the histogram
         alg.histogram[x_new] += 1
     else
         alg.histogram[x_old] += 1
