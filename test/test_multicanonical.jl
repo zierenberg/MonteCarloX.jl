@@ -117,10 +117,96 @@ function test_multicanonical_default_rng(; verbose=false)
     return pass
 end
 
+function test_multicanonical_accept_out_of_bounds(; verbose=false)
+    rng = MersenneTwister(905)
+    bins = 0.0:1.0:4.0
+    lw = BinnedLogWeight(bins, 0.0)
+    alg = Multicanonical(rng, lw)
+
+    pass = true
+
+    x_old = 2.0
+    x_new = 10.0  # outside right edge
+
+    steps_before = alg.steps
+    accepted_before = alg.accepted
+    hist_before = copy(alg.histogram.weights)
+
+    accepted = accept!(alg, x_new, x_old)
+
+    pass &= accepted == false
+    pass &= alg.steps == steps_before + 1
+    pass &= alg.accepted == accepted_before
+
+    idx_old = searchsortedlast(alg.histogram.bins[1].edges, x_old)
+    pass &= alg.histogram.weights[idx_old] == hist_before[idx_old] + 1
+    for i in eachindex(alg.histogram.weights)
+        if i != idx_old
+            pass &= alg.histogram.weights[i] == hist_before[i]
+        end
+    end
+
+    if verbose
+        println("Multicanonical out-of-bounds accept! branch: $(pass)")
+    end
+
+    return pass
+end
+
+function test_multicanonical_set_logweight_range_function(; verbose=false)
+    rng = MersenneTwister(903)
+    bins = 0.0:1.0:6.0
+    lw = BinnedLogWeight(bins, 0.0)
+    alg = Multicanonical(rng, lw)
+
+    pass = true
+
+    fill!(alg.logweight.weights, 0.0)
+
+    pass &= set_logweight!(alg, (1.0, 4.0), x -> 10.0 + x) === nothing
+    expected = [0.0, 11.5, 12.5, 13.5, 0.0, 0.0]
+    pass &= all(isapprox.(alg.logweight.weights, expected))
+
+    pass &= set_logweight!(alg, 0.0:1.0:6.0, x -> -x^2) === nothing
+    centers = collect(alg.histogram.bins[1])
+    pass &= all(isapprox.(alg.logweight.weights, -centers.^2))
+
+    if verbose
+        println("Multicanonical set-logweight range/function API: $(pass)")
+    end
+
+    return pass
+end
+
+function test_multicanonical_set_logweight_range_errors(; verbose=false)
+    rng = MersenneTwister(904)
+    bins = 0.0:1.0:5.0
+    lw = BinnedLogWeight(bins, 0.0)
+    alg = Multicanonical(rng, lw)
+
+    pass = true
+
+    pass &= try
+        set_logweight!(alg, (100.0, 200.0), x -> x)
+        false
+    catch err
+        err isa ArgumentError
+    end
+
+    if verbose
+        println("Multicanonical set-logweight range errors: $(pass)")
+    end
+
+    return pass
+end
+
 function run_multicanonical_testsets(; verbose=false)
     @testset "Multicanonical" begin
         @testset "Accept/reject" begin
             @test test_multicanonical_accept(verbose=verbose)
+        end
+        @testset "Accept out-of-bounds" begin
+            @test test_multicanonical_accept_out_of_bounds(verbose=verbose)
         end
         @testset "In-place update" begin
             @test test_multicanonical_weight_update_inplace(verbose=verbose)
@@ -130,6 +216,12 @@ function run_multicanonical_testsets(; verbose=false)
         end
         @testset "Default RNG" begin
             @test test_multicanonical_default_rng(verbose=verbose)
+        end
+        @testset "Set logweight range/function" begin
+            @test test_multicanonical_set_logweight_range_function(verbose=verbose)
+        end
+        @testset "Set logweight range errors" begin
+            @test test_multicanonical_set_logweight_range_errors(verbose=verbose)
         end
     end
     return true

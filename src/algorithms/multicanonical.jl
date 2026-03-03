@@ -34,10 +34,16 @@ Multicanonical(logweight) = Multicanonical(Random.GLOBAL_RNG, logweight)
 
 # dispatch the accept function so that histogram is updated on every call to `accept`
 function accept!(alg::Multicanonical, x_new::Real, x_old::Real)
+    # catch outside-of-domain moves and reject them (not efficient but simple to implement for now)
+    # this should could be handled within the logweight type?
+    if x_new < alg.histogram.bins[1].edges[1] || x_new > alg.histogram.bins[1].edges[end]
+        alg.histogram[x_old] += 1
+        alg.steps += 1
+        return false
+    end
     log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
     accepted = _accept!(alg, log_ratio)
     if accepted
-        # attention: this could possibly fail if x_new is out of bounds of the histogram
         alg.histogram[x_new] += 1
     else
         alg.histogram[x_old] += 1
@@ -49,6 +55,52 @@ function reset!(alg::Multicanonical)
     fill!(alg.histogram.weights, 0.0)
     alg.steps = 0
     alg.accepted = 0
+    return nothing
+end
+
+"""
+    set_logweight!(alg::Multicanonical, range, f)
+
+Set multicanonical log-weights in a selected value range by evaluating `f`
+on each bin center.
+
+`range` can be either `(left, right)` or any `AbstractRange` whose endpoints
+define the interval.
+
+For each center `x` in the selected interval, this applies
+`alg.logweight[x] = f(x)`.
+"""
+function set_logweight!(
+    alg::Multicanonical,
+    xrange::Union{Tuple{<:Real,<:Real},AbstractRange{<:Real}},
+    f::Function,
+)
+    length(size(alg.logweight.weights)) == 1 ||
+        throw(ArgumentError("`set_logweight!` currently supports only 1D binned log-weights"))
+
+    centers = alg.logweight.bins[1].centers
+    n = length(centers)
+
+    xleft, xright = if xrange isa Tuple
+        Float64(min(xrange[1], xrange[2])), Float64(max(xrange[1], xrange[2]))
+    else
+        Float64(min(first(xrange), last(xrange))), Float64(max(first(xrange), last(xrange)))
+    end
+
+    idx_left = clamp(searchsortedfirst(centers, xleft), 1, n)
+    idx_right = clamp(searchsortedlast(centers, xright), 1, n)
+    idx_left <= idx_right ||
+        throw(ArgumentError("selected range does not overlap any bin centers"))
+
+    if centers[idx_left] > xright || centers[idx_right] < xleft
+        throw(ArgumentError("selected range does not overlap any bin centers"))
+    end
+
+    @inbounds for i in idx_left:idx_right
+        x = centers[i]
+        alg.logweight.weights[i] = Float64(f(x))
+    end
+
     return nothing
 end
 

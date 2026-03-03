@@ -43,6 +43,8 @@ This can improve mixing for some model classes.
 
 - `Multicanonical` targets flat-histogram-like exploration by evolving a tabulated log weight.
 - `WangLandau` iteratively updates density-of-states estimates and refinement parameter `f`.
+- `set_logweight!(alg, range, f)` provides a compact way to set multicanonical
+    tabulated log-weights by applying `f` on bin centers over a selected range.
 
 ```julia
 using Random
@@ -69,6 +71,7 @@ acceptance_rate
 reset!(alg::AbstractImportanceSampling)
 Multicanonical
 WangLandau
+set_logweight!
 update_weight!
 update_f!
 ```
