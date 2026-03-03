@@ -80,8 +80,7 @@ function next_event(rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVect
         return index
     end
 end
-
-next_event(::AbstractRNG, ::Number) = 1
+@inline next_event(rng::AbstractRNG, rate::Number) = 1
 
 function next_event(rng::AbstractRNG, rates::MVector{2,T})::Int where {T <: AbstractFloat}
     if rand(rng) * (rates[1] + rates[2]) < rates[1]
@@ -142,40 +141,21 @@ For zero total rate, returns `(Inf, 0)`.
 """
 function next(alg::AbstractKineticMonteCarlo, rate::Number)
     dt = next_time(alg.rng, rate)
+    event = 1
     if !isfinite(dt)
         return Inf, nothing
     end
-    return dt, 1
+    return dt, event
 end
 
 """
     next(alg::AbstractKineticMonteCarlo, rates::AbstractVector)
 
-Draw next event waiting time and event id from raw rates.
+Draw next event waiting time and event id from raw rates (StatsBase.AbstractWeights is also an AbstractVector).
 
 For zero total rate, returns `(Inf, 0)`.
 """
 function next(alg::AbstractKineticMonteCarlo, rates::AbstractVector)
-    if length(rates) == 1
-        return next(alg, rates[1])
-    end
-    sum_rates = sum(rates)
-    dt = next_time(alg.rng, sum_rates)
-    if !isfinite(dt)
-        return Inf, nothing
-    end
-    event = next_event(alg.rng, rates)
-    return dt, event
-end
-
-"""
-    next(alg::AbstractKineticMonteCarlo, rates::AbstractWeights)
-
-Draw next event waiting time and event id from weighted rates.
-
-For zero total rate, returns `(Inf, 0)`.
-"""
-function next(alg::AbstractKineticMonteCarlo, rates::AbstractWeights)
     if length(rates) == 1
         return next(alg, rates[1])
     end
@@ -220,7 +200,7 @@ function next(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandle
 end
 
 """
-    next(alg::AbstractKineticMonteCarlo, rates_at_time::Function)
+  next(alg::AbstractKineticMonteCarlo, rates_at_time::Function)
 
 Draw next event waiting time and event from a time-dependent rates function.
 
@@ -232,80 +212,23 @@ function next(alg::AbstractKineticMonteCarlo, rates_at_time::Function)
 end
 
 """
-    step!(alg::AbstractKineticMonteCarlo, rates::AbstractVector)
+    step!(alg::AbstractKineticMonteCarlo, event_source)
 
-Perform one kinetic Monte Carlo event from raw rates.
+Perform one kinetic Monte Carlo step from an event_source (rates or an event handler).
 
 Updates `alg.time` and `alg.steps` internally and returns `(t_new, event)`.
+
+If dt=Inf then this is reflected in the algorithm.time and returned correspondingly
+If event is nothing, then this is returned as well.
 """
-function step!(alg::AbstractKineticMonteCarlo, rates::AbstractVector)
-    dt, event = next(alg, rates)
+@inline function step!(alg::AbstractKineticMonteCarlo, event_source::Union{AbstractVector, AbstractEventHandler, Function}) 
+    dt, event = next(alg, event_source)
     t_new = alg.time + dt
     alg.steps += 1
     alg.time = t_new
-    return t_new, event
-end
-
-"""
-    step!(alg::AbstractKineticMonteCarlo, rates::AbstractWeights)
-
-Perform one kinetic Monte Carlo event from weighted rates.
-
-Updates `alg.time` and `alg.steps` internally and returns `(t_new, event)`.
-"""
-function step!(alg::AbstractKineticMonteCarlo, rates::AbstractWeights)
-    dt, event = next(alg, rates)
-    t_new = alg.time + dt
-    alg.steps += 1
-    alg.time = t_new
-    return t_new, event
-end
-
-"""
-    step!(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerRate)
-
-Perform one kinetic Monte Carlo event from an event-handler backend.
-
-Updates `alg.time` and `alg.steps` internally and returns `(t_new, event)`.
-"""
-function step!(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerRate)
-    dt, event = next(alg, event_handler)
-    t_new = alg.time + dt
-    alg.steps += 1
-    alg.time = t_new
-    return t_new, event
-end
-
-"""
-    step!(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerTime)
-
-Perform one kinetic Monte Carlo event from a time-event handler backend.
-
-Updates `alg.time` and `alg.steps` internally and returns `(t_new, event)`.
-"""
-function step!(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerTime)
-    dt, event = next(alg, event_handler)
-    if event === nothing || !isfinite(dt)
-        return Inf, event
+    if !isfinite(t_new) 
+        event = nothing
     end
-    t_new = alg.time + dt
-    alg.steps += 1
-    alg.time = t_new
-    return t_new, event
-end
-
-"""
-    step!(alg::AbstractKineticMonteCarlo, rates_at_time::Function)
-
-Perform one kinetic Monte Carlo event from a time-dependent rates callback.
-
-Updates `alg.time` and `alg.steps` internally and returns `(t_new, event)`.
-"""
-function step!(alg::AbstractKineticMonteCarlo, rates_at_time::Function)
-    dt, event = next(alg, rates_at_time)
-    t_new = alg.time + dt
-    alg.steps += 1
-    alg.time = t_new
     return t_new, event
 end
 
