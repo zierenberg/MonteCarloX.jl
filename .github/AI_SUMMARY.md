@@ -1,46 +1,43 @@
-# MonteCarloX for AI Agents
+# MonteCarloX AI Summary (Read First)
 
-MonteCarloX is a Julia framework for Monte Carlo and stochastic simulation. It keeps algorithms separate from models and favors small, composable building blocks.
+Core concept: **MonteCarloX must stay concise, modular, and compact**.
 
-Mission and design
-- Separation of concerns: algorithms live in MonteCarloX, models live elsewhere (e.g., SpinSystems).
-- No systems in core: MonteCarloX contains algorithms only, not model implementations.
-- Composability: the same algorithm works with any compatible system.
+- Concise: minimal public API surface, avoid feature duplication.
+- Modular: clear separation between algorithms, weights, measurements, and systems.
+- Compact: prefer one general primitive over multiple special-case helpers.
 
-Core ideas
-- Algorithms are lightweight structs with explicit state and counters.
-- Logweight functions define target distributions and are passed into algorithms.
-- Measurements are explicit and scheduled; data flows through a small measurement API.
+MonteCarloX is algorithm-centric: model/system definitions are external to core.
 
-Core abstractions
-- AbstractSystem
-- AbstractAlgorithm
-- AbstractLogWeight
-- AbstractUpdate
-- AbstractMeasurement
+## Architecture (current)
 
-Key modules
-- src/algorithms: Metropolis and other samplers.
-- src/weights: canonical logweights for equilibrium sampling.
-- src/measurements: Measurement and scheduling utilities.
-- src/utils: histogram helpers and KL divergence.
+- Core abstractions: `AbstractSystem`, `AbstractAlgorithm`, `AbstractLogWeight`, `AbstractUpdate`, `AbstractMeasurement`.
+- Equilibrium importance-sampling algorithms: `Metropolis`, `HeatBath`/`Glauber`, `Multicanonical`, `ParallelMulticanonical`, `WangLandau`.
+- Non-equilibrium algorithms: `Gillespie` and kinetic Monte Carlo utilities.
+- Weight representations: `BoltzmannLogWeight`, `BinnedLogWeight`.
+- Measurement layer: `Measurement`, `Measurements`, schedules (`IntervalSchedule`, `PreallocatedSchedule`) and `measure!` / `reset!`.
+- Event-handler infrastructure for rate/time-based event queues.
 
-Measurement schedules
-- IntervalSchedule: measure every N steps.
-- PreallocatedSchedule: measure at specific times.
+## Key API patterns
 
-Typical workflow
-- Define a logweight (target distribution).
-- Construct an algorithm (e.g., Metropolis) with RNG and logweight.
-- Propose updates, compute log ratios, call accept!.
-- Measure observables with Measurement or Measurements.
-- Validate distributions with histograms or KL divergence.
+- Acceptance logic is centralized through `accept!` and shared counters (`steps`, `accepted`, `acceptance_rate`).
+- Histogram/tabulated generalized-ensemble methods use `BinnedLogWeight`.
+- Multicanonical uses one compact general setter:
+	- `set_logweight!(alg, range, f)` where `f` is evaluated on bin centers in the selected range.
+	- Use this primitive for analytic reference initialization and boundary-tail shaping.
 
-Tests
-- Tests mirror core modules in test/.
-- Metropolis tests cover 1D and 2D Gaussians, acceptance tracking, temperature effects, and proposal invariance.
+## Testing status and scope
 
-Notes for AI agents
-- Prefer local closures in tests and examples to avoid global state.
-- Keep logweight coupled to the algorithm instance.
-- Use Measurements to collect time series and histograms when comparing distributions.
+- Tests are organized by module under `test/` and run from `test/runtests.jl`.
+- Current multicanonical-focused tests pass, including the range/function `set_logweight!` behavior.
+
+## Implementation principle
+
+- New API design should default to the smallest general interface.
+- If a proposal can be expressed by composing existing primitives, do not add new top-level API.
+- Keep framework code free of model-specific assumptions.
+
+## Guidance for contributors and agents
+
+- Do not add model-specific logic to core framework code.
+- When adding features, first look for a smaller general API instead of multiple task-specific entry points.
+- Keep examples/notebooks aligned with exported APIs to avoid duplicated ad-hoc logic.
