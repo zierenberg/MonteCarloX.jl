@@ -1,6 +1,7 @@
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
@@ -9,6 +10,9 @@ ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SpinSystems = "8a5c3c8d-1234-5678-9abc-def012345678"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 julia = "1"
