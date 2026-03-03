@@ -27,7 +27,7 @@ jobs:
           arch: x64
       - uses: julia-actions/cache@v2
       - name: Instantiate examples environment
-        run: julia --project=examples -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'
+        run: julia --project=examples -e 'using Pkg; isempty(Pkg.Registry.reachable_registries()) && Pkg.Registry.add("General"); Pkg.instantiate()'
       - name: Run examples smoke checks
         env:
           MCX_CI: "true"
