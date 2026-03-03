@@ -36,7 +36,8 @@ Multicanonical(logweight) = Multicanonical(Random.GLOBAL_RNG, logweight)
 function accept!(alg::Multicanonical, x_new::Real, x_old::Real)
     # catch outside-of-domain moves and reject them (not efficient but simple to implement for now)
     # this should could be handled within the logweight type?
-    if x_new < alg.histogram.bins[1].edges[1] || x_new > alg.histogram.bins[1].edges[end]
+    idx_new = _binindex(alg.histogram.bins[1], x_new)
+    if idx_new < 1 || idx_new > size(alg.histogram.weights, 1)
         alg.histogram[x_old] += 1
         alg.steps += 1
         return false
