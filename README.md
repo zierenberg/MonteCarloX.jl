@@ -1,7 +1,8 @@
 ### MonteCarloX
 
 [![Docs: dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://zierenberg.github.io/MonteCarloX.jl/dev)
-[![CI Tests](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI.yml)
+[![CI: core](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_core.yml/badge.svg)](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_core.yml)
+[![CI: examples](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_examples.yml/badge.svg)](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_examples.yml)
 [![codecov](https://codecov.io/gh/zierenberg/MonteCarloX.jl/branch/main/graph/badge.svg?token=FUn6qFnsSN)](https://codecov.io/gh/zierenberg/MonteCarloX.jl)
 
 Modular Monte Carlo toolkit in Julia: core abstractions, measurements, equilibrium and non-equilibrium algorithms, plus optional model submodules.
