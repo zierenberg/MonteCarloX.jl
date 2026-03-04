@@ -1,0 +1,35 @@
+name: CI examples
+on:
+  pull_request:
+    paths:
+      - 'examples/**'
+      - 'src/**'
+      - 'SpinSystems/src/**'
+      - 'Project.toml'
+      - 'examples/Project.toml'
+      - 'SpinSystems/Project.toml'
+      - '.github/workflows/CI_core.yml'
+      - '.github/workflows/CI_examples.yml'
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+jobs:
+  examples:
+    name: Examples - Julia 1 - ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1'
+          arch: x64
+      - uses: julia-actions/cache@v2
+      - name: Instantiate examples environment
+        run: julia --project=examples -e 'using Pkg; isempty(Pkg.Registry.reachable_registries()) && Pkg.Registry.add("General"); Pkg.instantiate()'
+      - name: Run examples smoke checks
+        env:
+          MCX_CI: "true"
+          MCX_CI_LOOP_CAP: "2000"
+        run: julia --project=examples examples/runtests.jl

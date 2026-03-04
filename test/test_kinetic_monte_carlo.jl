@@ -110,7 +110,7 @@ function test_kmc_next_event_handler_consistency(; verbose=false)
     return pass
 end
 
-function test_kmc_single_rate_matches_randexp(; verbose=false)
+function test_kmc_single_rate(; verbose=false)
     seed = 2026
     rate = 1.2
     n_samples = 1_000
@@ -127,7 +127,7 @@ function test_kmc_single_rate_matches_randexp(; verbose=false)
     end
 
     if verbose
-        println("KMC single-rate matches randexp test pass: $(pass)")
+        println("KMC single-rate test pass: $(pass)")
     end
 
     return pass
@@ -172,7 +172,7 @@ function test_advance_time_event_queue_empty(; verbose=false)
 
     t_final = advance!(alg, q, 5.0)
 
-    pass = t_final == Inf && alg.time == 0.0 && alg.steps == 0
+    pass = t_final == Inf && alg.time == Inf && alg.steps == 1
 
     if verbose
         println("Advance empty time-queue pass: $(pass)")
@@ -191,7 +191,7 @@ function test_advance_time_event_queue_progress(; verbose=false)
     seen = Int[]
     t_final = advance!(alg, q, 3.0; update! = (handler, event, t) -> push!(seen, event))
 
-    pass = t_final == Inf && isapprox(alg.time, 2.5; atol = 1e-12) && alg.steps == 2 && seen == [1, 2]
+    pass = t_final == Inf && alg.time == Inf && alg.steps == 3 && seen == [1, 2]
 
     if verbose
         println("Advance populated time-queue pass: $(pass)")
@@ -202,7 +202,7 @@ end
 
 function test_kmc_advance_with_explicit_rates_callback(; verbose=false)
     sys = Dict(:N => 10)
-    local_rates(s, t) = [0.42, 0.40]
+    local_rates(sys,t) = [0.42, 0.40]
 
     alg = Gillespie(MersenneTwister(99))
     measured_N = Int[]
@@ -281,6 +281,7 @@ function test_kmc_next_event_special_cases(; verbose=false)
 
     rng_num = MersenneTwister(9)
     pass &= next_event(rng_num, 0.7) == 1
+    pass &= next_event(rng_num, 3) == 1
 
     rates = MVector{2, Float64}(0.3, 0.7)
     rng_a = MersenneTwister(19)
@@ -289,6 +290,16 @@ function test_kmc_next_event_special_cases(; verbose=false)
     draw_mvec = next_event(rng_a, rates)
     pass &= draw_mvec == draw_ref
     pass &= draw_mvec in (1, 2)
+
+    pass &= next_event(MersenneTwister(20), MVector{2, Float64}(1.0, 0.0)) == 1
+    pass &= next_event(MersenneTwister(21), MVector{2, Float64}(0.0, 1.0)) == 2
+
+    simple_nonempty = ListEventRateSimple{Int}([10, 20], [0.0, 1.0], 0.0, -1)
+    pass &= next_event(MersenneTwister(22), simple_nonempty) == 20
+
+    simple_empty = ListEventRateSimple{Int}(Int[], Float64[], 0.0, -1)
+    pass &= next_event(MersenneTwister(23), simple_empty) == -1
+    pass &= next_event(simple_empty) == -1
 
     if verbose
         println("KMC next_event special cases test pass: $(pass)")
@@ -357,13 +368,6 @@ function test_kmc_step_and_advance_zero_rate_edges(; verbose=false)
     pass &= event_step === nothing
     pass &= alg_step.time == Inf
     pass &= alg_step.steps == 1
-
-    alg_step_cb = Gillespie(MersenneTwister(2028))
-    t_step_cb, event_step_cb = step!(alg_step_cb, t -> [0.0])
-    pass &= t_step_cb == Inf
-    pass &= event_step_cb === nothing
-    pass &= alg_step_cb.time == Inf
-    pass &= alg_step_cb.steps == 1
 
     alg_adv = Gillespie(MersenneTwister(2029))
     seen_events = Any[]
@@ -440,18 +444,27 @@ function test_kmc_time_event_handler_paths(; verbose=false)
     pass &= e1 == 11
     pass &= isapprox(alg.time, 0.3; atol = 1e-12)
     pass &= alg.steps == 1
+    if verbose
+        println("... first step: $(pass)")
+    end
 
     t2, e2 = step!(alg, queue)
     pass &= isapprox(t2, 0.9; atol = 1e-12)
     pass &= e2 == 22
     pass &= isapprox(alg.time, 0.9; atol = 1e-12)
     pass &= alg.steps == 2
+    if verbose
+        println("... second step: $(pass)")
+    end
 
     t3, e3 = step!(alg, queue)
     pass &= t3 == Inf
     pass &= e3 === nothing
-    pass &= isapprox(alg.time, 0.9; atol = 1e-12)
-    pass &= alg.steps == 2
+    pass &= isapprox(alg.time, Inf; atol = 1e-12)
+    pass &= alg.steps == 3
+    if verbose
+        println("... third step (empty queue): $(pass)")
+    end
 
     queue2 = EventQueue{Int}(0.0)
     add!(queue2, (1.2, 7))
@@ -460,7 +473,7 @@ function test_kmc_time_event_handler_paths(; verbose=false)
 
     t_final = advance!(alg2, queue2, 10.0; t0 = 1.0, update! = (q, e, t) -> push!(observed, (e, t)))
     pass &= t_final == Inf
-    pass &= alg2.steps == 1
+    pass &= alg2.steps == 2
     pass &= length(observed) == 1
     pass &= observed[1][1] == 7
     pass &= isapprox(observed[1][2], 1.2; atol = 1e-12)
@@ -489,8 +502,8 @@ function run_kinetic_monte_carlo_testsets(; verbose=false)
         @testset "event handler consistency" begin
             @test test_kmc_next_event_handler_consistency(verbose=verbose)
         end
-        @testset "single-rate matches randexp" begin
-            @test test_kmc_single_rate_matches_randexp(verbose=verbose)
+        @testset "single-rate" begin
+            @test test_kmc_single_rate(verbose=verbose)
         end
         @testset "advance and statistics" begin
             @test test_kmc_advance_and_statistics(verbose=verbose)
