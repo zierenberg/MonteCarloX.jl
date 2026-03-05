@@ -1,32 +1,59 @@
 # Core Abstractions
 
-These abstractions are the stable conceptual backbone of MonteCarloX.
+This page explains the abstractions as responsibilities, not just type names.
 
 ## `AbstractSystem`
 
-Represents the model state (configuration, constraints, cached observables, etc.).
-The system decides **what** can happen and how to compute quantities such as energy.
+What it owns:
+
+- state variables
+- model parameters
+- model-specific observables (for example energy)
+- model-specific local update ingredients
+
+What it should not own:
+
+- generic sampling logic
 
 ## `AbstractLogWeight`
 
-Represents the target log-weight for equilibrium sampling.
-For canonical simulations this is usually Boltzmann-like.
-For generalized ensembles this can be tabulated and updated online.
+Encodes relative probability for equilibrium sampling.
+
+- Canonical ensemble: `BoltzmannLogWeight(β)`
+- Generalized ensemble: tabulated `BinnedLogWeight`
+
+Algorithms only need local log-weight differences, so they remain model-agnostic.
 
 ## `AbstractAlgorithm`
 
-Represents the Monte Carlo engine (Metropolis, HeatBath, Gillespie, ...).
-It usually stores RNG and statistics (`steps`, acceptance counters, simulation time).
+Owns sampler state and statistics.
+
+Examples:
+
+- `Metropolis`, `Glauber`, `HeatBath`
+- `Multicanonical`, `WangLandau`
+- `Gillespie`
+
+Typical fields are RNG, counters (`steps`, `accepted`) and/or simulation time.
 
 ## `AbstractUpdate`
 
-Represents update logic coordinating algorithm and state evolution.
-In practice, user-facing updates are often model functions (e.g. `spin_flip!`).
+Represents update mechanics.
+In practice, this usually appears as system-side methods like `spin_flip!` that call algorithm primitives (`accept!`, `step!`, ...).
 
 ## `AbstractMeasurement`
 
 Represents observable extraction and storage.
-MonteCarloX provides `Measurement` and `Measurements` with scheduling.
+MonteCarloX provides reusable scheduling through `Measurements`.
+
+## Practical checklist for a new model package
+
+To integrate with MonteCarloX cleanly, provide:
+
+1. A concrete `AbstractSystem`
+2. Observable functions you care about
+3. Update function(s) that call MonteCarloX algorithm primitives
+4. Initialization helpers (`init!`-style)
 
 ## API reference
 

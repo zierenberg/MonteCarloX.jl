@@ -1,41 +1,120 @@
 # Worked Examples
 
-This page maps common goals to runnable examples.
+This page collects example patterns from the repository and maps them to learning goals.
 
-## 1) Equilibrium Ising with Metropolis
+## A. Generic equilibrium sampling (no model package)
 
-**Goal:** sample canonical equilibrium and measure energy/magnetization.
+**Goal:** understand `Metropolis` + `Measurements` with the smallest possible state.
 
-- See notebook: `notebooks/simple_ising.ipynb`
-- Main pieces: `Ising` (system) + `BoltzmannLogWeight` via `Metropolis(β=...)` + `Measurements`
+Pattern:
 
-## 2) Branching / birth-death process
+- state is a scalar `x`
+- custom `logweight(x)`
+- proposal `x_new = x + randn(...)`
+- accept/reject with `accept!`
 
-**Goal:** simulate non-equilibrium stochastic population dynamics.
+Start from the README “generic Metropolis” example.
 
-- See notebook: `notebooks/birth_death_process.ipynb`
-- Main pieces: state variables + rates + `Gillespie` + time-based measurements
+## B. Ising model (with SpinSystems)
 
-## 3) Poisson process with kinetic Monte Carlo primitives
+**Goal:** run a full lattice model workflow with minimal boilerplate.
 
-**Goal:** simulate homogeneous and inhomogeneous Poisson processes.
+Pattern:
 
-- See notebook: `notebooks/poisson_kmc.ipynb`
-- Main pieces: `next_time`, `next_event`, `next`, `step!` and optional thinning callback
+- `sys = Ising([L, L], J=..., periodic=true)`
+- `init!(sys, :random, rng=...)`
+- `alg = Metropolis(rng; β=...)`
+- loop `spin_flip!` and `measure!`
 
-## 4) Generalized ensemble (multicanonical / Wang–Landau)
+Start from the README “Ising” example.
 
+## C. Continuous-time birth/death process
 
-**Goal:** adapt weights online to flatten histogram / estimate DOS.
+**Goal:** learn event-driven updates with `Gillespie`.
 
-- Main pieces: `Multicanonical` or `WangLandau`, `update_weight!`, `update_f!`
-- Start from equilibrium example and replace canonical weight with binned or mutable weight updates
+Pattern:
 
-## Suggested reading order
+- keep state (for example population size)
+- map current state to rate vector
+- call `step!` or `advance!`
+- update state from sampled event index
 
-1. Framework
-2. Core abstractions
-3. Weights
-4. Equilibrium or non-equilibrium algorithm page (depending on your project)
-5. Measurements
-6. This examples page + notebooks
+See maintained notebooks in `examples/stochastic_processes/`, especially:
+
+- `gillespie_birth_death.ipynb`
+- `gillespie_dimerization.ipynb`
+
+## D. Bayesian inference (coin-flip)
+
+**Goal:** use a minimal, general Bayesian pattern with Metropolis.
+
+Pattern:
+
+- proposal from prior: `θ_new = rand(rng, prior)`
+- weight by likelihood: `loglikelihood(θ)`
+- accept with `accept!(alg, θ_new, θ)`
+- collect posterior samples after burn-in
+
+See `examples/bayesian_coin_flip.ipynb`.
+
+## E. Bayesian linear regression (house prices)
+
+**Goal:** apply the exact same pattern to a vector parameter in a non-conjugate model.
+
+Pattern:
+
+- proposal from priors on `(β₀, β₁, logσ)`
+- weight via Gaussian-regression `loglikelihood(θ)`
+- same Metropolis accept/reject loop
+
+See `examples/house_price_prediction.ipynb`.
+
+## F. Poisson-process primitives
+
+**Goal:** understand low-level event-time/event-index utilities.
+
+Relevant API:
+
+- `next_time`
+- `next_event`
+- `next`
+- `step!`
+
+See `examples/stochastic_processes/kmc_poisson.ipynb`.
+
+## G. Generalized-ensemble workflows
+
+**Goal:** improve exploration with adaptive/tabulated weights.
+
+Patterns:
+
+- `Multicanonical` + `update_weight!`
+- `WangLandau` + `update_f!`
+- `BinnedLogWeight` for tabulated domains
+
+See:
+
+- `examples/stochastic_processes/muca_OU.ipynb`
+- `examples/muca_LDT_gaussian_rngs.ipynb`
+- `examples/spin_systems/muca_ising2D.ipynb`
+
+## H. Parallel generalized-ensemble example
+
+**Goal:** replica-like histogram sharing across ranks.
+
+See script:
+
+- `examples/spin_systems/muca_mpi_ising2D.jl`
+
+This demonstrates `ParallelMulticanonical` and MPI-based histogram/logweight synchronization.
+
+## Suggested progression
+
+1. generic Metropolis
+2. Ising + measurements
+3. Bayesian coin-flip (prior proposal + likelihood weight)
+4. Bayesian house-price regression (same pattern in higher dimension)
+5. Gillespie (step-based)
+6. `advance!` callbacks
+7. multicanonical / Wang-Landau
+8. parallel generalized ensembles

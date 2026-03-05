@@ -10,6 +10,7 @@ makedocs(;
     pages = [
         "Getting Started" => "index.md",
         "Framework" => "framework.md",
+        "Build Your Own System" => "build_your_own_system.md",
         "Core Abstractions" => "core_abstractions.md",
         "Weights" => "weights.md",
         "Importance Sampling Algorithms" => "importance_sampling_algorithms.md",

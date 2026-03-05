@@ -1,93 +1,86 @@
 # Framework: how to think in MonteCarloX
 
-MonteCarloX is designed around **composable parts** instead of one monolithic simulator.
-A simulation is built by combining:
+MonteCarloX is not a monolithic simulator.
+It is a toolkit of small building blocks that you compose explicitly.
 
-1. **System** (`AbstractSystem`): what state you evolve
-2. **Weight / rates** (`AbstractLogWeight` or rates): what distribution/dynamics define probability
-3. **Algorithm** (`AbstractAlgorithm`): how proposals/events are generated
-4. **Update** (`AbstractUpdate` + model-side methods): how accepted events modify state
-5. **Measurement** (`Measurement`, `Measurements`): what observables are recorded
+## The simulation recipe
 
-This separation is intentional:
+Every workflow needs these 3 parts:
 
-- You can keep the **same algorithm** and swap in a different system.
-- You can keep the **same system** and change the ensemble via a different log weight.
-- You can reuse a **measurement setup** across multiple algorithms.
+1. **System** (`AbstractSystem`): your current state
+2. **Weight/rates** (`AbstractLogWeight` or event rates): your target physics/statistics
+3. **Algorithm** (`AbstractAlgorithm`): how transitions are sampled
 
-## Two sampling paradigms
+Optional convenience layer:
 
-MonteCarloX supports two complementary paradigms:
+4. **Measurements** (`Measurement` / `Measurements`): helper containers and schedules for recording observables
 
-### Importance sampling
+This gives you a clean separation: model logic lives in systems, sampling logic lives in algorithms.
 
-```text
-System + LogWeight + Proposal/Accept + Apply + Measure
-```
+## Two paradigms, one interface style
 
-Primary goal: sample from a target stationary distribution.
+### 1) Importance sampling (discrete-step updates)
 
-### Continuous-time sampling
+Primary characteristic: the simulation advances in discrete proposal/update steps.
 
-```text
-State + Event rates + Sampler + Measure + Apply
-```
+This is often used for equilibrium sampling, but it can also be used for non-equilibrium protocols (for example driven schedules in parameters or weights).
 
-Primary goal: evolve stochastic dynamics in physical/simulation time.
+Loop structure:
 
-In continuous-time workflows, the sampler provides `(dt, event)` and advances
-time, then measurements are taken at the new time before applying the event
-update.
+1. Propose local change
+2. Compute local log-ratio / energy difference
+3. Accept/reject
+4. (Optional) record observables
 
-## Minimal importance-sampling workflow
+### 2) Continuous-time sampling (dynamics)
+
+Goal: evolve a stochastic process in physical/simulation time.
+
+Loop structure:
+
+1. Provide rates (or event handler)
+2. Sample `(dt, event)`
+3. Advance time by `dt`
+4. (Optional) record observables at time stamps that were passed
+5. Apply event update
+
+## Minimal equilibrium sketch
 
 ```julia
 using Random
 using MonteCarloX
-using SpinSystems
 
-rng = MersenneTwister(42)
-sys = Ising([16, 16], J=1, periodic=true)
-init!(sys, :random, rng=rng)
+rng = MersenneTwister(1)
+logweight(x) = -0.5 * x^2
+alg = Metropolis(rng, logweight)
 
-alg = Metropolis(rng; β=0.4)
-
-measurements = Measurements([
-    :energy => energy => Float64[],
-    :magnetization => magnetization => Float64[]
-], interval=10)
-
-for step in 1:100_000
-    spin_flip!(sys, alg)
-    measure!(measurements, sys, step)
+x = 0.0
+for _ in 1:10_000
+    x_new = x + randn(alg.rng)
+    x = accept!(alg, x_new, x) ? x_new : x
 end
 ```
 
-## Minimal continuous-time workflow
+## Minimal continuous-time sketch
 
 ```julia
 using Random
 using MonteCarloX
 
-rng = MersenneTwister(123)
-alg = Gillespie(rng)
-
-rates = [1.0, 2.0, 0.2]  # event intensities
+alg = Gillespie(MersenneTwister(2))
+rates = [0.2, 0.8]
 
 for _ in 1:10_000
     t, event = step!(alg, rates)
-    # 1) measure at time t
-    # 2) apply event update to state
-    # 3) refresh rates if needed
+    # update your state using `event`
 end
 ```
 
-## Where to go next
+## Next pages
 
-- [Core Abstractions](@ref)
-- [Weights](@ref)
-- [Importance Sampling Algorithms](importance_sampling_algorithms.md)
-- [Continuous-Time Sampling Algorithms](continuous_time_sampling_algorithms.md)
-- [Measurements](@ref)
-- [Systems and model packages](@ref)
-- [Worked Examples](@ref)
+- Build Your Own System
+- Core Abstractions
+- Importance Sampling Algorithms
+- Continuous-Time Sampling Algorithms
+- Measurements
+- Worked Examples
