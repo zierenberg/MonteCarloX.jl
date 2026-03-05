@@ -27,15 +27,14 @@ This separation keeps algorithm code model-agnostic.
 
 If you are new, read in this order:
 
-1. Framework
-2. Build Your Own System
-3. Importance Sampling Algorithms or Continuous-Time Sampling Algorithms
-4. Measurements
+1. Monte Carlo Fundamentals
+2. Importance Sampling Algorithms
+3. Continuous-Time Sampling Algorithms
+4. Build Your Own System
 5. Systems
 6. Weights
-7. Worked Examples
+7. Measurements
 
-`Core Abstractions` is useful reference material, but no longer required as an early onboarding step.
 
 ## Quick orientation
 
@@ -47,4 +46,13 @@ If you are new, read in this order:
 
 MonteCarloX is the algorithmic core. Concrete model families are intentionally external.
 This keeps the framework concise and easier to extend.
+
+## Random number generators
+
+MonteCarloX works with any Julia `AbstractRNG`.
+
+- Prefer `Xoshiro` as a modern default for new projects.
+- Use `MersenneTwister` when compatibility with existing workflows is needed.
+
+Because RNG is passed directly to algorithms, changing RNG is a one-line change.
 

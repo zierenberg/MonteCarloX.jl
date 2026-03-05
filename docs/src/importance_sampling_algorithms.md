@@ -16,6 +16,30 @@ Each step is:
 
 The core API function is `accept!`.
 
+## Target distribution and acceptance rule
+
+Let \(\pi(x)\) be the target density (or mass function) on the state space.
+
+- Bayesian example:
+
+\[
+\pi(\theta)=p(\theta\mid\mathcal D).
+\]
+
+- Statistical-mechanics microstate example:
+
+\[
+\pi(x)=p(x\mid\beta)=\frac{e^{-\beta E(x)}}{Z(\beta)}.
+\]
+
+Metropolis-Hastings acceptance is
+
+\[
+\alpha(x\to x')=\min\!\left(1,\frac{\pi(x')\,q(x\mid x')}{\pi(x)\,q(x'\mid x)}\right).
+\]
+
+For symmetric local proposals \(q\), this reduces to \(\pi(x')/\pi(x)\).
+
 ## Metropolis
 
 ### When to use it
@@ -46,6 +70,33 @@ end
 
 println(acceptance_rate(alg))
 ```
+
+### Bayesian example (primary)
+
+Coin-flip posterior with local random-walk proposals on theta:
+
+- \(\pi(\theta)=p(\theta\mid\text{data})\propto p(\text{data}\mid\theta)p(\theta)\)
+- implementation target: `logposterior(theta)`
+
+Repository example: `examples/bayesian_coin_flip.ipynb`
+
+### Statistical-mechanics example (secondary)
+
+Ising microstate sampling:
+
+- state \(x\) = spin configuration
+- target \(\pi(x)=e^{-\beta E(x)}/Z(\beta)\)
+- local proposal: spin flip
+
+Repository example: `examples/spin_systems/metropolis_ising2D.ipynb`
+
+Energy-variable view (same physics):
+
+\[
+p(E\mid\beta)=\frac{\Omega(E)e^{-\beta E}}{Z(\beta)},
+\]
+
+where \(\Omega(E)\) is the density of states.
 
 ## Glauber
 
@@ -100,6 +151,15 @@ alg = WangLandau(MersenneTwister(3), lw; logf=1.0)
 - Start with `Metropolis` for standard equilibrium sampling.
 - Use `HeatBath` when conditional local probabilities are natural and cheap.
 - Use `Multicanonical`/`WangLandau` when canonical sampling gets stuck or explores too narrowly.
+
+## Example map (algorithm ↔ application)
+
+- **Bayesian scalar posterior** (`Metropolis`): `examples/bayesian_coin_flip.ipynb`
+- **Bayesian regression posterior** (`Metropolis`): `examples/house_price_prediction.ipynb`
+- **Canonical spin sampling** (`Metropolis`): `examples/spin_systems/metropolis_ising2D.ipynb`
+- **Generalized-ensemble exploration** (`Multicanonical`, `WangLandau`):
+    - `examples/spin_systems/muca_ising2D.ipynb`
+    - `examples/muca_LDT_gaussian_rngs.ipynb`
 
 ## API reference
 

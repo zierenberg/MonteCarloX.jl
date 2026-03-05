@@ -12,6 +12,60 @@ To run a custom model with MonteCarloX, you typically need:
 
 You do **not** need to implement the full framework at once.
 
+## Core abstractions in practice
+
+When building a model package, these abstractions define responsibilities.
+
+### `AbstractSystem`
+
+Owns:
+
+- state variables
+- model parameters
+- model-specific observables (for example energy)
+- model-specific local update ingredients
+
+Should not own:
+
+- generic sampling logic
+
+### `AbstractLogWeight`
+
+Encodes relative probability for equilibrium sampling.
+
+In canonical form,
+\[
+\pi(x)=\frac{e^{-\beta E(x)}}{Z(\beta)}
+\]
+up to additive constants in log space.
+
+- canonical ensemble: `BoltzmannLogWeight(β)`
+- generalized ensemble: tabulated `BinnedLogWeight`
+
+Algorithms use local log-weight differences, so they remain model-agnostic.
+
+### `AbstractAlgorithm`
+
+Owns sampler state and statistics.
+
+Examples:
+
+- `Metropolis`, `Glauber`, `HeatBath`
+- `Multicanonical`, `WangLandau`
+- `Gillespie`
+
+Typical fields include RNG, counters (`steps`, `accepted`) and/or simulation time.
+
+### `AbstractUpdate`
+
+Represents update mechanics.
+In practice, this usually appears as system-side methods (for example `spin_flip!`) that call algorithm primitives (`accept!`, `step!`, ...).
+
+### `AbstractMeasurement`
+
+Represents observable extraction and storage.
+MonteCarloX provides reusable scheduling through `Measurements`.
+
 ## Example: minimal scalar model (`energy(x)`) with Metropolis
 
 ```julia
@@ -117,3 +171,13 @@ You can record observables manually in vectors, or use `Measurement`/`Measuremen
 ## Real model reference
 
 For a production-ready system implementation, inspect `SpinSystems` (for example Ising), where model logic is separated cleanly from MonteCarloX algorithms.
+
+## Abstractions API reference
+
+```@docs
+AbstractSystem
+AbstractLogWeight
+AbstractAlgorithm
+AbstractUpdate
+AbstractMeasurement
+```

@@ -3,6 +3,19 @@
 Weights determine relative probabilities in equilibrium workflows.
 Algorithms only need **differences in log weight**, so the representation can stay flexible.
 
+For canonical targets,
+\[
+\pi(x)=\frac{e^{-\beta E(x)}}{Z(\beta)},
+\]
+so
+\[
+\log \pi(x) = -\beta E(x) - \log Z(\beta),
+\]
+and local acceptance decisions depend on
+\[
+\Delta \log \pi = -\beta\,\Delta E.
+\]
+
 ## 1) Canonical ensemble: `BoltzmannLogWeight`
 
 For energy `E`, the log weight is `-βE`.

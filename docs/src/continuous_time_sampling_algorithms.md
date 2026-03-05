@@ -8,6 +8,14 @@ You sample **when** the next event happens and **which** event happens.
 - Importance sampling focuses on stationary distributions.
 - Continuous-time sampling focuses on trajectories in real/simulation time.
 
+Conceptually, trajectories can be viewed as states in path space.
+The continuous-time interface is a computational specialization for explicit event-time dynamics.
+
+Path-space notation:
+
+- trajectory \(\omega=(x_t)_{t\in[0,T]}\)
+- target path distribution \(\pi(\omega)=p(\omega\mid\lambda)\)
+
 ## Gillespie workflow
 
 At each step:
@@ -75,6 +83,12 @@ advance!(alg, sys, 20.0; rates=rates, update!=update_cb)
 - `next_time`: waiting-time sampling (homogeneous or thinning-based)
 - `next_event`: event-index sampling
 - `next`: one combined draw `(dt, event)`
+
+## Example map (algorithm ↔ application)
+
+- **Birth-death dynamics** (`Gillespie`): `examples/stochastic_processes/gillespie_birth_death.ipynb`
+- **Reaction-network dynamics** (`Gillespie`): `examples/stochastic_processes/gillespie_dimerization.ipynb`
+- **Poisson primitives / low-level event draws**: `examples/stochastic_processes/kmc_poisson.ipynb`
 
 ## API reference
 
