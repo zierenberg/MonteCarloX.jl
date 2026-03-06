@@ -1,8 +1,13 @@
-# Helper Tools
+# Helper utilities
 
-This page collects utility functions used across algorithms and model code.
+This page groups lower-level tools used by algorithms and model packages.
 
 ## Numeric helpers
+
+- `log_sum`: numerically stable log-sum operations
+- `binary_search`: utility for sorted-domain lookups
+- `logistic`: logistic helper used in acceptance rules
+- `kldivergence`: histogram/function divergence helper
 
 ```@docs
 log_sum
@@ -11,14 +16,18 @@ MonteCarloX.logistic
 kldivergence
 ```
 
-## RNG utilities
+## RNG helper
+
+`MutableRandomNumbers` is a lightweight utility for deterministic random-number replay/control in workflows that need mutable RNG-like streams.
 
 ```@docs
 MutableRandomNumbers
 reset!(rng::MutableRandomNumbers, [index::Int=0])
 ```
 
-## Event handler utilities
+## Event-handler backends
+
+These structures back event selection and queue-based scheduling in continuous-time samplers.
 
 ```@docs
 ListEventRateSimple

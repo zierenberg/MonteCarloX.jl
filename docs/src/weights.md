@@ -1,43 +1,55 @@
 # Weights
 
-In equilibrium Monte Carlo, a log weight defines relative probabilities.
-Algorithms consume log-weight differences through acceptance rules.
+Weights determine relative probabilities in equilibrium workflows.
+Algorithms only need **differences in log weight**, so the representation can stay flexible.
 
-## Canonical weight
+For canonical targets,
+\[
+\pi(x)=\frac{e^{-\beta E(x)}}{Z(\beta)},
+\]
+so
+\[
+\log \pi(x) = -\beta E(x) - \log Z(\beta),
+\]
+and local acceptance decisions depend on
+\[
+\Delta \log \pi = -\beta\,\Delta E.
+\]
 
-`BoltzmannLogWeight(β)` is the default canonical choice.
+## 1) Canonical ensemble: `BoltzmannLogWeight`
+
+For energy `E`, the log weight is `-βE`.
 
 ```julia
 using Random
 using MonteCarloX
 
 rng = MersenneTwister(1)
-alg = Metropolis(rng; β=0.5)
+alg = Metropolis(rng; β=0.5)  # internally uses BoltzmannLogWeight(0.5)
 ```
 
-## Mutable/tabulated weight
+Use this for standard fixed-temperature sampling.
 
-For generalized ensembles (multicanonical, Wang–Landau),
-`BinnedLogWeight` or `MutableLogWeight` (if available) store histogram-backed tables that can be updated.
+## 2) Tabulated weights: `BinnedLogWeight`
+
+Use when the weight is not known analytically, or when adapting it online (multicanonical / Wang-Landau).
 
 ```julia
 using MonteCarloX
-using StatsBase
 
-edges = (collect(-10.0:1.0:10.0),)
-h = fit(Histogram, Float64[], edges)
-lw = BinnedLogWeight(edges, 0.0)
+lw = BinnedLogWeight(-20:2:20, 0.0)
+lw[0] = 1.5
+value = lw(0)
 
-# or initialize directly from edges with a constant value
-lw0 = BinnedLogWeight(-10.0:1.0:10.0, 0.0)
-
-# edges can be any sorted vector/range
-edges_vec = collect(-5.0:0.5:5.0)
-lw1 = BinnedLogWeight(edges_vec, 0.0)
-
-lw[0.3] = 1.2
-w = lw(0.3)
+lw_zero = zero(lw)
 ```
+
+`BinnedLogWeight` supports discrete and continuous bin definitions (including multidimensional bin tuples).
+
+## How to choose
+
+- Known canonical target: `BoltzmannLogWeight`
+- Exploratory generalized-ensemble run: `BinnedLogWeight` + `Multicanonical` or `WangLandau`
 
 ## API reference
 

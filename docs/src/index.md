@@ -1,42 +1,58 @@
 # MonteCarloX.jl
 
-MonteCarloX is a composable framework for Monte Carlo simulations in Julia.
-It supports equilibrium and non-equilibrium workflows while keeping model code
-separate from algorithmic code.
+MonteCarloX is a compact Julia framework for Monte Carlo sampling.
+It is built around composable primitives, so algorithms stay reusable across very different models.
 
-## Philosophy
+## What this package gives you
 
-The core design principle is separation of concerns:
+- Equilibrium samplers (`Metropolis`, `Glauber`, `HeatBath`, `Multicanonical`, `WangLandau`)
+- Continuous-time samplers (`Gillespie`)
+- Measurement/scheduling framework (`Measurements`)
+- Log-weight tools (`BoltzmannLogWeight`, `BinnedLogWeight`)
+- Event handler backends for event-driven dynamics
 
-- **System**: state and model-specific operations
-- **Weight/rates**: probability structure (equilibrium) or event intensities (dynamics)
-- **Algorithm**: how proposals/events are sampled
-- **Update**: how accepted events modify state
-- **Measurement**: what is recorded and when
+## Core idea
 
-This allows reusable algorithm templates where systems can be swapped without
-rewriting the simulation driver.
+A simulation needs 3 pieces:
 
-## Documentation roadmap
+1. **System**: state and model-specific operations
+2. **Weight/rates**: target distribution or transition intensities
+3. **Algorithm**: transition sampler
 
-If you are new to the package, read in this order:
+`Measurements` are optional convenience tools for organized observable collection.
 
-1. Framework
-2. Core Abstractions
-3. Weights
-4. Importance Sampling or Continuous-Time Sampling Algorithms
-5. Measurements
-6. Systems
-7. Worked Examples
+This separation keeps algorithm code model-agnostic.
+
+## Reading path
+
+If you are new, read in this order:
+
+1. Monte Carlo Fundamentals
+2. Importance Sampling Algorithms
+3. Continuous-Time Sampling Algorithms
+4. Build Your Own System
+5. Systems
+6. Weights
+7. Measurements
+
+
+## Quick orientation
+
+- Use **importance sampling** for discrete-step update protocols (equilibrium or driven/non-equilibrium).
+- Use **continuous-time sampling** when physical/simulation time matters.
+- Use **companion model packages** (for example `SpinSystems`) for concrete systems.
 
 ## Scope
 
-MonteCarloX contains the algorithmic and infrastructure core.
-Concrete model families are expected to live in companion packages/modules,
-such as `SpinSystems`.
+MonteCarloX is the algorithmic core. Concrete model families are intentionally external.
+This keeps the framework concise and easier to extend.
 
-## Contributing
+## Random number generators
 
-The API is actively refined. Contributions are welcome, especially around
-examples, docs coverage, and cross-domain model integrations.
+MonteCarloX works with any Julia `AbstractRNG`.
+
+- Prefer `Xoshiro` as a modern default for new projects.
+- Use `MersenneTwister` when compatibility with existing workflows is needed.
+
+Because RNG is passed directly to algorithms, changing RNG is a one-line change.
 

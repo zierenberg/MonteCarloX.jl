@@ -358,7 +358,7 @@ version = "1.2.0"
 
 [[MonteCarloX]]
 deps = ["Distributions", "Graphs", "LinearAlgebra", "MPI", "Printf", "Random", "StaticArrays", "StatsBase"]
-path = "/Users/johannes/.julia/dev/MonteCarloX"
+path = ".."
 uuid = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
 version = "0.1.0"
 
@@ -563,6 +563,12 @@ version = "2.7.1"
 
     [SpecialFunctions.weakdeps]
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+
+[[SpinSystems]]
+deps = ["Graphs", "MonteCarloX", "SparseArrays"]
+path = "../SpinSystems"
+uuid = "8a5c3c8d-1234-5678-9abc-def012345678"
+version = "0.1.0"
 
 [[StaticArrays]]
 deps = ["LinearAlgebra", "PrecompileTools", "Random", "StaticArraysCore"]
