@@ -35,6 +35,23 @@ Base type for heat-bath style samplers.
 abstract type AbstractHeatBath <: AbstractAlgorithm end
 
 """
+    ImportanceSampling <: AbstractImportanceSampling
+
+Generic importance-sampling algorithm that operates on full-state
+acceptance arguments `(x_new, x_old)` using a callable `logweight`.
+"""
+mutable struct ImportanceSampling{LW,RNG<:AbstractRNG} <: AbstractImportanceSampling
+    rng::RNG
+    logweight::LW
+    steps::Int
+    accepted::Int
+end
+
+ImportanceSampling(rng::AbstractRNG, logweight) = ImportanceSampling(rng, logweight, 0, 0)
+
+@inline record_visit!(logweight, accepted::Bool, x_new, x_old) = nothing
+
+"""
     accept!(alg::AbstractImportanceSampling, x_new, x_old)
     accept!(alg::AbstractMetropolis, delta_x)
 
@@ -47,11 +64,13 @@ Returns true if the move is accepted based on the Metropolis criterion:
 
 This is the core accept/reject step used by all importance sampling algorithms.
 """
-function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T<:Union{Real, Vector{<:Real}}
+function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T
     log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
-    return _accept!(alg, log_ratio)
+    accepted = _accept!(alg, log_ratio)
+    record_visit!(alg.logweight, accepted, x_new, x_old)
+    return accepted
 end
-function accept!(alg::AbstractMetropolis, delta_x::Union{Real, Vector{<:Real}})
+function accept!(alg::AbstractMetropolis, delta_x)
     log_ratio = alg.logweight(delta_x)
     return _accept!(alg, log_ratio)
 end
@@ -86,3 +105,33 @@ function reset!(alg::AbstractImportanceSampling)
     alg.steps = 0
     alg.accepted = 0
 end
+
+"""
+    set!(alg::AbstractImportanceSampling, args...)
+
+Forward `set!` to the algorithm's logweight object.
+"""
+set!(alg::AbstractImportanceSampling, args...) = set!(alg.logweight, args...)
+
+"""
+    set_logweight!(alg::AbstractImportanceSampling, args...)
+
+Forward `set_logweight!` to the algorithm's logweight object.
+"""
+set_logweight!(alg::AbstractImportanceSampling, args...) = set!(alg, args...)
+
+"""
+    update!(alg::AbstractImportanceSampling, args...; kwargs...)
+
+Forward `update!` to the algorithm's logweight object.
+"""
+update!(alg::AbstractImportanceSampling, args...; kwargs...) =
+    update!(alg.logweight, args...; kwargs...)
+
+"""
+    update_weight!(alg::AbstractImportanceSampling, args...; kwargs...)
+
+Forward `update_weight!` to the algorithm's logweight object.
+"""
+update_weight!(alg::AbstractImportanceSampling, args...; kwargs...) =
+    update!(alg, args...; kwargs...)

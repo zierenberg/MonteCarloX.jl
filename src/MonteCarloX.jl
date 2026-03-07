@@ -21,7 +21,10 @@ include("measurements/measurements.jl")
 include("weights/canonical.jl")
 export BoltzmannLogWeight   
 include("weights/binned.jl")
-export  BinnedLogWeight
+include("weights/multicanonical.jl")
+export  BinnedObject,
+        BinnedLogWeight,
+        MulticanonicalLogWeight
 
 # Event handlers (non-equilibrium)
 include("event_handler/abstractions.jl")
@@ -65,6 +68,7 @@ export AbstractImportanceSampling,
        AbstractGeneralizedEnsemble,
        AbstractMetropolis,
        AbstractHeatBath,
+      ImportanceSampling,
        Metropolis,
        Glauber,
        HeatBath,
@@ -74,10 +78,12 @@ export AbstractImportanceSampling,
        accept!,
        acceptance_rate,
        reset!,
+       set!,
+       update!,
        is_root,
        merge_histograms!,
        update_weight!,
-         set_logweight!,
+       set_logweight!,
        distribute_logweight!,
        update_f! # TODO: rename this later to a common convention.
 

@@ -13,6 +13,7 @@ using MonteCarloX: AbstractSystem,
                    AbstractImportanceSampling,
                    AbstractMetropolis,
                    AbstractHeatBath,
+                   Multicanonical,
                    accept!,
                    logistic
 
