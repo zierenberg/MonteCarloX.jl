@@ -1,0 +1,19 @@
+.docs-package-name {
+    text-align: center;
+}
+
+.docs-package-name::before {
+    content: "";
+    display: block;
+    width: 112px;
+    height: 112px;
+    margin: 0.35rem auto 0.55rem auto;
+    background-image: url("montecarlox_logo.png");
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+}
+
+.docs-package-name .docs-autofit {
+    display: block;
+}
