@@ -65,8 +65,6 @@ function set!(
     return nothing
 end
 
-set_logweight!(lw::MulticanonicalLogWeight, xrange, f::Function) = set!(lw, xrange, f)
-
 """
     update!(lw::MulticanonicalLogWeight; mode=:simple)
 

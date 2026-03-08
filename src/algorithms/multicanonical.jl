@@ -52,3 +52,7 @@ function reset!(alg::ImportanceSampling{<:MulticanonicalLogWeight})
     alg.accepted = 0
     return nothing
 end
+
+@inline set_logweight!(alg::ImportanceSampling{<:MulticanonicalLogWeight}, xrange, f::Function) = set!(alg.logweight, xrange, f)
+
+@inline update_logweight!(alg::ImportanceSampling{<:MulticanonicalLogWeight}; mode=:simple) = update!(alg.logweight; mode=mode)

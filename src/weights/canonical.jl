@@ -24,8 +24,18 @@ logw = logweight(-2.5)  # Returns -0.5 * (-2.5) = 1.25
 logw = logweight([-1, -2, -3])  # Returns -0.5 * (-6) = 3.0
 ```
 """
-struct BoltzmannLogWeight{T<:Real} <: AbstractLogWeight
-    β::T
+struct BoltzmannLogWeight{B<:Real} <: AbstractLogWeight
+    β::B
+end
+# constructor clear (inverse) temperature argument for clear usage
+function BoltzmannLogWeight(; β=nothing, T=nothing)
+    if (β === nothing) == (T === nothing)
+        throw(ArgumentError("Specify exactly one of β or T"))
+    elseif β !== nothing
+        return BoltzmannLogWeight(β)
+    else
+        return BoltzmannLogWeight(inv(T))
+    end
 end
 
 """
@@ -39,10 +49,8 @@ For array/tuple of terms: log(w) = -β * sum(E)
 Specialized for type stability with scalar inputs.
 
 # Arguments
-- `E`: Energy (scalar) or energy components (array/tuple)
 
 # Returns
-- Log weight as Float64
 
 # Examples
 ```julia
