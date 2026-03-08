@@ -67,6 +67,8 @@ This is the core accept/reject step used by all importance sampling algorithms.
 function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T
     log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
     accepted = _accept!(alg, log_ratio)
+    # TODO: check if this costs too much if not needed..
+    # Problem: this is not passed on if logweight is a sum of logweights; hence we may have to make it vector/tuple of abstractLogWeiths?
     record_visit!(alg.logweight, accepted, x_new, x_old)
     return accepted
 end
