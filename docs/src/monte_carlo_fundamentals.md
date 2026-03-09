@@ -112,8 +112,8 @@ using Random
 using MonteCarloX
 
 rng = MersenneTwister(1)
-logweight(x) = -0.5 * x^2
-alg = Metropolis(rng, logweight)
+logdensity(x) = -0.5 * x^2
+alg = Metropolis(rng, logdensity)
 
 x = 0.0
 for _ in 1:10_000

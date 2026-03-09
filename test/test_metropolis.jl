@@ -235,7 +235,7 @@ function test_metropolis_acceptance_tracking(; verbose=false)
 end
 
 """
-Test Metropolis with BoltzmannLogWeight showing temperature effects using Measurement framework
+Test Metropolis with BoltzmannEnsemble showing temperature effects using Measurement framework
 """
 function test_metropolis_temperature_effects(; verbose=false)
     pass = true
@@ -396,13 +396,13 @@ function test_metropolis_proposal_invariance(; verbose=false)
 end
 
 """
-Test BoltzmannLogWeight call overloads and Metropolis convenience constructor.
+Test BoltzmannEnsemble logweight overloads and Metropolis convenience constructor.
 """
 function test_metropolis_boltzmann_overloads_and_constructor(; verbose=false)
     rng = MersenneTwister(500)
     β = 0.75
 
-    lw = BoltzmannLogWeight(β)
+    lw = logweight(BoltzmannEnsemble(β))
 
     # Scalar overload on Real (including integer inputs)
     e_int = 4
@@ -422,20 +422,20 @@ function test_metropolis_boltzmann_overloads_and_constructor(; verbose=false)
     alg = Metropolis(rng; β=β)
 
     pass &= alg.rng === rng
-    pass &= alg.logweight isa BoltzmannLogWeight
+    pass &= ensemble(alg) isa BoltzmannEnsemble
     pass &= alg.steps == 0
     pass &= alg.accepted == 0
-    pass &= alg.logweight(e_int) == -β * e_int
-    pass &= alg.logweight(e_vec) == -β * sum(e_vec)
+    pass &= lw(e_int) == -β * e_int
+    pass &= lw(e_vec) == -β * sum(e_vec)
 
     if verbose
-        println("Boltzmann Overloads + Constructor Test:")
+        println("Boltzmann logweight Overloads + Constructor Test:")
         println("  β: $(β)")
         println("  lw(Int): $(lw(e_int))")
         println("  lw(Real): $(lw(e_real))")
         println("  lw(Vector): $(lw(e_vec))")
         println("  lw(Matrix): $(lw(e_mat))")
-        println("  Constructor logweight type: $(typeof(alg.logweight))")
+        println("  Constructor ensemble type: $(typeof(ensemble(alg)))")
     end
 
     return pass

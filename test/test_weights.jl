@@ -2,14 +2,14 @@ using MonteCarloX
 using StatsBase
 using Test
 
-# test for BinnedLogWeight
+# test for BinnedObject
 function test_binned_logweight_discrete(; verbose=false)
     pass = true 
 
     # 1D
     bins = 0:2:10
-    lw = BinnedLogWeight(bins) # default constructor with init=0.0
-    pass &= lw isa BinnedLogWeight{1,MonteCarloX.DiscreteBinning{Int64}}
+    lw = BinnedObject(bins) # default constructor with init=0.0
+    pass &= lw isa BinnedObject{1,Float64,MonteCarloX.DiscreteBinning{Int64}}
     pass &= all(iszero, lw.weights)
     pass &= size(lw) == (6,)
     pass &= size(lw.weights) == (6,)
@@ -41,8 +41,8 @@ function test_binned_logweight_discrete(; verbose=false)
 
     # test constructor with vector domain
     bins_vec = [0, 2, 4, 6, 8, 10]
-    lw_vec = BinnedLogWeight(bins_vec, 0.0)
-    pass &= lw_vec isa BinnedLogWeight{1,MonteCarloX.DiscreteBinning{Int64}}
+    lw_vec = BinnedObject(bins_vec, 0.0)
+    pass &= lw_vec isa BinnedObject{1,Float64,MonteCarloX.DiscreteBinning{Int64}}
     pass &= all(iszero, lw_vec.weights)
     pass &= size(lw_vec) == (6,)
     pass &= size(lw_vec.weights) == (6,)
@@ -53,7 +53,7 @@ function test_binned_logweight_discrete(; verbose=false)
     # test special case of single-bin vector domain to throw an error
     valid = false
     try
-        BinnedLogWeight([0], 0.0)
+        BinnedObject([0], 0.0)
     catch err
         valid = err isa ArgumentError
     end
@@ -62,7 +62,7 @@ function test_binned_logweight_discrete(; verbose=false)
     # error for non-equidistant bins
     valid = false
     try      
-        BinnedLogWeight([0, 1, 3], 0.0)
+        BinnedObject([0, 1, 3], 0.0)
     catch err
         valid = err isa ArgumentError
     end
@@ -71,7 +71,7 @@ function test_binned_logweight_discrete(; verbose=false)
     # error when domain types is not supported
     valid = false
     try
-        BinnedLogWeight("invalid domain", 0.0)
+        BinnedObject("invalid domain", 0.0)
     catch err
         valid = err isa ArgumentError
     end
@@ -85,9 +85,9 @@ function test_binned_logweight_discrete(; verbose=false)
     pass &= MonteCarloX._binindex(b, 4.0) == 3
 
     # test _assert_same_domain
-    lw2 = BinnedLogWeight(0:2:10, 0.0)
+    lw2 = BinnedObject(0:2:10, 0.0)
     pass &= MonteCarloX._assert_same_domain(lw, lw2) == nothing
-    lw3 = BinnedLogWeight(0:1:10, 0.0)
+    lw3 = BinnedObject(0:1:10, 0.0)
     valid = false
     try
         MonteCarloX._assert_same_domain(lw, lw3)
@@ -97,13 +97,13 @@ function test_binned_logweight_discrete(; verbose=false)
     pass &= valid
 
     if verbose
-        println("BinnedLogWeight discrete 1D test pass: $(pass)")
+        println("BinnedObject discrete 1D test pass: $(pass)")
     end
 
     # 2D
     bins2d = (0:1:5, 0:2:10)
-    lw2d = BinnedLogWeight(bins2d, 0.0)
-    pass &= lw2d isa BinnedLogWeight{2, MonteCarloX.DiscreteBinning{Int64}}
+    lw2d = BinnedObject(bins2d, 0.0)
+    pass &= lw2d isa BinnedObject{2, Float64, MonteCarloX.DiscreteBinning{Int64}}
     pass &= all(iszero, lw2d.weights)
     pass &= size(lw2d) == (6, 6)
     pass &= size(lw2d.weights) == (6, 6)
@@ -118,7 +118,7 @@ function test_binned_logweight_discrete(; verbose=false)
 
     # return test result
     if verbose
-        println("BinnedLogWeight discrete 2D test pass: $(pass)")
+        println("BinnedObject discrete 2D test pass: $(pass)")
     end
 
     return pass
@@ -129,8 +129,8 @@ function test_binned_logweight_continuous(; verbose=false)
 
     # 1D
     edges = 0.0:1.0:4.0
-    lw = BinnedLogWeight(edges, 0.0)
-    pass &= lw isa BinnedLogWeight{1,MonteCarloX.ContinuousBinning{Float64}}
+    lw = BinnedObject(edges, 0.0)
+    pass &= lw isa BinnedObject{1,Float64,MonteCarloX.ContinuousBinning{Float64}}
     pass &= all(iszero, lw.weights)
     pass &= size(lw) == (4,)
     pass &= size(lw.weights) == (4,)
@@ -167,9 +167,9 @@ function test_binned_logweight_continuous(; verbose=false)
     # end
 
     # test _assert_same_domain
-    lw2 = BinnedLogWeight(edges, 0.0)
+    lw2 = BinnedObject(edges, 0.0)
     pass &= MonteCarloX._assert_same_domain(lw, lw2) == nothing
-    lw3 = BinnedLogWeight(0.0:0.5:4.0, 0.0)
+    lw3 = BinnedObject(0.0:0.5:4.0, 0.0)
     valid=false
     try        
         MonteCarloX._assert_same_domain(lw, lw3)
@@ -178,7 +178,7 @@ function test_binned_logweight_continuous(; verbose=false)
         valid = err isa AssertionError
     end
     pass &= valid
-    lw_discrete = BinnedLogWeight(0:1:4, 0.0)
+    lw_discrete = BinnedObject(0:1:4, 0.0)
     valid=false
     try
         MonteCarloX._assert_same_domain(lw, lw_discrete)
@@ -189,13 +189,13 @@ function test_binned_logweight_continuous(; verbose=false)
     pass &= valid
 
     if verbose
-        println("BinnedLogWeight continuous 1D test pass: $(pass)")
+        println("BinnedObject continuous 1D test pass: $(pass)")
     end
 
     # 2D
     edges2d = (0.0:1.0:3.0, 0.0:2.0:6.0)
-    lw2d = BinnedLogWeight(edges2d, 0.0)
-    pass &= lw2d isa BinnedLogWeight{2,MonteCarloX.ContinuousBinning{Float64}}
+    lw2d = BinnedObject(edges2d, 0.0)
+    pass &= lw2d isa BinnedObject{2,Float64,MonteCarloX.ContinuousBinning{Float64}}
     pass &= all(iszero, lw2d.weights)
     pass &= size(lw2d) == (3, 3)
     pass &= size(lw2d.weights) == (3, 3)
@@ -215,7 +215,7 @@ function test_binned_logweight_continuous(; verbose=false)
 
     # return test result
     if verbose
-        println("BinnedLogWeight continuous 2D test pass: $(pass)") 
+        println("BinnedObject continuous 2D test pass: $(pass)") 
     end
 
     return pass
@@ -223,7 +223,7 @@ end
 
 function run_weights_testsets(; verbose=false)
     @testset "Weights" begin
-        @testset "BinnedLogWeight" begin
+        @testset "BinnedObject" begin
             @test test_binned_logweight_discrete(verbose=verbose)
             @test test_binned_logweight_continuous(verbose=verbose)
         end

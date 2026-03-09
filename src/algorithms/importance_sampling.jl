@@ -6,18 +6,21 @@
 Base type for importance sampling algorithms (Metropolis, Heat Bath, etc.).
 
 Importance sampling algorithms:
-- Use accept/reject steps based on log weight ratios
+- Use accept/reject steps based on log-weight ratios
 - Track acceptance statistics
-- Include an RNG and a log weight function
+- Include an RNG and a callable ensemble score
+
+The ensemble score is typically a log target density:
+- Bayesian inference: `logposterior(theta) = loglikelihood(data, theta) + logprior(theta)`
+- Statistical mechanics: `logweight(x) = -beta * E(x)`
+
+Both levels are intentional in this API:
+- `ensemble(alg)` names the architectural object carried by the algorithm
+- `logweight(alg)` names its role in acceptance ratios
+
+`ensemble(alg)` therefore defines the effective logweight used by `accept!`.
 """
 abstract type AbstractImportanceSampling <: AbstractAlgorithm end
-
-"""
-    AbstractGeneralizedEnsemble <: AbstractImportanceSampling
-
-Base type for generalized-ensemble samplers (e.g. multicanonical, Wang-Landau).
-"""
-abstract type AbstractGeneralizedEnsemble <: AbstractImportanceSampling end
 
 """
     AbstractMetropolis <: AbstractImportanceSampling
@@ -38,18 +41,49 @@ abstract type AbstractHeatBath <: AbstractAlgorithm end
     ImportanceSampling <: AbstractImportanceSampling
 
 Generic importance-sampling algorithm that operates on full-state
-acceptance arguments `(x_new, x_old)` using a callable `logweight`.
+acceptance arguments `(x_new, x_old)` using a callable `ensemble`.
+
+The callable may be a function or a log-weight object and should return a
+scalar score such as a log density / log weight.
 """
 mutable struct ImportanceSampling{LW,RNG<:AbstractRNG} <: AbstractImportanceSampling
     rng::RNG
-    logweight::LW
+    ensemble::LW
     steps::Int
     accepted::Int
 end
 
-ImportanceSampling(rng::AbstractRNG, logweight) = ImportanceSampling(rng, logweight, 0, 0)
+@inline _as_ensemble(e::AbstractEnsemble) = e
+@inline _as_ensemble(e) = FunctionEnsemble(e)
 
-@inline record_visit!(logweight, accepted::Bool, x_new, x_old) = nothing
+ImportanceSampling(rng::AbstractRNG, ensemble) = ImportanceSampling(rng, _as_ensemble(ensemble), 0, 0)
+
+"""
+    ensemble(alg::AbstractImportanceSampling)
+
+Return the ensemble object carried by an importance-sampling algorithm.
+
+This is the canonical accessor in the ensemble-first API.
+Operationally, this object defines the logweight used in acceptance.
+"""
+@inline ensemble(alg::AbstractImportanceSampling) = getfield(alg, :ensemble)
+
+@inline logweight(e::AbstractEnsemble, x) = e(x)
+
+"""
+    logweight(alg::AbstractImportanceSampling)
+
+Return the algorithm ensemble via a logweight-oriented alias.
+Equivalent to `ensemble(alg)`.
+
+Use this accessor when reasoning about acceptance formulas.
+"""
+@inline logweight(alg::AbstractImportanceSampling) = ensemble(alg)
+
+# Optional ensemble-level visit hooks used by generic accept!.
+# Ensembles that need histogram/visit bookkeeping can specialize these.
+@inline should_record_visit(ens) = false
+@inline record_visit!(ens, x_vis) = nothing
 
 """
     accept!(alg::AbstractImportanceSampling, x_new, x_old)
@@ -65,15 +99,17 @@ Returns true if the move is accepted based on the Metropolis criterion:
 This is the core accept/reject step used by all importance sampling algorithms.
 """
 function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T
-    log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
+    ens = ensemble(alg)
+    log_ratio = logweight(ens, x_new) - logweight(ens, x_old)
     accepted = _accept!(alg, log_ratio)
-    # TODO: check if this costs too much if not needed..
-    # Problem: this is not passed on if logweight is a sum of logweights; hence we may have to make it vector/tuple of abstractLogWeiths?
-    record_visit!(alg.logweight, accepted, x_new, x_old)
+    if should_record_visit(ens)
+        x_vis = accepted ? x_new : x_old
+        record_visit!(ens, x_vis)
+    end
     return accepted
 end
 function accept!(alg::AbstractMetropolis, delta_x)
-    log_ratio = alg.logweight(delta_x)
+    log_ratio = logweight(ensemble(alg), delta_x)
     return _accept!(alg, log_ratio)
 end
 # core function to evaluate acceptance and update counters
@@ -103,7 +139,8 @@ Reset step and acceptance counters to zero.
 Useful when you want to measure acceptance rate for a specific
 run phase without previous history.
 """
-function reset!(alg::AbstractImportanceSampling)
+@inline reset!(alg::AbstractImportanceSampling) = _reset!(alg)
+function _reset!(alg::AbstractImportanceSampling)
     alg.steps = 0
     alg.accepted = 0
 end
@@ -113,27 +150,21 @@ end
 
 Forward `set!` to the algorithm's logweight object.
 """
-set!(alg::AbstractImportanceSampling, args...) = set!(alg.logweight, args...)
+set!(alg::AbstractImportanceSampling, args...) = set!(ensemble(alg), args...)
 
 """
     set_logweight!(alg::AbstractImportanceSampling, args...)
 
-Forward `set_logweight!` to the algorithm's logweight object.
+Forward `set_logweight!` to the algorithm's ensemble object.
+Useful for multicanonical-style workflows.
 """
 set_logweight!(alg::AbstractImportanceSampling, args...) = set!(alg, args...)
 
 """
     update!(alg::AbstractImportanceSampling, args...; kwargs...)
 
-Forward `update!` to the algorithm's logweight object.
+Forward `update!` to the algorithm's ensemble/logweight object.
 """
 update!(alg::AbstractImportanceSampling, args...; kwargs...) =
-    update!(alg.logweight, args...; kwargs...)
+    update!(ensemble(alg), args...; kwargs...)
 
-"""
-    update_weight!(alg::AbstractImportanceSampling, args...; kwargs...)
-
-Forward `update_weight!` to the algorithm's logweight object.
-"""
-update_weight!(alg::AbstractImportanceSampling, args...; kwargs...) =
-    update!(alg, args...; kwargs...)

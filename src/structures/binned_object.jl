@@ -56,8 +56,6 @@ struct BinnedObject{N,T,B<:AbstractBin}
     bins :: NTuple{N,B}
 end
 
-const BinnedLogWeight = BinnedObject
-
 @inline function Base.getproperty(bo::BinnedObject, name::Symbol)
     if name === :weights
         return getfield(bo, :values)
@@ -121,34 +119,53 @@ end
 # size of the weights array
 @inline Base.size(lw::BinnedObject) = size(lw.values)
 
+"""
+    get_centers(bo::BinnedObject, dim::Int=1)
+
+Return bin centers along dimension `dim`.
+For discrete bins this returns the bin support values.
+"""
+@inline get_centers(bo::BinnedObject, dim::Int=1) = collect(bo.bins[dim])
+
+"""
+    values(bo::BinnedObject)
+
+Return the underlying array of bin values.
+"""
+@inline Base.values(bo::BinnedObject) = bo.values
+@inline get_values(bo::BinnedObject) = Base.values(bo)
+
 # access via lw() syntax
 @inline function (lw::BinnedObject{1,T,B})(x::Real) where {T,B}
     idx = _binindex(lw.bins[1], x)
-    @inbounds lw.values[idx]
+    lw.values[idx]
 end
+
+@inline logweight(bo::BinnedObject{1}, x::Real) = bo(x)
+@inline logweight(bo::BinnedObject{N}, xs::Vararg{Real,N}) where {N} = bo(xs...)
 @inline function (lw::BinnedObject{N,T,B})(xs::Vararg{Real,N}) where {N,T,B}
     idxs = _binindex(lw.bins, xs)
-    @inbounds lw.values[CartesianIndex(idxs)]
+    lw.values[CartesianIndex(idxs)]
 end
 
 # access via lw[] syntax
 @inline function Base.getindex(lw::BinnedObject{1,T,B}, x::Real) where {T,B}
     idx = _binindex(lw.bins[1], x)
-    @inbounds lw.values[idx]
+    lw.values[idx]
 end
 @inline function Base.setindex!(lw::BinnedObject{1,T,B}, v, x::Real) where {T,B}
     idx = _binindex(lw.bins[1], x)
-    @inbounds lw.values[idx] = v
+    lw.values[idx] = v
 end
 @inline function Base.getindex(lw::BinnedObject{N,T,B}, xs::Vararg{Real,N}) where {N,T,B}
     #TODO: this can be very likely be optimized
     idxs = [_binindex(lw.bins[i], xs[i]) for i in 1:N]
-    @inbounds lw.values[idxs...]
+    lw.values[idxs...]
 end
 @inline function Base.setindex!(lw::BinnedObject{N,T,B}, v, xs::Vararg{Real,N}) where {N,T,B}
     #TODO: this can be very likely be optimized
     idxs = [_binindex(lw.bins[i], xs[i]) for i in 1:N]
-    @inbounds lw.values[idxs...] = v
+    lw.values[idxs...] = v
 end
 
 """

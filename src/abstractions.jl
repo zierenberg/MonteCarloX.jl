@@ -24,17 +24,17 @@ Examples:
 abstract type AbstractSystem end
 
 """
-    AbstractLogWeight
+    AbstractEnsemble
 
-Base type for log weight functions.
+Base type for ensemble objects.
 
-A LogWeight is:
-- A callable object or function that operates on a system
-- May store parameters (e.g., temperature β for Boltzmann)
-- May include a measure (for multicanonical, continuous functions, etc.)
-- In Bayesian case: log_likelihood + log_prior
+An ensemble defines the target distribution structure and provides a
+log-weight/log-density map used by acceptance rules.
 """
-abstract type AbstractLogWeight end
+abstract type AbstractEnsemble end
+
+# Ensemble-first API alias used while migrating surrounding docs/examples.
+const AbstractLogWeight = AbstractEnsemble
 
 """
     AbstractAlgorithm

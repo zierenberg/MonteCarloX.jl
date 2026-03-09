@@ -101,7 +101,8 @@ function spin_flip!(sys::AbstractSpinSystem, alg::AbstractImportanceSampling)
     
     # Evaluate log weight before and after
     # Terms can be scalars, tuples, or named tuples - sum handles all cases
-    log_ratio = alg.logweight(H_terms .+ ΔH_terms) - alg.logweight(H_terms)
+    ens = ensemble(alg)
+    log_ratio = logweight(ens, H_terms .+ ΔH_terms) - logweight(ens, H_terms)
     
     # Accept or reject the move
     if accept!(alg, log_ratio)

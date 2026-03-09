@@ -3,6 +3,14 @@
 Weights determine relative probabilities in equilibrium workflows.
 Algorithms only need **differences in log weight**, so the representation can stay flexible.
 
+The same callable concept also covers Bayesian targets:
+
+- Bayesian inference: `logweight(theta) = logposterior(theta) = loglikelihood(theta) + logprior(theta)`
+- Statistical mechanics: `logweight(x) = -beta * E(x)`
+
+In the sampler API this callable is stored as the algorithm `ensemble`, with
+`logweight(alg)` as an equivalent accessor.
+
 For canonical targets,
 \[
 \pi(x)=\frac{e^{-\beta E(x)}}{Z(\beta)},

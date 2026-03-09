@@ -473,7 +473,7 @@ end
 
 function _pair_sum(sys::IsingLatticeOptim)
     pair_sum = 0
-    for i in eachindex(sys.spins)
+    @inbounds for i in eachindex(sys.spins)
         pair_sum += local_pair_interactions(sys, i)
     end
     return div(pair_sum, 2)
@@ -482,7 +482,7 @@ end
 @inline _full_energy(sys::IsingLatticeOptim) = -_pair_sum(sys)
 
 @inline function flip_changes(sys::IsingLatticeOptim, i)
-    s = sys.spins[i]
+    @inbounds s = sys.spins[i]
     Δpair = -2 * local_pair_interactions(sys, i)
     Δspin = -2 * s
     return Δpair, Δspin
@@ -491,7 +491,7 @@ end
 @inline delta_energy(sys::IsingLatticeOptim, Δpair, Δspin, i) = -Δpair
 
 function modify!(sys::IsingLatticeOptim, i, Δpair, Δspin)
-    sys.spins[i] = -sys.spins[i]
+    @inbounds sys.spins[i] = -sys.spins[i]
     sys.sum_pair_interactions += Δpair
     sys.sum_spins += Δspin
     return nothing
