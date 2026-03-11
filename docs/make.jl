@@ -4,9 +4,16 @@ using Documenter, MonteCarloX
 
 #DocMeta.setdocmeta!(MonteCarloX, :DocTestSetup, :(using MonteCarloX); recursive = true)
 
+strict_docs = get(ENV, "DOCS_STRICT", "false") == "true"
+
 makedocs(;
     modules = [MonteCarloX],
-    format = Documenter.HTML(),
+    format = Documenter.HTML(;
+        assets = ["assets/custom.css", "assets/custom.js"],
+    ),
+    doctest = strict_docs,
+    checkdocs = strict_docs ? :exports : :none,
+    warnonly = !strict_docs,
     pages = [
         "Getting Started" => "index.md",
         "Monte Carlo Fundamentals" => "monte_carlo_fundamentals.md",

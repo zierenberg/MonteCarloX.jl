@@ -47,6 +47,33 @@ If you are new, read in this order:
 MonteCarloX is the algorithmic core. Concrete model families are intentionally external.
 This keeps the framework concise and easier to extend.
 
+## Related Julia packages
+
+The Julia ecosystem already has several Monte Carlo packages with different goals and interfaces.
+If your use case is better served by a domain-specific implementation, these are useful alternatives or complements:
+
+- [GeneralizedMonteCarlo.jl](https://juliapackages.com/p/generalizedmontecarlo): generalized-ensemble methods (for example multicanonical and related workflows).
+- [MonteCarlo.jl](https://github.com/carstenbauer/MonteCarlo.jl): quantum many-body focused Monte Carlo framework.
+- [Carlo.jl](https://github.com/lukas-weber/Carlo.jl): lattice-model Monte Carlo toolkit with a strong focus on physics applications.
+
+Other related packages (grouped by common use cases):
+
+- Bayesian inference and MCMC:
+	- [Turing.jl](https://github.com/TuringLang/Turing.jl)
+	- [AbstractMCMC.jl](https://github.com/TuringLang/AbstractMCMC.jl)
+	- [AdvancedMH.jl](https://github.com/TuringLang/AdvancedMH.jl)
+	- [AdvancedHMC.jl](https://github.com/TuringLang/AdvancedHMC.jl)
+	- [DynamicHMC.jl](https://github.com/tpapp/DynamicHMC.jl)
+	- [BAT.jl](https://github.com/bat/BAT.jl)
+	- [Gen.jl](https://github.com/probcomp/Gen.jl)
+- Monte Carlo integration and low-discrepancy sampling:
+	- [Cuba.jl](https://github.com/giordano/Cuba.jl)
+	- [QuasiMonteCarlo.jl](https://github.com/SciML/QuasiMonteCarlo.jl)
+- Uncertainty propagation with particle arithmetic:
+	- [MonteCarloMeasurements.jl](https://github.com/baggepinnen/MonteCarloMeasurements.jl)
+
+MonteCarloX stays focused on compact, model-agnostic algorithmic building blocks, while these packages offer specialized ecosystems for their target domains.
+
 ## Random number generators
 
 MonteCarloX works with any Julia `AbstractRNG`.
