@@ -1,6 +1,47 @@
 using MonteCarloX
 using Test
 
+struct BadEnsemble <: AbstractEnsemble end
+
+"""
+Test AbstractEnsemble constructor with various valid cases and error conditions.
+"""
+function test_abstract_ensemble_constructor(; verbose=false)
+    # test that failures come when trying to constructing a new ensemble type that doesn't implement relevant functions
+    ens = BadEnsemble()
+    pass = true
+
+    # logweight(ens)
+    pass &= try
+        logweight(ens)
+        false
+    catch err
+        if verbose; println("✓ logweight(ens) throws error for BadEnsemble"); end
+        err isa ArgumentError
+    end
+    
+    # loweight(ens, x)
+    pass &= try
+        logweight(ens, 1.0)
+        false
+    catch err
+        if verbose; println("✓ logweight(ens, 1.0) throws error for BadEnsemble"); end
+        err isa ArgumentError
+    end
+
+    # update!(ens)
+    pass &= try
+        update!(ens)
+        false
+    catch err
+        if verbose; println("✓ update!(ens) throws error for BadEnsemble"); end
+        err isa ArgumentError
+    end
+
+    return pass
+end
+
+
 """
 Test BoltzmannEnsemble constructor with various valid cases and error conditions.
 """
@@ -264,11 +305,12 @@ function test_function_ensemble_constructor(; verbose=false)
     return pass
 end
 
-function run_ensemble_testsets()
+function run_ensemble_testsets(;verbose=false)
     @testset "Ensemble Constructors" begin
-        @test test_boltzmann_ensemble_constructor(verbose=true)
-        @test test_multicanonical_ensemble_constructor(verbose=true)
-        @test test_wang_landau_ensemble_constructor(verbose=true)
-        @test test_function_ensemble_constructor(verbose=true)
+        @test test_abstract_ensemble_constructor(verbose=verbose)
+        @test test_boltzmann_ensemble_constructor(verbose=verbose)
+        @test test_multicanonical_ensemble_constructor(verbose=verbose)
+        @test test_wang_landau_ensemble_constructor(verbose=verbose)
+        @test test_function_ensemble_constructor(verbose=verbose)
     end
 end
