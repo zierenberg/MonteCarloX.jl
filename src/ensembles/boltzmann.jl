@@ -26,4 +26,4 @@ end
 
 @inline logweight(e::BoltzmannEnsemble, E::Real) = -e.beta * E
 @inline logweight(e::BoltzmannEnsemble, E::AbstractArray) = -e.beta * sum(E)
-@inline logweight(e::BoltzmannEnsemble) = E -> logweight(e, E)
+@inline logweight(e::BoltzmannEnsemble) = x -> logweight(e, x)

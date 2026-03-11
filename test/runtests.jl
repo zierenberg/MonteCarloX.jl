@@ -19,6 +19,10 @@ using Random
     include("test_measurements.jl")
     run_measurements_testsets()
 
+    # ensemble constructors
+    include("test_ensembles.jl")
+    run_ensemble_testsets()
+
     # equilibrium / Metropolis
     include("test_metropolis.jl")
     run_metropolis_testsets()

@@ -70,7 +70,7 @@ function test_wang_landau_update_f(; verbose=false)
     wl = WangLandau(rng, lw; logf=1.0)
 
     logf0 = ensemble(wl).logf
-    pass = update!(wl) === nothing && ensemble(wl).logf == 0.5 * logf0
+    pass = update!(ensemble(wl)) === nothing && ensemble(wl).logf == 0.5 * logf0
 
     if verbose
         println("Wang-Landau schedule update!: logf0=$(logf0), logf1=$(ensemble(wl).logf)")

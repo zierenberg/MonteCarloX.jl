@@ -8,7 +8,7 @@ It is built around composable primitives, so algorithms stay reusable across ver
 - Equilibrium samplers (`Metropolis`, `Glauber`, `HeatBath`, `Multicanonical`, `WangLandau`)
 - Continuous-time samplers (`Gillespie`)
 - Measurement/scheduling framework (`Measurements`)
-- Log-weight tools (`BoltzmannLogWeight`, `BinnedLogWeight`)
+- Ensemble and weight tools (`BoltzmannEnsemble`, `BinnedObject`)
 - Event handler backends for event-driven dynamics
 
 ## Core idea

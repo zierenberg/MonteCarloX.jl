@@ -142,15 +142,15 @@ using MonteCarloX
 lw = BinnedObject(-20:2:20, 0.0)
 alg = Multicanonical(MersenneTwister(2), lw)
 
-set_logweight!(alg, -10:2:10, x -> 0.0)
+set!(ensemble(alg), -10:2:10, x -> 0.0)
 # run your update loop with accept!(alg, x_new, x_old)
-# then call update!(alg)
+# then call update!(ensemble(alg))
 ```
 
 ### Wang-Landau
 
 - updates log-density-of-states estimate at visited bins
-- progressively refines modification factor (`logf` via `update!(alg)` between stages)
+- progressively refines modification factor (`logf` via `update!(ensemble(alg))` between stages)
 
 ```julia
 using Random
@@ -184,6 +184,11 @@ alg = WangLandau(MersenneTwister(3), lw; logf=1.0)
 AbstractImportanceSampling
 AbstractMetropolis
 AbstractHeatBath
+ImportanceSampling
+ensemble(alg::AbstractImportanceSampling)
+logweight(alg::AbstractImportanceSampling)
+logweight(ens::AbstractEnsemble)
+logweight(ens::AbstractEnsemble, x)
 Metropolis
 Glauber
 HeatBath
@@ -192,6 +197,6 @@ acceptance_rate
 reset!(alg::AbstractImportanceSampling)
 Multicanonical
 WangLandau
-set_logweight!
-update!
+update!(ens::AbstractEnsemble, args...)
+update!(e::WangLandauEnsemble; power::Real=0.5)
 ```

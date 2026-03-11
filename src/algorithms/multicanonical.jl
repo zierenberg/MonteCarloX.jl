@@ -1,5 +1,3 @@
-using Random
-
 """
     Multicanonical([rng,] bins; init=0.0)
 
@@ -34,4 +32,3 @@ function reset!(alg::ImportanceSampling{<:MulticanonicalEnsemble})
     return nothing
 end
 
-@inline set_logweight!(alg::ImportanceSampling{<:MulticanonicalEnsemble}, xrange, f::Function) = set!(ensemble(alg), xrange, f)

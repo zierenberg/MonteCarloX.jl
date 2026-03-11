@@ -8,21 +8,17 @@ mutable struct MulticanonicalEnsemble{BO<:BinnedObject} <: AbstractEnsemble
         new{BO}(logweight, histogram, record_visits)
     end
 end
-MulticanonicalEnsemble(logweight::BO; histogram=nothing) where {BO<:BinnedObject} =
-    MulticanonicalEnsemble(logweight, histogram === nothing ? zero(logweight) : histogram)
+MulticanonicalEnsemble(logweight::BO; histogram=nothing, record_visits::Bool=true) where {BO<:BinnedObject} =
+    MulticanonicalEnsemble(logweight, histogram === nothing ? zero(logweight) : histogram; record_visits=record_visits)
 
-function MulticanonicalEnsemble(bins; init::Real=0.0)
+function MulticanonicalEnsemble(bins; init::Real=0.0, record_visits::Bool=true)
     lw = bins isa BinnedObject ? bins : BinnedObject(bins, float(init))
     histogram = zero(lw)
-    return MulticanonicalEnsemble(lw, histogram)
+    return MulticanonicalEnsemble(lw, histogram; record_visits=record_visits)
 end
 
-@inline logweight(e::MulticanonicalEnsemble) = e.logweight
+@inline logweight(e::MulticanonicalEnsemble) = e.logweight # this is already a callable BinnedObject, so we can just return it
 @inline logweight(e::MulticanonicalEnsemble, x) = e.logweight(x)
-
-@inline get_centers(e::MulticanonicalEnsemble, dim::Int=1) = get_centers(e.logweight, dim)
-@inline Base.values(e::MulticanonicalEnsemble) = Base.values(e.logweight)
-@inline get_values(e::MulticanonicalEnsemble) = Base.values(e)
 
 @inline should_record_visit(ens::MulticanonicalEnsemble) = ens.record_visits
 
@@ -38,41 +34,6 @@ function record_visit!(ens::MulticanonicalEnsemble, x_vis)
         if 1 <= idx_new <= size(h.values, 1)
             h[x_vis] += 1
         end
-    end
-
-    return nothing
-end
-
-
-function set!(
-    e::MulticanonicalEnsemble,
-    xrange::Union{Tuple{<:Real,<:Real},AbstractRange{<:Real}},
-    f::Function,
-)
-    length(size(e.logweight.values)) == 1 ||
-        throw(ArgumentError("`set!` currently supports only 1D binned log-weights"))
-
-    cs = collect(e.logweight.bins[1])
-    n = length(cs)
-
-    xleft, xright = if xrange isa Tuple
-        Float64(min(xrange[1], xrange[2])), Float64(max(xrange[1], xrange[2]))
-    else
-        Float64(min(first(xrange), last(xrange))), Float64(max(first(xrange), last(xrange)))
-    end
-
-    idx_left = clamp(searchsortedfirst(cs, xleft), 1, n)
-    idx_right = clamp(searchsortedlast(cs, xright), 1, n)
-    idx_left <= idx_right ||
-        throw(ArgumentError("selected range does not overlap any bin centers"))
-
-    if cs[idx_left] > xright || cs[idx_right] < xleft
-        throw(ArgumentError("selected range does not overlap any bin centers"))
-    end
-
-    @inbounds for i in idx_left:idx_right
-        x = cs[i]
-        e.logweight.values[i] = Float64(f(x))
     end
 
     return nothing

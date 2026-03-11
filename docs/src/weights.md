@@ -24,7 +24,7 @@ and local acceptance decisions depend on
 \Delta \log \pi = -\beta\,\Delta E.
 \]
 
-## 1) Canonical ensemble: `BoltzmannLogWeight`
+## 1) Canonical ensemble: `BoltzmannEnsemble`
 
 For energy `E`, the log weight is `-βE`.
 
@@ -33,36 +33,39 @@ using Random
 using MonteCarloX
 
 rng = MersenneTwister(1)
-alg = Metropolis(rng; β=0.5)  # internally uses BoltzmannLogWeight(0.5)
+alg = Metropolis(rng; β=0.5)  # internally uses BoltzmannEnsemble(0.5)
 ```
 
 Use this for standard fixed-temperature sampling.
 
-## 2) Tabulated weights: `BinnedLogWeight`
+## 2) Tabulated weights: `BinnedObject`
 
 Use when the weight is not known analytically, or when adapting it online (multicanonical / Wang-Landau).
 
 ```julia
 using MonteCarloX
 
-lw = BinnedLogWeight(-20:2:20, 0.0)
+lw = BinnedObject(-20:2:20, 0.0)
 lw[0] = 1.5
 value = lw(0)
 
 lw_zero = zero(lw)
 ```
 
-`BinnedLogWeight` supports discrete and continuous bin definitions (including multidimensional bin tuples).
+`BinnedObject` supports discrete and continuous bin definitions (including multidimensional bin tuples).
 
 ## How to choose
 
-- Known canonical target: `BoltzmannLogWeight`
-- Exploratory generalized-ensemble run: `BinnedLogWeight` + `Multicanonical` or `WangLandau`
+- Known canonical target: `BoltzmannEnsemble`
+- Exploratory generalized-ensemble run: `BinnedObject` + `Multicanonical` or `WangLandau`
 
 ## API reference
 
 ```@docs
-BoltzmannLogWeight
-BinnedLogWeight
-Base.zero(::BinnedLogWeight)
+BoltzmannEnsemble
+FunctionEnsemble
+BinnedObject
+get_centers(bo::BinnedObject, dim::Int=1)
+Base.values(bo::BinnedObject)
+Base.zero(lw::BinnedObject)
 ```

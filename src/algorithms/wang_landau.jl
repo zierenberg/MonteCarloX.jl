@@ -35,17 +35,3 @@ function accept!(alg::ImportanceSampling{<:WangLandauEnsemble}, x_new::Real, x_o
     lw[x_vis] -= ens.logf
     return accepted
 end
-
-"""
-    update!(alg::ImportanceSampling{<:WangLandauEnsemble})
-
-Update Wang-Landau schedule by scaling the modification factor:
-`logf <- power * logf` with default `power=0.5`.
-"""
-function update!(ens::WangLandauEnsemble; power::Real=0.5)
-    ens.logf *= power
-    return nothing
-end
-
-update!(alg::ImportanceSampling{<:WangLandauEnsemble}; kwargs...) =
-    update!(ensemble(alg); kwargs...)

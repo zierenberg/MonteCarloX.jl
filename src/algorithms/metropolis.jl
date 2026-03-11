@@ -1,9 +1,23 @@
-# Metropolis Algorithm
-# Classic importance sampling with Metropolis-Hastings acceptance criterion
-using Random
+"""
+    AbstractMetropolis <: AbstractImportanceSampling
+
+Base type for Metropolis-family samplers where acceptance is naturally
+computed from a local state difference (e.g. ΔE).
+"""
+abstract type AbstractMetropolis <: AbstractImportanceSampling end
 
 """
-    Metropolis <: AbstractImportanceSampling
+    accept!(alg::AbstractMetropolis, delta_state)
+
+Metropolis-family acceptance using a local state difference.
+"""
+function accept!(alg::AbstractMetropolis, delta_state)
+    log_ratio = logweight(ensemble(alg), delta_state)
+    return _accept!(alg, log_ratio)
+end
+
+"""
+    Metropolis <: AbstractMetropolis
 
 Metropolis algorithm for importance sampling.
 

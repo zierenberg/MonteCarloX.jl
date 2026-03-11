@@ -14,6 +14,10 @@ end
 @inline logweight(e::WangLandauEnsemble) = e.logweight
 @inline logweight(e::WangLandauEnsemble, x) = e.logweight(x)
 
-@inline get_centers(e::WangLandauEnsemble, dim::Int=1) = get_centers(e.logweight, dim)
-@inline Base.values(e::WangLandauEnsemble) = Base.values(e.logweight)
-@inline get_values(e::WangLandauEnsemble) = Base.values(e)
+"""
+    update!(e::WangLandauEnsemble; power=0.5)
+
+Update Wang-Landau schedule by scaling the modification factor:
+`logf <- power * logf` with default `power=0.5`.
+"""
+@inline update!(e::WangLandauEnsemble; power::Real=0.5) = (e.logf *= power; nothing)

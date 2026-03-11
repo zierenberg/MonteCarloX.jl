@@ -2,18 +2,6 @@
 # Shared by all continuous-time event-driven algorithms.
 
 """
-    AbstractKineticMonteCarlo <: AbstractAlgorithm
-
-Base type for continuous-time kinetic Monte Carlo algorithms.
-
-Kinetic Monte Carlo algorithms:
-- Draw waiting times from event rates
-- Draw events proportional to rates
-- Track simulation time and number of accepted events
-"""
-abstract type AbstractKineticMonteCarlo <: AbstractAlgorithm end
-
-"""
     reset!(alg::AbstractKineticMonteCarlo)
 
 Reset kinetic Monte Carlo statistics (`steps`, `time`) to zero.

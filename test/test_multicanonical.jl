@@ -58,7 +58,7 @@ function test_multicanonical_weight_update_inplace(; verbose=false)
         println("histogram weights:", ensemble(alg).histogram.weights)
     end
 
-    pass &= update!(alg) === nothing
+    pass &= update!(ensemble(alg)) === nothing
 
     expected = copy(w_before)
     for i in eachindex(expected)
@@ -88,7 +88,7 @@ function test_multicanonical_mode(; verbose=false)
 
     pass = true    
     pass &= try
-        update!(alg; mode=:notavail)  # unsupported mode should throw
+        update!(ensemble(alg); mode=:notavail)  # unsupported mode should throw
         false
     catch err
         err isa ArgumentError
@@ -155,11 +155,11 @@ function test_multicanonical_set_logweight_range_function(; verbose=false)
 
     fill!(ensemble(alg).logweight.weights, 0.0)
 
-    pass &= set_logweight!(alg, (1.0, 4.0), x -> 10.0 + x) === nothing
+    pass &= set!(logweight(alg), (1.0, 4.0), x -> 10.0 + x) === nothing
     expected = [0.0, 11.5, 12.5, 13.5, 0.0, 0.0]
     pass &= all(isapprox.(ensemble(alg).logweight.weights, expected))
 
-    pass &= set_logweight!(alg, 0.0:1.0:6.0, x -> -x^2) === nothing
+    pass &= set!(logweight(alg), 0.0:1.0:6.0, x -> -x^2) === nothing
     centers = collect(ensemble(alg).histogram.bins[1])
     pass &= all(isapprox.(ensemble(alg).logweight.weights, -centers.^2))
 
@@ -179,7 +179,7 @@ function test_multicanonical_set_logweight_range_errors(; verbose=false)
     pass = true
 
     pass &= try
-        set_logweight!(alg, (100.0, 200.0), x -> x)
+        set!(logweight(alg), (100.0, 200.0), x -> x)
         false
     catch err
         err isa ArgumentError

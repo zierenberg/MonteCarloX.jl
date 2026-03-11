@@ -141,8 +141,6 @@ Return the underlying array of bin values.
     lw.values[idx]
 end
 
-@inline logweight(bo::BinnedObject{1}, x::Real) = bo(x)
-@inline logweight(bo::BinnedObject{N}, xs::Vararg{Real,N}) where {N} = bo(xs...)
 @inline function (lw::BinnedObject{N,T,B})(xs::Vararg{Real,N}) where {N,T,B}
     idxs = _binindex(lw.bins, xs)
     lw.values[CartesianIndex(idxs)]
@@ -194,5 +192,40 @@ end
             @assert b1.edges == b2.edges "Continuous bins must have the same edges."
         end
     end
+    return nothing
+end
+
+
+function set!(
+    bo::BinnedObject,
+    xrange::Union{Tuple{<:Real,<:Real},AbstractRange{<:Real}},
+    f::Function,
+)
+    length(size(bo.values)) == 1 ||
+        throw(ArgumentError("`set!` currently supports only 1D binned log-weights"))
+
+    cs = collect(bo.bins[1])
+    n = length(cs)
+
+    xleft, xright = if xrange isa Tuple
+        Float64(min(xrange[1], xrange[2])), Float64(max(xrange[1], xrange[2]))
+    else
+        Float64(min(first(xrange), last(xrange))), Float64(max(first(xrange), last(xrange)))
+    end
+
+    idx_left = clamp(searchsortedfirst(cs, xleft), 1, n)
+    idx_right = clamp(searchsortedlast(cs, xright), 1, n)
+    idx_left <= idx_right ||
+        throw(ArgumentError("selected range does not overlap any bin centers"))
+
+    if cs[idx_left] > xright || cs[idx_right] < xleft
+        throw(ArgumentError("selected range does not overlap any bin centers"))
+    end
+
+    @inbounds for i in idx_left:idx_right
+        x = cs[i]
+        bo.values[i] = Float64(f(x))
+    end
+
     return nothing
 end
