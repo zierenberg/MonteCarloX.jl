@@ -1,4 +1,4 @@
-# MonteCarloX
+# MonteCarloX.jl
 
 [![Docs: dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://zierenberg.github.io/MonteCarloX.jl/dev)
 [![CI: core](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_core.yml/badge.svg)](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_core.yml)
@@ -7,8 +7,10 @@
 
 <img src="assets/montecarlox_logo.png" alt="MonteCarloX logo" width="180" />
 
-MonteCarloX is a concise, modular Monte Carlo framework in Julia.
+MonteCarloX.jl is a concise, modular Monte Carlo framework in Julia.
 It provides reusable sampling algorithms and measurement tools, while model-specific code lives in companion packages (for example, `SpinSystems`).
+
+To install MonteCarloX.jl, run import Pkg; Pkg.add("MonteCarloX") as a Julia language command. 
 
 ## Design in one sentence
 
