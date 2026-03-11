@@ -24,18 +24,8 @@ end
 
 function record_visit!(ens::MulticanonicalEnsemble, x_vis)
     h = ens.histogram
-    if x_vis isa Tuple
-        idx_new = _binindex(h.bins, x_vis)
-        if all(d -> (1 <= idx_new[d] <= size(h.values, d)), 1:length(idx_new))
-            h[x_vis...] += 1
-        end
-    else
-        idx_new = _binindex(h.bins[1], x_vis)
-        if 1 <= idx_new <= size(h.values, 1)
-            h[x_vis] += 1
-        end
-    end
-
+    # multidimensional aspects should be handled by the BinnedObject indexing.
+    h[x_vis] += 1
     return nothing
 end
 

@@ -28,8 +28,8 @@ using Random
     run_metropolis_testsets()
 
     # weights
-    include("test_weights.jl")
-    run_weights_testsets()
+    include("test_binned_objects.jl")
+    run_binned_objects_testsets()
 
     # generalized ensembles
     include("test_multicanonical.jl")

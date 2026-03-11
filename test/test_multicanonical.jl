@@ -146,22 +146,33 @@ function test_multicanonical_accept_out_of_bounds(; verbose=false)
 end
 
 function test_multicanonical_set_logweight_range_function(; verbose=false)
-    rng = MersenneTwister(903)
+    # start from MulticanonicalEnsemble and use default rng
     bins = 0.0:1.0:6.0
-    lw = BinnedObject(bins, 0.0)
-    alg = Multicanonical(rng, lw)
+    ens = MulticanonicalEnsemble(bins)
+    alg = Multicanonical(ens)
+    
+    pass = true
+    pass &= alg.rng === Random.GLOBAL_RNG
+    if verbose&pass; println("✓ Multicanonical uses GLOBAL_RNG"); end
 
     pass = true
-
     fill!(ensemble(alg).logweight.weights, 0.0)
 
     pass &= set!(logweight(alg), (1.0, 4.0), x -> 10.0 + x) === nothing
     expected = [0.0, 11.5, 12.5, 13.5, 0.0, 0.0]
     pass &= all(isapprox.(ensemble(alg).logweight.weights, expected))
+    if verbose&pass; println("✓ set!(logweight(alg), range, func) works only in restricted range"); end
 
     pass &= set!(logweight(alg), 0.0:1.0:6.0, x -> -x^2) === nothing
     centers = collect(ensemble(alg).histogram.bins[1])
     pass &= all(isapprox.(ensemble(alg).logweight.weights, -centers.^2))
+    if verbose&pass; println("✓ set!(logweight(alg), range, func) works for full range"); end
+
+    # set logweight so that move is not accepted
+    x = 0.0
+    set!(logweight(alg), (1.0, 6.0), w -> -100.0)
+    pass &= accept!(alg, 2.0, x) == false
+    if verbose&pass; println("✓ set!(logweight(alg), range, func) can be used to suppress acceptance in certain bins"); end
 
     if verbose
         println("Multicanonical set-logweight range/function API: $(pass)")

@@ -6,6 +6,30 @@ using Distributions
 using Test
 
 """
+Test ImportanceSampling basics (construction and definition/nondefinition of functions)
+"""
+function test_importance_sampling_basics(; verbose=false)
+    rng = MersenneTwister(42)
+    logdensity(x) = -0.5 * x^2
+    alg = ImportanceSampling(rng, logdensity)
+    
+    pass = true
+    pass &= alg.rng === rng
+    pass &= alg.ensemble === FunctionEnsemble(logdensity)
+    pass &= hasmethod(accept!, Tuple{typeof(alg), Float64, Float64})
+    pass &= hasmethod(reset!, Tuple{typeof(alg)})
+    if verbose&pass; println("✓ ImportanceSampling construction and method definitions"); end
+
+    pass &= ensemble(alg) isa FunctionEnsemble
+    pass &= logweight(alg) === logdensity
+
+    pass &= MonteCarloX.should_record_visit(ensemble(alg)) == false
+    pass &= MonteCarloX.record_visit!(ensemble(alg), 1.0) === nothing
+    
+    return pass
+end
+
+"""
 Test Metropolis sampler on a 1D Gaussian with scheduled measurements and KL divergence check
 """
 function test_metropolis_1d_gaussian(; verbose=false)
@@ -500,6 +524,9 @@ end
 
 function run_metropolis_testsets(; verbose=false)
     @testset "Metropolis" begin
+        @testset "Importance Sampling" begin
+            @test test_importance_sampling_basics(verbose=verbose)
+        end
         @testset "1D Gaussian" begin
             @test test_metropolis_1d_gaussian(verbose=verbose)
         end
