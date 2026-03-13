@@ -6,6 +6,30 @@ using Distributions
 using Test
 
 """
+Test ImportanceSampling basics (construction and definition/nondefinition of functions)
+"""
+function test_importance_sampling_basics(; verbose=false)
+    rng = MersenneTwister(42)
+    logdensity(x) = -0.5 * x^2
+    alg = ImportanceSampling(rng, logdensity)
+    
+    pass = true
+    pass &= alg.rng === rng
+    pass &= alg.ensemble === FunctionEnsemble(logdensity)
+    pass &= hasmethod(accept!, Tuple{typeof(alg), Float64, Float64})
+    pass &= hasmethod(reset!, Tuple{typeof(alg)})
+    if verbose&pass; println("✓ ImportanceSampling construction and method definitions"); end
+
+    pass &= ensemble(alg) isa FunctionEnsemble
+    pass &= logweight(alg) === logdensity
+
+    pass &= MonteCarloX.should_record_visit(ensemble(alg)) == false
+    pass &= MonteCarloX.record_visit!(ensemble(alg), 1.0) === nothing
+    
+    return pass
+end
+
+"""
 Test Metropolis sampler on a 1D Gaussian with scheduled measurements and KL divergence check
 """
 function test_metropolis_1d_gaussian(; verbose=false)
@@ -235,7 +259,7 @@ function test_metropolis_acceptance_tracking(; verbose=false)
 end
 
 """
-Test Metropolis with BoltzmannLogWeight showing temperature effects using Measurement framework
+Test Metropolis with BoltzmannEnsemble showing temperature effects using Measurement framework
 """
 function test_metropolis_temperature_effects(; verbose=false)
     pass = true
@@ -396,13 +420,14 @@ function test_metropolis_proposal_invariance(; verbose=false)
 end
 
 """
-Test BoltzmannLogWeight call overloads and Metropolis convenience constructor.
+Test BoltzmannEnsemble logweight overloads and Metropolis convenience constructor.
 """
 function test_metropolis_boltzmann_overloads_and_constructor(; verbose=false)
     rng = MersenneTwister(500)
     β = 0.75
 
-    lw = BoltzmannLogWeight(β)
+    ens = BoltzmannEnsemble(β)
+    lw = logweight(ens)
 
     # Scalar overload on Real (including integer inputs)
     e_int = 4
@@ -417,25 +442,28 @@ function test_metropolis_boltzmann_overloads_and_constructor(; verbose=false)
     pass &= lw(e_real) == -β * e_real
     pass &= lw(e_vec) == -β * sum(e_vec)
     pass &= lw(e_mat) == -β * sum(e_mat)
+    pass &= lw(e_int) == -β * e_int
+    pass &= lw(e_vec) == -β * sum(e_vec)
 
     # Metropolis convenience constructor with β keyword
     alg = Metropolis(rng; β=β)
 
     pass &= alg.rng === rng
-    pass &= alg.logweight isa BoltzmannLogWeight
+    pass &= ensemble(alg) isa BoltzmannEnsemble
     pass &= alg.steps == 0
     pass &= alg.accepted == 0
-    pass &= alg.logweight(e_int) == -β * e_int
-    pass &= alg.logweight(e_vec) == -β * sum(e_vec)
+    pass &= logweight(ensemble(alg), e_int) == -β * e_int
+    pass &= logweight(ensemble(alg), e_vec) == -β * sum(e_vec)
 
     if verbose
-        println("Boltzmann Overloads + Constructor Test:")
+        println("Boltzmann logweight Overloads + Constructor Test:")
         println("  β: $(β)")
+        println("  lw callable from logweight(ens): $(lw(e_int))")
         println("  lw(Int): $(lw(e_int))")
         println("  lw(Real): $(lw(e_real))")
         println("  lw(Vector): $(lw(e_vec))")
         println("  lw(Matrix): $(lw(e_mat))")
-        println("  Constructor logweight type: $(typeof(alg.logweight))")
+        println("  Constructor ensemble type: $(typeof(ensemble(alg)))")
     end
 
     return pass
@@ -496,6 +524,9 @@ end
 
 function run_metropolis_testsets(; verbose=false)
     @testset "Metropolis" begin
+        @testset "Importance Sampling" begin
+            @test test_importance_sampling_basics(verbose=verbose)
+        end
         @testset "1D Gaussian" begin
             @test test_metropolis_1d_gaussian(verbose=verbose)
         end

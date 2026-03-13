@@ -1,42 +1,61 @@
 # Importance Sampling - Core functionality
 # Shared by all importance sampling algorithms (Metropolis, Heat Bath, etc.)
 """
-    AbstractImportanceSampling <: AbstractAlgorithm
+    ImportanceSampling <: AbstractImportanceSampling
 
-Base type for importance sampling algorithms (Metropolis, Heat Bath, etc.).
+Generic importance-sampling algorithm that operates on full-state
+acceptance arguments `(x_new, x_old)` using a callable `ensemble`.
 
-Importance sampling algorithms:
-- Use accept/reject steps based on log weight ratios
-- Track acceptance statistics
-- Include an RNG and a log weight function
+The callable may be a function or a log-weight object and should return a
+scalar score such as a log density / log weight.
+
+Conceptual API expectations:
+- `ensemble(alg)` returns the architectural ensemble object carried by the algorithm.
+- `logweight(alg)` returns a callable score object/function derived from that ensemble.
+- Acceptance logic uses score differences from `logweight`.
+
+Unified view:
+- Bayesian inference: `logweight(theta) = logposterior(theta)`
+- Statistical mechanics: `logweight(x) = -beta * E(x)`
+
+Both are represented identically as ensemble-provided logweight callables.
 """
-abstract type AbstractImportanceSampling <: AbstractAlgorithm end
+mutable struct ImportanceSampling{LW,RNG<:AbstractRNG} <: AbstractImportanceSampling
+    rng::RNG
+    ensemble::LW
+    steps::Int
+    accepted::Int
+end
+
+ImportanceSampling(rng::AbstractRNG, ensemble) = ImportanceSampling(rng, _as_ensemble(ensemble), 0, 0)
 
 """
-    AbstractGeneralizedEnsemble <: AbstractImportanceSampling
+    ensemble(alg::AbstractImportanceSampling)
 
-Base type for generalized-ensemble samplers (e.g. multicanonical, Wang-Landau).
-"""
-abstract type AbstractGeneralizedEnsemble <: AbstractImportanceSampling end
+Return the ensemble object carried by an importance-sampling algorithm.
 
+This is the canonical accessor in the ensemble-first API.
+Operationally, this object defines the logweight used in acceptance.
 """
-    AbstractMetropolis <: AbstractImportanceSampling
-
-Base type for Metropolis-family samplers where acceptance is naturally
-computed from a local state difference (e.g. ΔE).
-"""
-abstract type AbstractMetropolis <: AbstractImportanceSampling end
+@inline ensemble(alg::AbstractImportanceSampling) = getfield(alg, :ensemble)
 
 """
-    AbstractHeatBath <: AbstractAlgorithm
+    logweight(alg::AbstractImportanceSampling)
 
-Base type for heat-bath style samplers.
+Return the algorithm ensemble via a logweight-oriented alias.
+Equivalent to `ensemble(alg)`.
+
+Use this accessor when reasoning about acceptance formulas.
 """
-abstract type AbstractHeatBath <: AbstractAlgorithm end
+@inline logweight(alg::AbstractImportanceSampling) = logweight(ensemble(alg))
+
+# Optional ensemble-level visit hooks used by generic accept!.
+# Ensembles that need histogram/visit bookkeeping can specialize these.
+@inline should_record_visit(ens) = false
+@inline record_visit!(ens, x_vis) = nothing
 
 """
     accept!(alg::AbstractImportanceSampling, x_new, x_old)
-    accept!(alg::AbstractMetropolis, delta_x)
 
 Evaluate acceptance criterion for importance sampling with differences.
 
@@ -47,13 +66,15 @@ Returns true if the move is accepted based on the Metropolis criterion:
 
 This is the core accept/reject step used by all importance sampling algorithms.
 """
-function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T<:Union{Real, Vector{<:Real}}
-    log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
-    return _accept!(alg, log_ratio)
-end
-function accept!(alg::AbstractMetropolis, delta_x::Union{Real, Vector{<:Real}})
-    log_ratio = alg.logweight(delta_x)
-    return _accept!(alg, log_ratio)
+function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T
+    ens = ensemble(alg)
+    log_ratio = logweight(ens, x_new) - logweight(ens, x_old)
+    accepted = _accept!(alg, log_ratio)
+    if should_record_visit(ens)
+        x_vis = accepted ? x_new : x_old
+        record_visit!(ens, x_vis)
+    end
+    return accepted
 end
 # core function to evaluate acceptance and update counters
 function _accept!(alg::AbstractImportanceSampling, log_ratio::Real)
@@ -82,7 +103,10 @@ Reset step and acceptance counters to zero.
 Useful when you want to measure acceptance rate for a specific
 run phase without previous history.
 """
-function reset!(alg::AbstractImportanceSampling)
+@inline reset!(alg::AbstractImportanceSampling) = _reset!(alg)
+function _reset!(alg::AbstractImportanceSampling)
     alg.steps = 0
     alg.accepted = 0
 end
+
+

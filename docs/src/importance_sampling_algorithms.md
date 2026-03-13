@@ -40,6 +40,23 @@ Metropolis-Hastings acceptance is
 
 For symmetric local proposals \(q\), this reduces to \(\pi(x')/\pi(x)\).
 
+### Unified view: Bayesian and statistical-physics targets
+
+The same sampler is used in both domains by changing only the callable
+log target score:
+
+- Bayesian inference: `logweight(theta) = logposterior(theta) = loglikelihood(theta) + logprior(theta)`
+- Statistical mechanics: `logweight(x) = -beta * E(x)`
+
+In MonteCarloX this callable is carried by the algorithm as the `ensemble`
+object, and can also be accessed as `logweight(alg)`.
+
+Both views are important:
+- `ensemble(alg)` is the architecture-level object
+- `logweight(alg)` is the acceptance-rule interpretation
+
+They refer to the same callable value.
+
 ## Metropolis
 
 ### When to use it
@@ -59,8 +76,8 @@ using Random
 using MonteCarloX
 
 rng = MersenneTwister(1)
-logweight(x) = -0.5 * x^2
-alg = Metropolis(rng, logweight)
+logdensity(x) = -0.5 * x^2
+alg = Metropolis(rng, logdensity)
 
 x = 0.0
 for _ in 1:20_000
@@ -122,28 +139,28 @@ These methods adapt or use non-canonical weights to improve exploration.
 using Random
 using MonteCarloX
 
-lw = BinnedLogWeight(-20:2:20, 0.0)
+lw = BinnedObject(-20:2:20, 0.0)
 alg = Multicanonical(MersenneTwister(2), lw)
 
-set_logweight!(alg, -10:2:10, x -> 0.0)
+set!(ensemble(alg), -10:2:10, x -> 0.0)
 # run your update loop with accept!(alg, x_new, x_old)
-# then call update_weight!(alg)
+# then call update!(ensemble(alg))
 ```
 
 ### Wang-Landau
 
 - updates log-density-of-states estimate at visited bins
-- progressively refines modification factor (`logf` via `update_f!`)
+- progressively refines modification factor (`logf` via `update!(ensemble(alg))` between stages)
 
 ```julia
 using Random
 using MonteCarloX
 
-lw = BinnedLogWeight(-20:2:20, 0.0)
+lw = BinnedObject(-20:2:20, 0.0)
 alg = WangLandau(MersenneTwister(3), lw; logf=1.0)
 
 # in your loop: accept!(alg, x_new, x_old)
-# between stages: update_f!(alg)
+# between stages: update!(alg)
 ```
 
 ## Choosing quickly
@@ -165,9 +182,13 @@ alg = WangLandau(MersenneTwister(3), lw; logf=1.0)
 
 ```@docs
 AbstractImportanceSampling
-AbstractGeneralizedEnsemble
 AbstractMetropolis
 AbstractHeatBath
+ImportanceSampling
+ensemble(alg::AbstractImportanceSampling)
+logweight(alg::AbstractImportanceSampling)
+logweight(ens::AbstractEnsemble)
+logweight(ens::AbstractEnsemble, x)
 Metropolis
 Glauber
 HeatBath
@@ -176,7 +197,6 @@ acceptance_rate
 reset!(alg::AbstractImportanceSampling)
 Multicanonical
 WangLandau
-set_logweight!
-update_weight!
-update_f!
+update!(ens::AbstractEnsemble, args...)
+update!(e::WangLandauEnsemble; power::Real=0.5)
 ```

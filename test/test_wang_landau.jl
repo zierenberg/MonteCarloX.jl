@@ -9,11 +9,11 @@ function test_wang_landau_accept(; verbose=false)
     pass = true
 
     bins = 0.0:1.0:4.0
-    lw = BinnedLogWeight(bins, 0.0)
+    lw = BinnedObject(bins, 0.0)
     alg = WangLandau(rng, lw)
 
     step = 0.1
-    function update!(x::Float64, alg::WangLandau)::Float64
+    function update!(x::Float64, alg)::Float64
         x_new = x + randn(alg.rng) * step
         if accept!(alg, x_new, x)
             return x_new
@@ -45,14 +45,14 @@ function test_wang_landau_local_update(; verbose=false)
     pass = true
 
     bins = 0.0:1.0:4.0
-    lw = BinnedLogWeight(bins, 0.0)
+    lw = BinnedObject(bins, 0.0)
     wl = WangLandau(rng, lw; logf=log(2.0))
 
     x = 1.2
     w0 = lw[x]
-    pass &= update_weight!(wl, x) === nothing
+    pass &= accept!(wl, x, x) == true
 
-    pass &= lw[x] == w0 - wl.logf
+    pass &= lw[x] == w0 - ensemble(wl).logf
 
     if verbose
         println("Wang-Landau local update:")
@@ -66,14 +66,14 @@ function test_wang_landau_update_f(; verbose=false)
     rng = MersenneTwister(781)
 
     bins = 0.0:1.0:4.0
-    lw = BinnedLogWeight(bins, 0.0)
+    lw = BinnedObject(bins, 0.0)
     wl = WangLandau(rng, lw; logf=1.0)
 
-    logf0 = wl.logf
-    pass = update_f!(wl) === nothing && wl.logf == 0.5 * logf0
+    logf0 = ensemble(wl).logf
+    pass = update!(ensemble(wl)) === nothing && ensemble(wl).logf == 0.5 * logf0
 
     if verbose
-        println("Wang-Landau update_f!: logf0=$(logf0), logf1=$(wl.logf)")
+        println("Wang-Landau schedule update!: logf0=$(logf0), logf1=$(ensemble(wl).logf)")
     end
 
     return pass
@@ -81,7 +81,7 @@ end
 
 function test_wang_landau_default_rng(; verbose=false)
     bins = 0.0:1.0:4.0
-    lw = BinnedLogWeight(bins, 0.0)
+    lw = BinnedObject(bins, 0.0)
     wl = WangLandau(lw; logf=log(2.0))
 
     pass = wl.rng === Random.GLOBAL_RNG

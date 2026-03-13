@@ -358,7 +358,7 @@ version = "1.2.0"
 
 [[MonteCarloX]]
 deps = ["Distributions", "Graphs", "LinearAlgebra", "MPI", "Printf", "Random", "StaticArrays", "StatsBase"]
-path = ".."
+path = "/Users/johannes/.julia/dev/MonteCarloX.jl"
 uuid = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
 version = "0.1.0"
 

@@ -1,18 +1,39 @@
-# Metropolis Algorithm
-# Classic importance sampling with Metropolis-Hastings acceptance criterion
-using Random
+"""
+    AbstractMetropolis <: AbstractImportanceSampling
+
+Base type for Metropolis-family samplers where acceptance is naturally
+computed from a local state difference (e.g. ΔE).
+"""
+abstract type AbstractMetropolis <: AbstractImportanceSampling end
 
 """
-    Metropolis <: AbstractImportanceSampling
+    accept!(alg::AbstractMetropolis, delta_state)
+
+Metropolis-family acceptance using a local state difference.
+"""
+function accept!(alg::AbstractMetropolis, delta_state)
+    log_ratio = logweight(ensemble(alg), delta_state)
+    return _accept!(alg, log_ratio)
+end
+
+"""
+    Metropolis <: AbstractMetropolis
 
 Metropolis algorithm for importance sampling.
 
 The Metropolis algorithm samples from a probability distribution 
 proportional to exp(log_weight) using an accept/reject criterion.
 
+Unified view:
+- Bayesian inference: `logweight(theta) = logposterior(theta)`
+- Statistical mechanics: `logweight(x) = -beta * E(x)`
+
+Both are passed as the same callable ensemble score.
+In other words, the algorithm `ensemble` defines the operative logweight.
+
 # Fields
 - `rng::AbstractRNG`: Random number generator
-- `logweight::Union{AbstractLogWeight, Function}`: Log weight function
+- `ensemble`: Callable ensemble score (function or weight object)
 - `steps::Int`: Total number of steps attempted
 - `accepted::Int`: Number of accepted steps
 
@@ -21,32 +42,42 @@ proportional to exp(log_weight) using an accept/reject criterion.
 # Create with Boltzmann weight
 alg = Metropolis(Random.default_rng(), β=2.0)
 
-# Create with custom log weight function
-alg = Metropolis(Random.default_rng(), E -> -2.0 * sum(E))
+# Create with Bayesian log-posterior
+logposterior(theta) = loglikelihood(theta) + logprior(theta)
+alg = Metropolis(Random.default_rng(), logposterior)
+
+# Create with custom callable score
+alg = Metropolis(Random.default_rng(), x -> -0.5 * x^2)
 
 # Create with a weight object
-logweight = BoltzmannLogWeight(1.5)
-alg = Metropolis(Random.default_rng(), logweight)
+ens = BoltzmannEnsemble(1.5)
+alg = Metropolis(Random.default_rng(), ens)
+```
+
+```julia
+# Create with a tabulated or custom ensemble
+ens = FunctionEnsemble(x -> -0.5 * x^2)
+alg = Metropolis(Random.default_rng(), ens)
 ```
 """
 mutable struct Metropolis{LW, RNG<:AbstractRNG} <: AbstractMetropolis
     rng::RNG
-    logweight::LW
+    ensemble::LW
     steps::Int
     accepted::Int
 end
 
 """
-    Metropolis(rng::AbstractRNG, logweight::Union{AbstractLogWeight, Function})
+    Metropolis(rng::AbstractRNG, ensemble)
 
-Create a Metropolis sampler with a general log weight function.
+Create a Metropolis sampler with a general callable ensemble score.
 
 # Arguments
 - `rng::AbstractRNG`: Random number generator
-- `logweight`: Either an `AbstractLogWeight` object or a callable function
+- `ensemble`: A callable object or function returning log weight / log density
 """
-Metropolis(rng::AbstractRNG, logweight::Union{AbstractLogWeight, Function}) = 
-    Metropolis(rng, logweight, 0, 0)
+Metropolis(rng::AbstractRNG, ensemble) = 
+    Metropolis(rng, _as_ensemble(ensemble), 0, 0)
 
 """
     Metropolis(rng::AbstractRNG; β::Real)
@@ -62,7 +93,7 @@ This is a convenience constructor for the canonical ensemble.
 - `β::Real`: Inverse temperature (β = 1/k_B T)
 """
 Metropolis(rng::AbstractRNG; β::Real) = 
-    Metropolis(rng, BoltzmannLogWeight(β))
+    Metropolis(rng, BoltzmannEnsemble(β))
 
 """
     Glauber <: AbstractMetropolis
@@ -76,19 +107,19 @@ but acceptance is:
 """
 mutable struct Glauber{LW, RNG<:AbstractRNG} <: AbstractMetropolis
     rng::RNG
-    logweight::LW
+    ensemble::LW
     steps::Int
     accepted::Int
 end
 
-Glauber(rng::AbstractRNG, logweight::Union{AbstractLogWeight, Function}) =
-    Glauber(rng, logweight, 0, 0)
+Glauber(rng::AbstractRNG, ensemble) =
+    Glauber(rng, _as_ensemble(ensemble), 0, 0)
 
 Glauber(rng::AbstractRNG; β::Real) =
-    Glauber(rng, BoltzmannLogWeight(β))
+    Glauber(rng, BoltzmannEnsemble(β))
 
 function accept!(alg::Glauber, delta_state::Real)
-    log_ratio = alg.logweight(delta_state)
+    log_ratio = logweight(ensemble(alg), delta_state)
     alg.steps += 1
     accepted = rand(alg.rng) < logistic(log_ratio)
     alg.accepted += accepted

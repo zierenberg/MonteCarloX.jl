@@ -19,13 +19,17 @@ using Random
     include("test_measurements.jl")
     run_measurements_testsets()
 
+    # ensemble constructors
+    include("test_ensembles.jl")
+    run_ensemble_testsets()
+
     # equilibrium / Metropolis
     include("test_metropolis.jl")
     run_metropolis_testsets()
 
     # weights
-    include("test_weights.jl")
-    run_weights_testsets()
+    include("test_binned_objects.jl")
+    run_binned_objects_testsets()
 
     # generalized ensembles
     include("test_multicanonical.jl")

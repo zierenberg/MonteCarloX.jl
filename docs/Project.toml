@@ -5,5 +5,5 @@ MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
 SpinSystems = "8a5c3c8d-1234-5678-9abc-def012345678"
 
 [sources]
-MonteCarloX = {path = ".."}
+MonteCarloX = {path = "/Users/johannes/.julia/dev/MonteCarloX.jl"}
 SpinSystems = {path = "../SpinSystems"}

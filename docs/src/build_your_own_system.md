@@ -29,7 +29,7 @@ Should not own:
 
 - generic sampling logic
 
-### `AbstractLogWeight`
+### `AbstractEnsemble`
 
 Encodes relative probability for equilibrium sampling.
 
@@ -39,8 +39,8 @@ In canonical form,
 \]
 up to additive constants in log space.
 
-- canonical ensemble: `BoltzmannLogWeight(β)`
-- generalized ensemble: tabulated `BinnedLogWeight`
+- canonical ensemble: `BoltzmannEnsemble(β)`
+- generalized ensemble: tabulated `BinnedObject` wrapped by ensemble types
 
 Algorithms use local log-weight differences, so they remain model-agnostic.
 
@@ -56,15 +56,8 @@ Examples:
 
 Typical fields include RNG, counters (`steps`, `accepted`) and/or simulation time.
 
-### `AbstractUpdate`
-
-Represents update mechanics.
-In practice, this usually appears as system-side methods (for example `spin_flip!`) that call algorithm primitives (`accept!`, `step!`, ...).
-
-### `AbstractMeasurement`
-
-Represents observable extraction and storage.
-MonteCarloX provides reusable scheduling through `Measurements`.
+Update mechanics are model-side functions (for example `spin_flip!`) that call
+algorithm primitives (`accept!`, `step!`, ...).
 
 ## Example: minimal scalar model (`energy(x)`) with Metropolis
 
@@ -85,7 +78,7 @@ function local_update(x::Float64, alg::Metropolis)
 end
 
 rng = MersenneTwister(42)
-alg = Metropolis(rng; β=1.0)  # uses BoltzmannLogWeight(β)
+alg = Metropolis(rng; β=1.0)  # uses BoltzmannEnsemble(β)
 x = 0.0
 
 for _ in 1:10_000
@@ -176,8 +169,6 @@ For a production-ready system implementation, inspect `SpinSystems` (for example
 
 ```@docs
 AbstractSystem
-AbstractLogWeight
+AbstractEnsemble
 AbstractAlgorithm
-AbstractUpdate
-AbstractMeasurement
 ```

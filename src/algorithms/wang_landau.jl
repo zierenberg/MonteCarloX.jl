@@ -1,79 +1,37 @@
-# Wang-Landau generalized-ensemble scaffolding
-
 using Random
 
 """
-    WangLandau <: AbstractImportanceSampling
+    WangLandau([rng,] bins_or_logweight; init=0.0, logf=1.0)
 
-Wang-Landau generalized-ensemble sampler.
-
-Notation used here:
-- `g(E)`: density of states estimate
-- `S(E) = log g(E)`: entropy estimate
-- `logWeight(E) = S(E)` stored in `alg.logweight`
-- `logf = log(f)`: logarithmic modification factor
-
-Each visit to an energy bin `E_i` applies the local update
-`S(E_i) <- S(E_i) + logf`.
-In this API convention this appears as
-`alg.logweight[E_i] -= logf`.
+Create a generic `ImportanceSampling` algorithm with a
+`WangLandauEnsemble` built from `bins_or_logweight`.
+If `rng` is not provided, the global RNG will be used.
 """
-mutable struct WangLandau{RNG<:AbstractRNG} <: AbstractGeneralizedEnsemble
-    rng::RNG
-    logweight::BinnedLogWeight
-    logf::Float64
-    steps::Int
-    accepted::Int
+function WangLandau(rng::AbstractRNG, bins_or_logweight; init::Real=0.0, logf::Real=1.0)
+    ens = bins_or_logweight isa BinnedObject ?
+          WangLandauEnsemble(bins_or_logweight; logf=logf) :
+          WangLandauEnsemble(bins_or_logweight; init=init, logf=logf)
+    return ImportanceSampling(rng, ens)
 end
+WangLandau(bins_or_logweight; init::Real=0.0, logf::Real=1.0) =
+    WangLandau(Random.GLOBAL_RNG, bins_or_logweight; init=init, logf=logf)
 
-WangLandau(rng::AbstractRNG, logweight::BinnedLogWeight; logf::Real = 1.0) =
-    WangLandau(rng, logweight, Float64(logf), 0, 0)
+# access to the logweight object
+@inline logweight(alg::ImportanceSampling{<:WangLandauEnsemble}) =
+    logweight(ensemble(alg))
 
-WangLandau(logweight::BinnedLogWeight; logf::Real = 1.0) =
-    WangLandau(Random.GLOBAL_RNG, logweight; logf=logf)
+"""
+    accept!(alg::ImportanceSampling{<:WangLandauEnsemble}, x_new, x_old)
 
-# dispatch accept! to add Wang-Landau specific bookkeeping
-function accept!(alg::WangLandau, x_new::Real, x_old::Real)
-    log_ratio = alg.logweight(x_new) - alg.logweight(x_old)
+Perform Metropolis acceptance and apply Wang-Landau local adaptation at the
+visited state by updating the tabulated logweight.
+"""
+function accept!(alg::ImportanceSampling{<:WangLandauEnsemble}, x_new::Real, x_old::Real)
+    ens = ensemble(alg)
+    lw = logweight(alg)
+    log_ratio = lw(x_new) - lw(x_old)
     accepted = _accept!(alg, log_ratio)
-    if accepted
-        alg.logweight[x_new] -= alg.logf
-    else
-        alg.logweight[x_old] -= alg.logf
-    end
+    x_vis = accepted ? x_new : x_old
+    lw[x_vis] -= ens.logf
     return accepted
-end
-
-
-"""
-    update_weight!(alg::WangLandau, x)
-
-Apply one local Wang-Landau update at `x`:
-- `alg.logweight[x] -= alg.logf`
-
-Mutates in place and returns `nothing`.
-"""
-function update_weight!(
-    alg::WangLandau,
-    x::Real,
-)
-    log_weight = alg.logweight
-    w = log_weight[x]
-    if w === missing
-        throw(DomainError(x, "`x` is outside the tabulated log-weight bins"))
-    end
-    log_weight[x] = w - alg.logf
-
-    return nothing
-end
-
-"""
-    update_f!(alg::WangLandau)
-
-Update Wang-Landau schedule in-place with
-`logf <- 0.5 * logf` (equivalent to `f <- sqrt(f)`).
-"""
-function update_f!(alg::WangLandau)
-    alg.logf *= 0.5
-    return nothing
 end
