@@ -56,7 +56,7 @@ log_dos_beale_8x8 = [
 exact_logdos = Dict(log_dos_beale_8x8)
 domain = sort([e for (e, _) in log_dos_beale_8x8])
 # TODO: make this work with arbitrary domains and not just the discrete steps
-exact_logdos = BinnedLogWeight(domain[1]:4:domain[end], 0.0)
+exact_logdos = BinnedObject(domain[1]:4:domain[end], 0.0)
 # fill the exact_logdos with the values from log_dos_beale_8x8
 for (e, logdos) in log_dos_beale_8x8
     if e in domain
@@ -117,18 +117,18 @@ for iter in 1:n_iter
         spin_flip!(sys, alg)
     end
 
-    merge_histograms!(pmuca, alg.histogram)
+    merge_histograms!(pmuca, alg.ensemble.histogram)
     if is_root(pmuca)
-        update_weight!(alg; mode=:simple)
-        print("Iteration $iter/$n_iter, RMSE (exact) = $(round(rmse_exact(alg.logweight), digits=4))\r")
+        update!(alg.ensemble; mode=:simple)
+        print("Iteration $iter/$n_iter, RMSE (exact) = $(round(rmse_exact(alg.ensemble.logweight), digits=4))\r")
     end
-    distribute_logweight!(pmuca, alg.logweight)
+    distribute_logweight!(pmuca, alg.ensemble.logweight)
 end
 
 MPI.Barrier(pmuca.comm)
 
 if is_root(pmuca)
-    final_rmse = rmse_exact(alg.logweight)
+    final_rmse = rmse_exact(alg.ensemble.logweight)
     println("\n✓ Simulation complete!")
     println("Final RMSE (vs exact Beale): $(round(final_rmse, digits=4))")
 end
