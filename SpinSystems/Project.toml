@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Johannes Zierenberg", "Martin Weigel"]
 
 [deps]
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"

@@ -55,7 +55,6 @@ log_dos_beale_8x8 = [
 ]
 exact_logdos = Dict(log_dos_beale_8x8)
 domain = sort([e for (e, _) in log_dos_beale_8x8])
-# TODO: make this work with arbitrary domains and not just the discrete steps
 exact_logdos = BinnedObject(domain[1]:4:domain[end], 0.0)
 # fill the exact_logdos with the values from log_dos_beale_8x8
 for (e, logdos) in log_dos_beale_8x8

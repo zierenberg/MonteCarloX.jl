@@ -14,6 +14,7 @@ using MonteCarloX: AbstractSystem,
                    AbstractMetropolis,
                    AbstractHeatBath,
                    Multicanonical,
+                   BinnedObject,
                    accept!,
                    logistic
 
@@ -23,6 +24,7 @@ export AbstractSpinSystem,
        IsingMatrix,
        IsingLatticeOptim,
        BlumeCapel,
+       logdos_exact_ising2D,
        # Initialization
        init!,
        # Observables
@@ -39,5 +41,6 @@ export AbstractSpinSystem,
 include("abstractions.jl")
 include("ising.jl")
 include("blume_capel.jl")
+include("ising2d_exact.jl")
 
 end # module SpinSystems
