@@ -10,6 +10,7 @@ MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
+DelimitedFiles = "1.9.1"
 Graphs = "1"
 MonteCarloX = "0.1"
 julia = "1"

@@ -2,14 +2,15 @@
 ising_muca_mpi.jl
 
 Multicanonical (MUCA) sampling for 2D Ising model using MPI for parallel replica exchange.
-Run with: mpiexec -n 4 julia --project ising_muca_mpi.jl
+Run with: mpiexec -n 4 julia --project muca_Ising2d_mpi.jl
 
 Each MPI rank runs one independent replica and exchanges histograms via Allreduce.
 """
 
-using Pkg
-Pkg.activate(dirname(@__DIR__))
-Pkg.instantiate()
+import Pkg                                          
+Pkg.activate(joinpath(@__FILE__, "../../../../")) 
+Pkg.instantiate()                                 
+
 
 # Add local dev packages to load path
 # push!(LOAD_PATH, joinpath(dirname(@__DIR__), "SpinSystems", "src"))
@@ -63,16 +64,16 @@ for (e, logdos) in log_dos_beale_8x8
     end
 end
 # normalize
-exact_logdos.weights .-= exact_logdos[0]
+exact_logdos.values .-= exact_logdos[0]
 # mask to only those values that are in the raw_domain
 full_domain = collect(domain[1]:4:domain[end])
 mask_rmse = full_domain .∈ Ref(domain)
 #mask to only compute RMSE on the domain points that are in the exact_logdos
-exact_masked = exact_logdos.weights[mask_rmse]
+exact_masked = exact_logdos.values[mask_rmse]
 
 function rmse_exact(lw)
     MonteCarloX._assert_same_domain(lw, exact_logdos)
-    est = -deepcopy(lw.weights)
+    est = -deepcopy(lw.values)
     est .+= lw[0]  # shift to match exact at E=0
     # implement the mask to only compute RMSE on the domain points that are in the exact_logdos
     est_masked = est[mask_rmse]

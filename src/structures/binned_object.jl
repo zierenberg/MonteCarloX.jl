@@ -1,11 +1,13 @@
 # binned log weights for discrete and continuous variables 
 # (designed for histogram-based methods like multicanonical sampling and Wang-Landau)
-
 abstract type AbstractBin end
-@inline function _binindex(bins::NTuple{N,AbstractBin}, xs::NTuple{N,Real}) where N
+@inline function _binindex(bins::NTuple{N,B}, xs::NTuple{N,Real}) where {N,B<:AbstractBin}
     ntuple(i -> _binindex(bins[i], xs[i]), N)
 end
+@inline _binindices(bins::NTuple{N,B}, xs::Vararg{Real,N}) where {N,B<:AbstractBin} = _binindex(bins, xs)
 
+
+# Discrete binning: defined by start, step, and number of bins. Bin centers are at start + step * (0:num-1).
 struct DiscreteBinning{T<:Real} <: AbstractBin
     start :: T
     step  :: T
@@ -18,8 +20,11 @@ end
 @inline function _binindex(b::DiscreteBinning{T}, x::T) where T<:Integer
     div(x - b.start, b.step) + 1
 end
-@inline Base.collect(b::DiscreteBinning) = Base.collect(b.start:b.step:b.start + b.step*(b.num-1))
+@inline get_centers(b::DiscreteBinning) = collect(b.start:b.step:b.start + b.step*(b.num-1))
+@inline get_edges(b::DiscreteBinning) = collect(b.start - b.step/2 : b.step : b.start + b.step*(b.num-1) + b.step/2)
 
+
+# Continuous binning: defined by edges. Bin centers are midpoints between edges.
 struct ContinuousBinning{T<:Real} <: AbstractBin
     edges :: Vector{T}
     centers :: Vector{T}
@@ -27,11 +32,40 @@ end
 @inline function _binindex(b::ContinuousBinning, x::Real)
     searchsortedlast(b.edges, x)
 end
-@inline Base.collect(b::ContinuousBinning) = b.centers
+@inline get_centers(b::ContinuousBinning) = b.centers
+@inline get_edges(b::ContinuousBinning) = b.edges
 
-# struct ExplicitBinning{B}
-#     labels :: B
-# end
+@inline function _discrete_binning_from_domain(d::AbstractRange{T}) where {T<:Real}
+    return DiscreteBinning(first(d), T(step(d)), length(d))
+end
+
+@inline function _discrete_binning_from_domain(d::AbstractVector{T}) where {T<:Real}
+    n = length(d)
+    n >= 2 || throw(ArgumentError("Cannot create bins from a single value."))
+    steps = diff(d)
+    all(steps .== steps[1]) ||
+        throw(ArgumentError("Non-equidistant discrete bins not supported without ExplicitBinning."))
+    return DiscreteBinning(d[1], steps[1], n)
+end
+
+@inline function _continuous_binning_from_domain(d::Union{AbstractRange{T},AbstractVector{T}}) where {T<:Real}
+    length(d) >= 2 || throw(ArgumentError("Continuous bin edges must contain at least two values."))
+    edges = collect(d)
+    centers = @inbounds (edges[1:end-1] .+ edges[2:end]) .* T(0.5)
+    return ContinuousBinning(edges, centers)
+end
+
+@inline function _bin_from_domain(d::Union{AbstractRange{T},AbstractVector{T}}, interpretation::Symbol) where {T<:Real}
+    if interpretation === :auto
+        return eltype(d) <: Integer ? _discrete_binning_from_domain(d) : _continuous_binning_from_domain(d)
+    elseif interpretation === :discrete
+        return _discrete_binning_from_domain(d)
+    elseif interpretation === :continuous
+        return _continuous_binning_from_domain(d)
+    else
+        throw(ArgumentError("Invalid interpretation=$(interpretation). Use :auto, :discrete, or :continuous."))
+    end
+end
 
 """
     BinnedObject(domain::AbstractRange, init)
@@ -56,53 +90,20 @@ struct BinnedObject{N,T,B<:AbstractBin}
     bins :: NTuple{N,B}
 end
 
-@inline function Base.getproperty(bo::BinnedObject, name::Symbol)
-    if name === :weights
-        return getfield(bo, :values)
-    end
-    return getfield(bo, name)
+function BinnedObject(domain::AbstractRange{T}, init::S; interpretation::Symbol=:auto) where {T<:Real, S}
+    return BinnedObject((domain,), init; interpretation=interpretation)
 end
 
-@inline function Base.setproperty!(bo::BinnedObject, name::Symbol, value)
-    if name === :weights
-        return setfield!(bo, :values, value)
-    end
-    return setfield!(bo, name, value)
+function BinnedObject(domain::AbstractVector{T}, init::S; interpretation::Symbol=:auto) where {T<:Real, S}
+    return BinnedObject((domain,), init; interpretation=interpretation)
 end
 
-function BinnedObject(domain::AbstractRange{T}, init::S) where {T<:Real, S}
-    return BinnedObject((domain,), init)
-end
-
-function BinnedObject(domain::AbstractVector{T}, init::S) where {T<:Real, S}
-    return BinnedObject((domain,), init)
-end
-
-function BinnedObject(domains::NTuple{N,Union{AbstractRange{T},AbstractVector{T}}}, init::Real) where {N,T<:Real}
-    bins = ntuple(i -> begin
-        d = domains[i]
-        if eltype(d) <: Integer
-            if d isa AbstractRange
-                DiscreteBinning(first(d), T(step(d)), length(d))
-            elseif d isa AbstractVector
-                n = length(d)
-                if n == 1
-                    throw(ArgumentError("Cannot create bins from a single value."))
-                else
-                    steps = diff(d)
-                    if all(steps .== steps[1])
-                        DiscreteBinning(d[1], steps[1], n)
-                    else
-                        throw(ArgumentError("Non-equidistant discrete bins not supported without ExplicitBinning."))
-                    end
-                end
-            end
-        else
-            edges = collect(d)
-            centers = @inbounds (edges[1:end-1] .+ edges[2:end]) .* T(0.5)
-            ContinuousBinning(edges, centers)
-        end
-    end, N)
+function BinnedObject(
+    domains::NTuple{N,Union{AbstractRange{T},AbstractVector{T}}},
+    init::Real;
+    interpretation::Symbol=:auto,
+) where {N,T<:Real}
+    bins = ntuple(i -> _bin_from_domain(domains[i], interpretation), N)
     # Check all bins are of the same type
     @assert all(map(b -> typeof(b) == typeof(bins[1]), bins)) "All bins must be of the same type for NTuple type stability."
     sizes = ntuple(i -> bins[i] isa DiscreteBinning ? bins[i].num : length(bins[i].edges)-1, N)
@@ -114,9 +115,9 @@ function BinnedObject(domain, init)
     throw(ArgumentError("Invalid domain type for BinnedObject: Expected AbstractRange or AbstractVector of Real numbers, or a tuple of such (**but with identical types**)."))
 end
 # default constructor
-@inline BinnedObject(domain) = BinnedObject(domain, 0.0)
+@inline BinnedObject(domain; interpretation::Symbol=:auto) = BinnedObject(domain, 0.0; interpretation=interpretation)
 
-# size of the weights array
+# size of the values array
 @inline Base.size(lw::BinnedObject) = size(lw.values)
 
 """
@@ -125,45 +126,48 @@ end
 Return bin centers along dimension `dim`.
 For discrete bins this returns the bin support values.
 """
-@inline get_centers(bo::BinnedObject, dim::Int=1) = collect(bo.bins[dim])
+@inline get_centers(bo::BinnedObject, dim::Int=1) = get_centers(bo.bins[dim])
 
 """
-    values(bo::BinnedObject)
+    get_values(bo::BinnedObject)
 
 Return the underlying array of bin values.
 """
-@inline Base.values(bo::BinnedObject) = bo.values
-@inline get_values(bo::BinnedObject) = Base.values(bo)
+@inline get_values(bo::BinnedObject) = bo.values
+
+"""
+    get_edges(bo::BinnedObject, dim::Int=1)
+Return bin edges along dimension `dim`.
+For discrete bins this returns the edges between discrete values.
+"""
+@inline get_edges(bo::BinnedObject, dim::Int=1) = get_edges(bo.bins[dim])
 
 # access via lw() syntax
-@inline function (lw::BinnedObject{1,T,B})(x::Real) where {T,B}
+@inline function (lw::BinnedObject{1})(x::Real)
     idx = _binindex(lw.bins[1], x)
-    lw.values[idx]
+    return lw.values[idx]
 end
-
-@inline function (lw::BinnedObject{N,T,B})(xs::Vararg{Real,N}) where {N,T,B}
-    idxs = _binindex(lw.bins, xs)
-    lw.values[CartesianIndex(idxs)]
+@inline function (lw::BinnedObject{N})(xs::Vararg{Real,N}) where {N}
+    idxs = _binindices(lw.bins, xs...)
+    return lw.values[idxs...]
 end
 
 # access via lw[] syntax
-@inline function Base.getindex(lw::BinnedObject{1,T,B}, x::Real) where {T,B}
+@inline function Base.getindex(lw::BinnedObject{1}, x::Real)
     idx = _binindex(lw.bins[1], x)
-    lw.values[idx]
+    return lw.values[idx]
 end
-@inline function Base.setindex!(lw::BinnedObject{1,T,B}, v, x::Real) where {T,B}
+@inline function Base.getindex(lw::BinnedObject{N}, xs::Vararg{Real,N}) where {N}
+    idxs = _binindices(lw.bins, xs...)
+    return lw.values[idxs...]
+end
+@inline function Base.setindex!(lw::BinnedObject{1}, v, x::Real)
     idx = _binindex(lw.bins[1], x)
-    lw.values[idx] = v
+    return (lw.values[idx] = v)
 end
-@inline function Base.getindex(lw::BinnedObject{N,T,B}, xs::Vararg{Real,N}) where {N,T,B}
-    #TODO: this can be very likely be optimized
-    idxs = [_binindex(lw.bins[i], xs[i]) for i in 1:N]
-    lw.values[idxs...]
-end
-@inline function Base.setindex!(lw::BinnedObject{N,T,B}, v, xs::Vararg{Real,N}) where {N,T,B}
-    #TODO: this can be very likely be optimized
-    idxs = [_binindex(lw.bins[i], xs[i]) for i in 1:N]
-    lw.values[idxs...] = v
+@inline function Base.setindex!(lw::BinnedObject{N}, v, xs::Vararg{Real,N}) where {N}
+    idxs = _binindices(lw.bins, xs...)
+    return (lw.values[idxs...] = v)
 end
 
 """
@@ -204,7 +208,7 @@ function set!(
     length(size(bo.values)) == 1 ||
         throw(ArgumentError("`set!` currently supports only 1D binned log-weights"))
 
-    cs = collect(bo.bins[1])
+    cs = get_centers(bo, 1)
     n = length(cs)
 
     xleft, xright = if xrange isa Tuple

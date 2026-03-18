@@ -49,6 +49,7 @@ export  Measurement,
 include("structures/binned_object.jl")
 export  BinnedObject,
         get_centers,
+        get_edges,
         get_values,
         set!
 
