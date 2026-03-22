@@ -5,6 +5,7 @@ using Documenter, Literate, MonteCarloX
 example_dir   = joinpath(@__DIR__, "src", "examples")
 generated_dir = joinpath(@__DIR__, "src", "generated")
 
+include(joinpath(@__DIR__, "src", "examples", "defaults.jl"))
 for (root, dirs, files) in walkdir(example_dir)
     for file in files
         if endswith(file, ".jl") && !endswith(file, "_mpi.jl")
@@ -37,13 +38,20 @@ makedocs(;
         "Helper"                               => "helper.md",
         "Examples" => [
             "Spin Systems" => [
-                "Importance Sampling Ising - Introduction" => "generated/importance_Ising2D.md",
+                "Importance Sampling: Ising" => "generated/importance_Ising2D.md",
                 "Multicanonical Ising - the standard case" => "generated/muca_Ising2D.md",
                 "Multicanonical BlumeCapel - mixed ensembles " => "generated/muca_BlumeCapel.md",
             ],
             "Bayesian Inference" => [
+                "Importance Sampling: Coin Flips" => "generated/coin_flips.md",    
+                "Importance Sampling: Housing Prices" => "generated/housing_prices.md",
+                "Importance Sampling: Eight Schools Problem" => "generated/eight_schools.md",
+            ],
+            "Large Deviation Theory" => [
+                "Multicanonical Sum of Gaussian RVs" => "generated/muca_sum_gaussian.md",
             ],
             "Stochastic Processes" => [
+                "Multicanonical Ornstein-Uhlenbeck trajectories" => "generated/muca_OU.md",
             ],
         ],
     ],

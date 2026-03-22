@@ -2,6 +2,7 @@
 import Pkg                                          #src
 Pkg.activate(joinpath(@__FILE__, "../../../../"))   #src
 Pkg.instantiate()                                   #src
+include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 
 # # Large Deviation Theory: Sum of Gaussian Random Variables
 #
@@ -153,8 +154,10 @@ cs        = get_centers(lw)
 set!(lw, (first(cs), last(cs)), x -> -logpdf(pdf_sum, x))
 
 ## to prevent the chain escaping the binned region, add linear tails beyond ±2σ
-x_left  = first(bins_sum) + 2*std_sum
-x_right = last(bins_sum)  - 2*std_sum
+## x_left  = first(bins_sum) + std_sum
+## _right = last(bins_sum)  - std_sum
+x_left  = - 3*std_sum
+x_right = + 3*std_sum
 set!(lw, (first(cs), x_left),  x -> lw(x_left)  + (x - x_left)  * 2.0)
 set!(lw, (x_right, last(cs)),  x -> lw(x_right) - (x - x_right) * 2.0)
 
@@ -165,9 +168,9 @@ plot!(cs, -logpdf_sum; lw=2, color=:black, ls=:dash, label="Exact −log PDF")
 
 # %%
 # Multicanonical sampling 
-for _ in 1:100_000;      update!(sys_known, alg_known; δ=0.1); end
+for _ in 1:10_000;     update!(sys_known, alg_known; δ=0.1); end
 reset!(alg_known)
-for i in 1:100_000_000; update!(sys_known, alg_known; δ=0.1); end
+for i in 1:50_000_000; update!(sys_known, alg_known; δ=0.1); end
 println("MUCA (known): acceptance = ", round(acceptance_rate(alg_known); digits=3))
 
 hist_known = alg_known.ensemble.histogram.values
@@ -200,9 +203,9 @@ i_left      = searchsortedfirst(cs_iter, x_left)
 i_right     = searchsortedlast(cs_iter,  x_right)
 
 @showprogress 1 "Iterating MUCA..." for _ in 1:n_iter
-    for _ in 1:10_000;     update!(sys_iter, alg_iter); end
+    for _ in 1:10_000;    update!(sys_iter, alg_iter); end
     reset!(alg_iter)
-    for _ in 1:10_000_000; update!(sys_iter, alg_iter); end
+    for _ in 1:5_000_000; update!(sys_iter, alg_iter); end
 
     MonteCarloX.update!(ensemble(alg_iter); mode=:simple)
 

@@ -1,6 +1,6 @@
 # %%                                                #src
 import Pkg                                          #src
-Pkg.activate(joinpath(@__FILE__, "../../../../")) #src
+Pkg.activate(joinpath(@__FILE__, "../../"))         #src
 Pkg.instantiate()                                   #src
 
 # # Logo prototype via tri-modal potential and Metropolis chain
@@ -127,5 +127,6 @@ idx_gray = findall(i -> !near[i], eachindex(near))
 scatter!(p, x_show[idx_gray], y_show[idx_gray]; ms=4.0, color=:gray58, alpha=0.36)
 
 plot!(p, axis=nothing, ticks=nothing, border=:none)
-
 p
+# save
+savefig(p, joinpath(@__DIR__, "logo.png"))
