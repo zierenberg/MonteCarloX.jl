@@ -27,32 +27,47 @@ makedocs(;
     checkdocs = strict_docs ? :exports : :none,
     warnonly = !strict_docs,
     pages = [
-        "Getting Started"                      => "index.md",
-        "Monte Carlo Fundamentals"             => "monte_carlo_fundamentals.md",
-        "Importance Sampling Algorithms"       => "importance_sampling_algorithms.md",
-        "Continuous-Time Sampling Algorithms"  => "continuous_time_sampling_algorithms.md",
-        "Build Your Own System"                => "build_your_own_system.md",
-        "Measurements"                         => "measurements.md",
-        "Systems"                              => "systems.md",
-        "Weights"                              => "weights.md",
-        "Helper"                               => "helper.md",
+        "Getting Started" => "index.md",
+        "Guides" => [
+            "Monte Carlo Fundamentals"            => "monte_carlo_fundamentals.md",
+            "Importance Sampling"                 => "importance_sampling_algorithms.md",
+            "Continuous-Time Sampling"            => "continuous_time_sampling_algorithms.md",
+            "Measurements"                        => "measurements.md",
+            "Build Your Own System"               => "build_your_own_system.md",
+        ],
         "Examples" => [
+            "Getting Started with Examples" => [
+            "Coin Flip (Bayesian inference)"          => "generated/coin_flip.md",
+            "Importance sampling: Ising Model"        => "generated/importance_Ising2D.md",
+            "Birth-Death Process (Gillespie)"         => "generated/gillespie_birth_death.md",
+            ],
             "Spin Systems" => [
-                "Importance Sampling: Ising" => "generated/importance_Ising2D.md",
-                "Multicanonical Ising - the standard case" => "generated/muca_Ising2D.md",
-                "Multicanonical BlumeCapel - mixed ensembles " => "generated/muca_BlumeCapel.md",
+            "Importance sampling: Ising 2D"           => "generated/importance_Ising2D.md",
+            "Multicanonical sampling: Ising 2D"       => "generated/muca_Ising2D.md",
+            "Multicanonical sampling: Blume-Capel"    => "generated/muca_BlumeCapel.md",
             ],
+
             "Bayesian Inference" => [
-                "Importance Sampling: Coin Flips" => "generated/coin_flips.md",    
-                "Importance Sampling: Housing Prices" => "generated/housing_prices.md",
-                "Importance Sampling: Eight Schools Problem" => "generated/eight_schools.md",
+            "Importance sampling: Coin Flip"          => "generated/coin_flip.md",
+            "Importance sampling: House Price Prediction" => "generated/house_price_prediction.md",
+            "Hierarchical sampling: Eight Schools"    => "generated/eight_schools.md",
             ],
-            "Large Deviation Theory" => [
-                "Multicanonical Sum of Gaussian RVs" => "generated/muca_sum_gaussian.md",
-            ],
+
             "Stochastic Processes" => [
-                "Multicanonical Ornstein-Uhlenbeck trajectories" => "generated/muca_OU.md",
+            "Gillespie: Poisson Process"              => "generated/kmc_poisson.md",
+            "Gillespie: Dimerization Reaction"        => "generated/gillespie_dimerization.md",
+            "Multicanonical: Ornstein-Uhlenbeck"      => "generated/muca_OU.md",
             ],
+
+            "Large Deviation Theory" => [
+            "Multicanonical: Sum of Gaussians"        => "generated/muca_sum_gaussian.md",
+            "Multicanonical: Ornstein-Uhlenbeck"      => "generated/muca_OU.md",
+            ],
+        ],
+        "API Reference" => [
+            "Systems"                             => "systems.md",
+            "Weights"                             => "weights.md",
+            "Helper"                              => "helper.md",
         ],
     ],
     sitename = "MonteCarloX",

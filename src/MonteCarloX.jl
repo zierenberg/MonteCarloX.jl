@@ -121,6 +121,8 @@ export  AbstractKineticMonteCarlo,
         step!,
         next_time,
         next_event,
+        event_source,
+        modify!,
         advance!
 
 include("algorithms/gillespie.jl")

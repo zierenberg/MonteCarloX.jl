@@ -8,7 +8,7 @@ concrete implementations of AbstractSystem for various spin models.
 """
 module SpinSystems
 
-# Import required types from MonteCarloX
+# using for type definitions and utilities
 using MonteCarloX: AbstractSystem,
                    AbstractImportanceSampling,
                    AbstractMetropolis,
@@ -17,6 +17,9 @@ using MonteCarloX: AbstractSystem,
                    BinnedObject,
                    accept!,
                    logistic
+
+# import for extensions of MonteCarloX functions
+import MonteCarloX
 
 export AbstractSpinSystem,
        Ising,
@@ -33,7 +36,6 @@ export AbstractSpinSystem,
        delta_energy,
        # Updates
        spin_flip!,
-       modify!,
        # Utilities
        pick_site,
        local_pair_interactions

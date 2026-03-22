@@ -247,7 +247,7 @@ end
 @inline delta_energy(sys::BlumeCapelGraph, Δpair, Δspin, Δspin2, i) =
     -Δpair - delta_field_interactions(sys, Δspin, i) + sys.D * Δspin2
 
-function modify!(sys::BlumeCapelGraph, i, s_new::Int8, Δpair, Δspin, Δspin2)
+function MonteCarloX.modify!(sys::BlumeCapelGraph, i, s_new::Int8, Δpair, Δspin, Δspin2)
     sys.spins[i] = s_new
     sys.sum_pair_interactions += Δpair
     sys.sum_spins += Δspin
@@ -255,7 +255,7 @@ function modify!(sys::BlumeCapelGraph, i, s_new::Int8, Δpair, Δspin, Δspin2)
     return nothing
 end
 
-function modify!(sys::Union{BlumeCapelGraphCouplingUniformField,BlumeCapelGraphCouplingVectorField},
+function MonteCarloX.modify!(sys::Union{BlumeCapelGraphCouplingUniformField,BlumeCapelGraphCouplingVectorField},
                  i,
                  s_new::Int8,
                  Δpair,
@@ -435,7 +435,7 @@ end
 @inline delta_energy(sys::BlumeCapelMatrix, Δpair, Δspin, Δspin2, i) =
     -Δpair - delta_field_interactions(sys, Δspin, i) + sys.D * Δspin2
 
-function modify!(sys::BlumeCapelMatrix, i, s_new::Int8, Δpair, Δspin, Δspin2)
+function MonteCarloX.modify!(sys::BlumeCapelMatrix, i, s_new::Int8, Δpair, Δspin, Δspin2)
     sys.spins[i] = s_new
     sys.sum_pair_interactions += Δpair
     sys.sum_spins += Δspin
@@ -443,7 +443,7 @@ function modify!(sys::BlumeCapelMatrix, i, s_new::Int8, Δpair, Δspin, Δspin2)
     return nothing
 end
 
-function modify!(sys::Union{BlumeCapelMatrixCouplingUniformField,BlumeCapelMatrixCouplingVectorField},
+function MonteCarloX.modify!(sys::Union{BlumeCapelMatrixCouplingUniformField,BlumeCapelMatrixCouplingVectorField},
                  i,
                  s_new::Int8,
                  Δpair,
@@ -458,7 +458,7 @@ function modify!(sys::Union{BlumeCapelMatrixCouplingUniformField,BlumeCapelMatri
 end
 
 # Backward-compatible convenience method.
-@inline function modify!(sys::AbstractBlumeCapel, i, s_new, _)
+@inline function MonteCarloX.modify!(sys::AbstractBlumeCapel, i, s_new, _)
     Δpair, Δspin, Δspin2 = propose_changes(sys, i, Int8(s_new))
     return modify!(sys, i, Int8(s_new), Δpair, Δspin, Δspin2)
 end
