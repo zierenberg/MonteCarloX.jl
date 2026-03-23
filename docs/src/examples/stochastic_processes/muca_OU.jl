@@ -30,6 +30,13 @@ using Plots, ProgressMeter
 μ, D, θ  = 0.0, 1.0, 1.0
 dt, T, x0 = 0.1, 10.0, 0.0
 
+const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
+n_direct   = CI_MODE ? 1_000    : 100_000
+n_therm    = CI_MODE ? 100      : 10_000
+n_metro    = CI_MODE ? 1_000    : 1_000_000
+n_muca     = CI_MODE ? 1_000    : 10_000_000
+n_iter     = CI_MODE ? 3        : 10
+n_iter_steps = CI_MODE ? 1_000  : 5_000_000;
 ## exact terminal distribution (see Wikipedia: OU process)
 mean_T = x0 * exp(-T*θ) + μ * (1 - exp(-T*θ))
 var_T  = θ < 1e-6 ? 2*D*T : D/θ * (1 - exp(-2*T*θ))
@@ -113,7 +120,7 @@ plot(sys0.ts, sys0.xs; label=nothing, xlabel="Time", ylabel="x",
 # We draw ``10^5`` independent trajectories and record ``x(T)`` as a reference.
 
 direct_samples = [OUTrajectory(MersenneTwister(i); x0=x0, μ=μ, D=D, θ=θ,
-                               dt=dt, T=T).xs[end] for i in 1:100_000]
+                               dt=dt, T=T).xs[end] for i in 1:n_direct]
 hist_direct = normalize(fit(Histogram, direct_samples, bins_T); mode=:pdf)
 
 plot(hist_direct; st=:bar, linewidth=0, alpha=0.6,
@@ -127,13 +134,13 @@ plot!(centers_T, pdf.(pdf_T, centers_T); lw=2, color=:black, ls=:dash, label="Ex
 # large (``\beta > 0``) or small (``\beta < 0``) values of ``x(T)``,
 # giving direct access to the tails of the distribution.
 
-function run_metropolis(; β=0.0, n_therm=10_000, n_steps=1_000_000)
+function run_metropolis(; β=0.0)
     sys  = OUTrajectory(MersenneTwister(123); x0=x0, μ=μ, D=D, θ=θ, dt=dt, T=T)
     alg  = Metropolis(MersenneTwister(42); β=β)
     meas_ts   = Measurements([:x_T => x_T => Float64[]], interval=100)
     meas_hist = Measurements([:x_T => x_T => fit(Histogram, [], bins_T)], interval=1)
     for _ in 1:n_therm;  update!(sys, alg); end
-    for i in 1:n_steps
+    for i in 1:n_metro
         update!(sys, alg)
         measure!(meas_hist, sys, i)
         measure!(meas_ts,   sys, i)
@@ -196,8 +203,8 @@ sys_muca0  = OUTrajectory(MersenneTwister(123); x0=x0, μ=μ, D=D, θ=θ, dt=dt,
 alg_muca0  = Multicanonical(MersenneTwister(100), BinnedObject(bins_T, 0.0))
 meas_muca0 = Measurements([:x_T => x_T => fit(Histogram, [], bins_T)], interval=1)
 
-for _ in 1:10_000;    update!(sys_muca0, alg_muca0); end
-for i in 1:1_000_000; update!(sys_muca0, alg_muca0); measure!(meas_muca0, sys_muca0, i); end
+for _ in 1:n_therm;  update!(sys_muca0, alg_muca0); end
+for i in 1:n_muca;   update!(sys_muca0, alg_muca0); measure!(meas_muca0, sys_muca0, i); end
 println("MUCA (flat):  acceptance = ", round(acceptance_rate(alg_muca0); digits=3))
 
 w0   = meas_muca0[:x_T].data.weights
@@ -225,9 +232,9 @@ x_right = last(bins_T)  - std_T
 cs      = get_centers(logweight(alg_iter))
 
 @showprogress 1 "Iterating MUCA..." for _ in 1:n_iter
-    for _ in 1:10_000;    update!(sys_iter, alg_iter; δ=0.5); end
+    for _ in 1:n_therm;    update!(sys_iter, alg_iter; δ=0.5); end
     reset!(alg_iter)
-    for _ in 1:1_000_000; update!(sys_iter, alg_iter; δ=0.5); end
+    for _ in 1:n_iter_steps; update!(sys_iter, alg_iter; δ=0.5); end
 
     MonteCarloX.update!(ensemble(alg_iter); mode=:simple)
 

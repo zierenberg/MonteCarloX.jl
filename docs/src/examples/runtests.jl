@@ -4,44 +4,31 @@
 ##   julia --project=docs docs/src/examples/runtests.jl
 ##
 ## Environment variables:
-##   MCX_SMOKE=true          — enable smoke mode (also triggered by MCX_CI=true)
-##   MCX_SMOKE_LOOP_CAP=N    — cap all numeric for-loops to N iterations (default 2000)
+##   MCX_SMOKE=true    — enable smoke mode (also triggered by MCX_CI=true)
 
 using Pkg
-Pkg.activate(normpath(joinpath(@__DIR__, "..", "..")))   ## activate docs/ — everything is already there
+Pkg.activate(normpath(joinpath(@__DIR__, "..", "..")))
 Pkg.instantiate()
 
 const EXAMPLES_DIR = @__DIR__
 const SMOKE_MODE   = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
-const LOOP_CAP     = something(
-    tryparse(Int, get(ENV, "MCX_SMOKE_LOOP_CAP", get(ENV, "MCX_CI_LOOP_CAP", ""))),
-    2000,
-)
 
 ## -----------------------------------------------------------------------
 ## Helpers
 ## -----------------------------------------------------------------------
 
-function cap_loops(code::AbstractString, cap::Int)
-    cap <= 0 && return code
-    pattern     = r"(for\s+[_A-Za-z][_A-Za-z0-9]*\s+in\s+1\s*:)([^;\n,\]]+)"
-    replacement = SubstitutionString("\\1min($(cap), \\2)")
-    return replace(code, pattern => replacement)
-end
-
 function sanitize_src_code(code::AbstractString)
-    ## strip lines ending in #src (Pkg.activate, Pkg.instantiate, include defaults.jl, etc.)
+    ## strip lines ending in #src
     lines = filter(split(code, '\n')) do line
         !endswith(rstrip(line), "#src")
     end
     return join(lines, '\n')
 end
 
-function run_script(path::String; smoke::Bool=false, cap::Int=0)
+function run_script(path::String; smoke::Bool=false)
     println("\n=== $(relpath(path, EXAMPLES_DIR)) ===")
     code = read(path, String)
     code = sanitize_src_code(code)
-    smoke && (code = cap_loops(code, cap))
     mod  = Module(Symbol("MCXExample_", hash(path)))
     Base.include_string(mod, code, basename(path))
 end
@@ -73,7 +60,6 @@ function main()
     isempty(scripts) && error("No examples found under $(EXAMPLES_DIR)")
 
     println("Smoke mode : ", SMOKE_MODE)
-    println("Loop cap   : ", LOOP_CAP)
     println("Examples   : ", length(scripts))
 
     n_pass = 0
@@ -81,7 +67,7 @@ function main()
 
     for path in scripts
         try
-            run_script(path; smoke=SMOKE_MODE, cap=LOOP_CAP)
+            run_script(path; smoke=SMOKE_MODE)
             println("  ✓")
             n_pass += 1
         catch e

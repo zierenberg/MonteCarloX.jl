@@ -16,12 +16,14 @@ using MonteCarloX, SpinSystems, MPI
 
 MPI.Initialized() || MPI.Init()
 
+
 # ## Parameters
+const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
 
 L             = 8;
-n_iter        = 10;
-sweeps_therm  = 100;
-sweeps_record = 10_000;
+n_iter        = CI_MODE ? 3 : 10;
+sweeps_therm  = CI_MODE ? 100 : 1_000;
+sweeps_record = CI_MODE ? 1_000 : 100_000;
 
 # ## Validation and visualization
 #

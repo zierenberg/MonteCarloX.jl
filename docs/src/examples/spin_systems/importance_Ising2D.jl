@@ -1,4 +1,4 @@
-# %%                                                #src
+# %% #src
 import Pkg                                          #src
 Pkg.activate(joinpath(@__FILE__, "../../../../"))   #src
 Pkg.instantiate()                                   #src
@@ -10,17 +10,24 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 # Hamiltonian ``H = -J\sum_{\langle ij\rangle} s_i s_j``. We cover three topics:
 # (1) system implementations and their runtime, (2) sampling algorithms, and
 # (3) validation against the exact solution.
+
 using Random, StatsBase, Plots, BenchmarkTools
 using MonteCarloX, SpinSystems
 using Graphs, SparseArrays
 
-# ## Parameters
-L                = 8
-β                = 0.3
-seed             = 42
-therm_sweeps     = 1_000
-prod_sweeps      = 10_000
+# ## CI parameters
+
+const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
+
+therm_sweeps     = CI_MODE ? 10    : 1_000
+prod_sweeps      = CI_MODE ? 100   : 10_000
 measure_interval = 10
+
+# ## Parameters
+
+L    = 8
+β    = 0.3
+seed = 42
 
 # ## System implementations
 #
@@ -32,6 +39,7 @@ measure_interval = 10
 # - `IsingLatticeOptim`: hard-coded 2D square lattice with periodic boundaries
 #
 # We benchmark a single `spin_flip!` step for each.
+
 alg_bench = Metropolis(Xoshiro(seed); β=β)
 
 sys_graph  = Ising([L, L]; J=1, periodic=true)
@@ -62,6 +70,7 @@ println("Optimized 2D Ising:")
 # the two non-trivial acceptance probabilities and avoid calling `exp` at every
 # step. This shows how to extend **MonteCarloX.jl** with a custom algorithm by
 # implementing the `accept!` interface.
+
 mutable struct TableMetropolis{R<:AbstractRNG} <: AbstractMetropolis
     rng      :: R
     p4       :: Float64
@@ -91,14 +100,14 @@ println("Standard Metropolis + Xoshiro:")
 println("TableMetropolis + Xoshiro:")
 @btime spin_flip!($sys_table, $alg_table)
 
-
 # ## Simulation helper
-function run_chain!(sys, alg; therm_sweeps, prod_sweeps, interval)
+
+function run_chain!(sys, alg)
     N = length(sys.spins)
     measurements = Measurements([
         :energy        => energy        => Float64[],
         :magnetization => magnetization => Float64[],
-    ], interval=interval)
+    ], interval=measure_interval)
     for _ in 1:(N * therm_sweeps); spin_flip!(sys, alg); end
     hasmethod(reset!, Tuple{typeof(alg)}) && reset!(alg)
     for i in 1:(N * prod_sweeps)
@@ -117,10 +126,11 @@ end
 # The exact energy distribution follows the Boltzmann weights applied to the
 # exact density of states (Beale 1996). `plot_importance_sampling` overlays
 # the sampled histograms of all algorithms against this reference.
+
 exact_logdos          = logdos_exact_ising2D(L)
 exact_logdos.values .-= exact_logdos[0]
-log_dos  = exact_logdos.values 
-log_w    = log_dos .- β .* get_centers(exact_logdos) 
+log_dos  = exact_logdos.values
+log_w    = log_dos .- β .* get_centers(exact_logdos)
 log_Z    = reduce((a,b) -> a > b ? a + log1p(exp(b-a)) : b + log1p(exp(a-b)),
                   filter(isfinite, log_w))
 mask     = isfinite.(log_dos)
@@ -135,8 +145,7 @@ function plot_importance_sampling(results, labels)
                   title="Distribution vs exact", legend=:topright)
     cols = palette(:tab10)
     for (i, (res, label)) in enumerate(zip(results, labels))
-        plot!(p_ts, res.energies; label=label, lw=1, color=cols[i])
-        ## shift edges by -2 so bin centers land on exact energy values
+        plot!(p_ts, res.energies; lw=1, color=cols[i])
         edges = get_edges(exact_logdos.bins[1])
         hist  = fit(Histogram, res.energies, edges, closed=:left)
         dist  = StatsBase.normalize(hist; mode=:probability)
@@ -153,11 +162,10 @@ end
 # The Metropolis-Hastings algorithm accepts a proposed spin flip with
 # probability ``\min(1, e^{-\beta\Delta E})``. It is the standard workhorse
 # for spin systems: simple, general, and efficient.
+
 sys_meta = IsingLatticeOptim(L, L)
 init!(sys_meta, :random, rng=MersenneTwister(seed))
-res_meta = run_chain!(sys_meta, Metropolis(MersenneTwister(seed); β=β);
-                      therm_sweeps=therm_sweeps, prod_sweeps=prod_sweeps,
-                      interval=measure_interval)
+res_meta = run_chain!(sys_meta, Metropolis(MersenneTwister(seed); β=β))
 
 plot_importance_sampling([res_meta], ["Metropolis"])
 
@@ -167,11 +175,10 @@ plot_importance_sampling([res_meta], ["Metropolis"])
 # which corresponds to directly sampling the conditional distribution of a
 # single spin given its neighbours. It tends to have shorter autocorrelation
 # times than Metropolis at low temperatures.
+
 sys_hb = IsingLatticeOptim(L, L)
 init!(sys_hb, :random, rng=MersenneTwister(seed))
-res_hb = run_chain!(sys_hb, HeatBath(MersenneTwister(seed); β=β);
-                    therm_sweeps=therm_sweeps, prod_sweeps=prod_sweeps,
-                    interval=measure_interval)
+res_hb = run_chain!(sys_hb, HeatBath(MersenneTwister(seed); β=β))
 
 plot_importance_sampling([res_hb], ["HeatBath"])
 
@@ -181,11 +188,10 @@ plot_importance_sampling([res_hb], ["HeatBath"])
 # are equivalent for spin-``1/2`` systems. The distinction matters for systems
 # with more than two spin states, where Glauber uses a linearised transition
 # rate rather than the exact conditional distribution.
+
 sys_gla = IsingLatticeOptim(L, L)
 init!(sys_gla, :random, rng=MersenneTwister(seed))
-res_gla = run_chain!(sys_gla, Glauber(MersenneTwister(seed); β=β);
-                     therm_sweeps=therm_sweeps, prod_sweeps=prod_sweeps,
-                     interval=measure_interval)
+res_gla = run_chain!(sys_gla, Glauber(MersenneTwister(seed); β=β))
 
 plot_importance_sampling([res_gla], ["Glauber"])
 
@@ -194,12 +200,14 @@ plot_importance_sampling([res_gla], ["Glauber"])
 # All three algorithms sample the same Boltzmann distribution. Overlaying
 # them confirms that the choice of algorithm does not affect the physics,
 # only the efficiency.
+
 plot_importance_sampling(
     [res_meta, res_hb, res_gla],
     ["Metropolis", "HeatBath", "Glauber"]
 )
+
 println("Average energy per spin:")
-println("  Exact      : ", round(mean(get_centers(exact_logdos) .* P_exact), digits=3))
-println("  Metropolis : ", round(res_meta.avg_E, digits=3))
-println("  HeatBath   : ", round(res_hb.avg_E,   digits=3))
-println("  Glauber    : ", round(res_gla.avg_E,   digits=3))
+println("  Exact      : ", round(mean(get_centers(exact_logdos) .* P_exact); digits=3))
+println("  Metropolis : ", round(res_meta.avg_E; digits=3))
+println("  HeatBath   : ", round(res_hb.avg_E;   digits=3))
+println("  Glauber    : ", round(res_gla.avg_E;   digits=3))

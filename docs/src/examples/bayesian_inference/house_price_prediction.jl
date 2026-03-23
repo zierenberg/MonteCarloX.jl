@@ -18,6 +18,13 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 using Random, Statistics, Distributions, Plots
 using MonteCarloX
 
+# ## CI parameters
+
+const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
+
+n_steps  = CI_MODE ? 1_000  : 100_000
+burn_in  = CI_MODE ? 200    : 10_000
+
 # ## Synthetic data
 #
 # We generate 50 house prices from a known ground-truth model. Working on a
@@ -54,7 +61,7 @@ function loglikelihood(θ)
     return -0.5 * sum((y_norm .- (β0 .+ β1 .* x_norm)).^2) / σ^2 - n * logσ
 end
 
-logprior(θ) = logpdf(prior_β0, θ[1]) + logpdf(prior_β1, θ[2]) + logpdf(prior_logσ, θ[3])
+logprior(θ)     = logpdf(prior_β0, θ[1]) + logpdf(prior_β1, θ[2]) + logpdf(prior_logσ, θ[3])
 logposterior(θ) = logprior(θ) + loglikelihood(θ)
 
 # ## Metropolis sampling
@@ -63,17 +70,17 @@ logposterior(θ) = logprior(θ) + loglikelihood(θ)
 # The three-parameter posterior is explored jointly; `accept!` evaluates
 # the log-posterior ratio and updates the acceptance counter automatically.
 
-function run_metropolis(logposterior; seed=2026, Δ=0.05, n_steps=100_000, burn_in=10_000)
+function run_metropolis(logposterior; seed=2026, Δ=0.05)
     rng     = MersenneTwister(seed)
     alg     = Metropolis(rng, logposterior)
     θ       = [rand(rng, prior_β0), rand(rng, prior_β1), rand(rng, prior_logσ)]
     samples = [Float64[] for _ in 1:3]
-    for i in 1:burn_in
+    for _ in 1:burn_in
         θ_new = θ .+ Δ .* randn(rng, 3)
         accept!(alg, θ_new, θ) && (θ = θ_new)
     end
-
-    for i in 1:n_steps
+    reset!(alg)
+    for _ in 1:n_steps
         θ_new = θ .+ Δ .* randn(rng, 3)
         accept!(alg, θ_new, θ) && (θ = θ_new)
         push!.(samples, θ)
@@ -110,7 +117,7 @@ end
 # posterior uncertainty. The posterior mean line recovers the ground truth well.
 
 xline   = range(minimum(x), maximum(x); length=200)
-n_lines = 80
+n_lines = min(80, length(β0_si))
 idx     = rand(1:length(β0_si), n_lines)
 
 plt_pred = scatter(x, y; alpha=0.7, ms=4, label="data",

@@ -14,6 +14,13 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 using Random, Statistics, Distributions, Plots
 using MonteCarloX
 
+# ## CI parameters
+
+const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
+
+n_steps  = CI_MODE ? 1_000  : 100_000
+burn_in  = CI_MODE ? 200    : 10_000
+
 # ## Data and model
 #
 # We observe 100 coin flips with 61 heads and 39 tails. The conjugate prior
@@ -50,17 +57,16 @@ function update!(alg::Metropolis, θ, Δ)
     return θ
 end
 
-function run_metropolis(logposterior, prior;
-                        seed=2026, Δ=0.03, n_steps=100_000, burn_in=10_000)
+function run_metropolis(logposterior, prior; seed=2026, Δ=0.03)
     rng     = MersenneTwister(seed)
     alg     = Metropolis(rng, logposterior)
     θ       = rand(rng, prior)
     samples = Float64[]
-    for step in 1:burn_in
+    for _ in 1:burn_in
         θ = update!(alg, θ, Δ)
     end
-    reset!(alg) ## reset statistics after burn-in 
-    for step in 1:n_steps
+    reset!(alg)
+    for _ in 1:n_steps
         θ = update!(alg, θ, Δ)
         push!(samples, θ)
     end
@@ -79,16 +85,18 @@ println("Samples collected : ", length(samples))
 # posterior closely, confirming correct implementation. The plot shows the
 # Bayesian update from prior to posterior, with the MCMC histogram overlaid.
 
-println("Posterior mean:  MCMC = ", round(mean(samples),          digits=4),
-                       "  exact = ", round(mean(posterior_exact), digits=4))
-println("95% CI:  MCMC  = [", round(quantile(samples,          0.025), digits=4),
-                    ", ",      round(quantile(samples,          0.975), digits=4), "]")
-println("         exact = [", round(quantile(posterior_exact,  0.025), digits=4),
-                    ", ",      round(quantile(posterior_exact,  0.975), digits=4), "]")
+println("Posterior mean:  MCMC = ", round(mean(samples);          digits=4),
+                       "  exact = ", round(mean(posterior_exact); digits=4))
+println("95% CI:  MCMC  = [", round(quantile(samples,         0.025); digits=4),
+                    ", ",      round(quantile(samples,         0.975); digits=4), "]")
+println("         exact = [", round(quantile(posterior_exact, 0.025); digits=4),
+                    ", ",      round(quantile(posterior_exact, 0.975); digits=4), "]")
 
 xgrid = range(0.3, 0.85; length=300)
 histogram(samples; bins=50, normalize=:pdf, alpha=0.5,
           label="MCMC samples", xlabel="θ", ylabel="Density",
           title="Coin-flip: prior → posterior")
-plot!(xgrid, pdf.(prior, xgrid);           lw=2, color=:gray,  ls=:dash, label="Prior Beta($(α_prior),$(β_prior))")
-plot!(xgrid, pdf.(posterior_exact, xgrid); lw=2, color=:black, label="Exact posterior")
+plot!(xgrid, pdf.(prior, xgrid);
+      lw=2, color=:gray, ls=:dash, label="Prior Beta($(α_prior),$(β_prior))")
+plot!(xgrid, pdf.(posterior_exact, xgrid);
+      lw=2, color=:black, label="Exact posterior")
