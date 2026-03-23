@@ -42,18 +42,27 @@ println("Exact posterior : Beta($(α_prior + n_heads), $(β_prior + n_tails))")
 # The `accept!` interface of **MonteCarloX.jl** evaluates the log-posterior
 # ratio and handles the acceptance decision, tracking statistics automatically.
 
+function update!(alg::Metropolis, θ, Δ)
+    θ_new = θ + Δ * randn(alg.rng)
+    if 0.0 < θ_new < 1.0
+        accept!(alg, θ_new, θ) && (θ = θ_new)
+    end
+    return θ
+end
+
 function run_metropolis(logposterior, prior;
                         seed=2026, Δ=0.03, n_steps=100_000, burn_in=10_000)
     rng     = MersenneTwister(seed)
     alg     = Metropolis(rng, logposterior)
     θ       = rand(rng, prior)
     samples = Float64[]
+    for step in 1:burn_in
+        θ = update!(alg, θ, Δ)
+    end
+    reset!(alg) ## reset statistics after burn-in 
     for step in 1:n_steps
-        θ_new = θ + Δ * randn(rng)
-        if 0.0 < θ_new < 1.0
-            accept!(alg, θ_new, θ) && (θ = θ_new)
-        end
-        step > burn_in && push!(samples, θ)
+        θ = update!(alg, θ, Δ)
+        push!(samples, θ)
     end
     return samples, alg
 end

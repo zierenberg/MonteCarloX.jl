@@ -68,12 +68,15 @@ function run_metropolis(logposterior; seed=2026, Δ=0.05, n_steps=100_000, burn_
     alg     = Metropolis(rng, logposterior)
     θ       = [rand(rng, prior_β0), rand(rng, prior_β1), rand(rng, prior_logσ)]
     samples = [Float64[] for _ in 1:3]
-    for step in 1:n_steps
+    for i in 1:burn_in
         θ_new = θ .+ Δ .* randn(rng, 3)
         accept!(alg, θ_new, θ) && (θ = θ_new)
-        if step > burn_in
-            push!.(samples, θ)
-        end
+    end
+
+    for i in 1:n_steps
+        θ_new = θ .+ Δ .* randn(rng, 3)
+        accept!(alg, θ_new, θ) && (θ = θ_new)
+        push!.(samples, θ)
     end
     return samples, alg
 end

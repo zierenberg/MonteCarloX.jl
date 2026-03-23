@@ -1,6 +1,8 @@
 # binned log weights for discrete and continuous variables 
 # (designed for histogram-based methods like multicanonical sampling and Wang-Landau)
 abstract type AbstractBin end
+import Base: ==
+
 @inline function _binindex(bins::NTuple{N,B}, xs::NTuple{N,Real}) where {N,B<:AbstractBin}
     ntuple(i -> _binindex(bins[i], xs[i]), N)
 end
@@ -22,7 +24,8 @@ end
 end
 @inline get_centers(b::DiscreteBinning) = collect(b.start:b.step:b.start + b.step*(b.num-1))
 @inline get_edges(b::DiscreteBinning) = collect(b.start - b.step/2 : b.step : b.start + b.step*(b.num-1) + b.step/2)
-
+# DiscreteBinning equality
+==(a::DiscreteBinning, b::DiscreteBinning) = (a.start == b.start && a.step == b.step && a.num == b.num)
 
 # Continuous binning: defined by edges. Bin centers are midpoints between edges.
 struct ContinuousBinning{T<:Real} <: AbstractBin
@@ -34,6 +37,9 @@ end
 end
 @inline get_centers(b::ContinuousBinning) = b.centers
 @inline get_edges(b::ContinuousBinning) = b.edges
+# ContinuousBinning equality
+==(a::ContinuousBinning, b::ContinuousBinning) = (a.edges == b.edges && a.centers == b.centers)
+
 
 @inline function _discrete_binning_from_domain(d::AbstractRange{T}) where {T<:Real}
     return DiscreteBinning(first(d), T(step(d)), length(d))
@@ -50,8 +56,12 @@ end
 
 @inline function _continuous_binning_from_domain(d::Union{AbstractRange{T},AbstractVector{T}}) where {T<:Real}
     length(d) >= 2 || throw(ArgumentError("Continuous bin edges must contain at least two values."))
+    # if d is type Integer, convert to float to avoid issues with non-integer bin centers
+    if eltype(d) <: Integer
+        d = float.(d)
+    end
     edges = collect(d)
-    centers = @inbounds (edges[1:end-1] .+ edges[2:end]) .* T(0.5)
+    centers = @inbounds (edges[1:end-1] .+ edges[2:end]) .* 0.5
     return ContinuousBinning(edges, centers)
 end
 
@@ -169,6 +179,9 @@ end
     idxs = _binindices(lw.bins, xs...)
     return (lw.values[idxs...] = v)
 end
+
+# BinnedObject equality
+==(a::BinnedObject, b::BinnedObject) = (a.values == b.values && a.bins == b.bins)
 
 """
     zero(lw::BinnedObject)

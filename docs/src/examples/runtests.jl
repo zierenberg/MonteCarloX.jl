@@ -24,8 +24,7 @@ const LOOP_CAP     = something(
 
 function cap_loops(code::AbstractString, cap::Int)
     cap <= 0 && return code
-    ## cap any for loop of the form: for x in 1:ANYTHING
-    pattern     = r"(for\s+[_A-Za-z][_A-Za-z0-9]*\s+in\s+1\s*:)([^\n,\]]+)"
+    pattern     = r"(for\s+[_A-Za-z][_A-Za-z0-9]*\s+in\s+1\s*:)([^;\n,\]]+)"
     replacement = SubstitutionString("\\1min($(cap), \\2)")
     return replace(code, pattern => replacement)
 end

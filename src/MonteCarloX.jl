@@ -48,6 +48,8 @@ export  Measurement,
 # Binned utilities
 include("structures/binned_object.jl")
 export  BinnedObject,
+        DiscreteBinning,
+        ContinuousBinning,
         get_centers,
         get_edges,
         get_values,
