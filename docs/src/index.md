@@ -69,6 +69,7 @@ Other related packages (grouped by common use cases):
 - Monte Carlo integration and low-discrepancy sampling:
 	- [Cuba.jl](https://github.com/giordano/Cuba.jl)
 	- [QuasiMonteCarlo.jl](https://github.com/SciML/QuasiMonteCarlo.jl)
+	- [SpinMC](https://github.com/fbuessen/SpinMC.jl)
 - Uncertainty propagation with particle arithmetic:
 	- [MonteCarloMeasurements.jl](https://github.com/baggepinnen/MonteCarloMeasurements.jl)
 

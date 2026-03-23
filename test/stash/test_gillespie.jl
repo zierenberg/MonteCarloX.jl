@@ -32,9 +32,9 @@ function test_gillespie()
 #     hist_time = fit(Histogram, times, 0:tbin:t_max + tbin)
 #     cdf_time_meas = normalize(float(hist_time), mode = :probability)
 #     pdf_sum = 0.0
-#     for i in 1:length(cdf_time_meas.weights)
-#         pdf_sum += cdf_time_meas.weights[i]
-#         cdf_time_meas.weights[i] = pdf_sum
+#     for i in 1:length(cdf_time_meas.values)
+#         pdf_sum += cdf_time_meas.values[i]
+#         cdf_time_meas.values[i] = pdf_sum
 #     end
 #     # since measurements only performed until time_max, we have to rescale
 #     # pdf_time(t) to integrate to 1 in the bounds (-infty, t_max). This is

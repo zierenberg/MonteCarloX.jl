@@ -8,14 +8,19 @@ concrete implementations of AbstractSystem for various spin models.
 """
 module SpinSystems
 
-# Import required types from MonteCarloX
+# using for type definitions and utilities
 using MonteCarloX: AbstractSystem,
                    AbstractImportanceSampling,
                    AbstractMetropolis,
                    AbstractHeatBath,
                    Multicanonical,
+                   BinnedObject,
+                   modify!,
                    accept!,
                    logistic
+
+# import for extensions of MonteCarloX functions
+import MonteCarloX
 
 export AbstractSpinSystem,
        Ising,
@@ -23,6 +28,7 @@ export AbstractSpinSystem,
        IsingMatrix,
        IsingLatticeOptim,
        BlumeCapel,
+       logdos_exact_ising2D,
        # Initialization
        init!,
        # Observables
@@ -31,7 +37,6 @@ export AbstractSpinSystem,
        delta_energy,
        # Updates
        spin_flip!,
-       modify!,
        # Utilities
        pick_site,
        local_pair_interactions
@@ -39,5 +44,6 @@ export AbstractSpinSystem,
 include("abstractions.jl")
 include("ising.jl")
 include("blume_capel.jl")
+include("ising2d_exact.jl")
 
 end # module SpinSystems

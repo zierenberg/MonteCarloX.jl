@@ -20,17 +20,17 @@ end
 
 # Merge local histogram across all ranks
 function merge_histograms!(pmuca::ParallelMulticanonical, histogram)
-    values = histogram.weights
+    values = histogram isa BinnedObject ? histogram.values : histogram.weights
     MPI.Allreduce!(values, MPI.SUM, pmuca.comm)
-    histogram.weights .= values
+    return nothing
 end
 
 # Distribute logweight from root to all ranks
 function distribute_logweight!(pmuca::ParallelMulticanonical, logweight)
     # Only root rank has the updated logweight, broadcast to all ranks
-    values = logweight.weights
+    values = logweight.values
     MPI.Bcast!(values, pmuca.root, pmuca.comm)
-    logweight.weights .= values
+    logweight.values .= values
     MPI.Barrier(pmuca.comm)
     return nothing
 end

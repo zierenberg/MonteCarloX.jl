@@ -139,7 +139,7 @@ function test_multicanonical_ensemble_constructor(; verbose=false)
     ens1 = MulticanonicalEnsemble(lw)
     pass &= ens1.logweight === lw
     pass &= ens1.histogram isa BinnedObject
-    pass &= all(iszero, ens1.histogram.weights)
+    pass &= all(iszero, ens1.histogram.values)
     if verbose; println("✓ MulticanonicalEnsemble from BinnedObject"); end
 
     # Test 2: Constructor with explicit histogram
@@ -157,12 +157,12 @@ function test_multicanonical_ensemble_constructor(; verbose=false)
     # Test 4: Constructor from bins (creates BinnedObject internally)
     ens4 = MulticanonicalEnsemble(bins)
     pass &= ens4.logweight isa BinnedObject
-    pass &= all(iszero, ens4.logweight.weights)
+    pass &= all(iszero, ens4.logweight.values)
     if verbose; println("✓ MulticanonicalEnsemble from bins"); end
 
     # Test 5: Constructor from bins with init value
     ens5 = MulticanonicalEnsemble(bins; init=-1.0)
-    pass &= all(w -> isapprox(w, -1.0), ens5.logweight.weights)
+    pass &= all(w -> isapprox(w, -1.0), ens5.logweight.values)
     if verbose; println("✓ MulticanonicalEnsemble from bins with init"); end
 
     # Test 6: Default record_visits should be true
@@ -236,12 +236,12 @@ function test_wang_landau_ensemble_constructor(; verbose=false)
     # Test 3: Constructor from bins (creates BinnedObject internally)
     ens3 = WangLandauEnsemble(bins)
     pass &= ens3.logweight isa BinnedObject
-    pass &= all(iszero, ens3.logweight.weights)
+    pass &= all(iszero, ens3.logweight.values)
     if verbose; println("✓ WangLandauEnsemble from bins"); end
 
     # Test 4: Constructor from bins with init value
     ens4 = WangLandauEnsemble(bins; init=-1.0)
-    pass &= all(w -> isapprox(w, -1.0), ens4.logweight.weights)
+    pass &= all(w -> isapprox(w, -1.0), ens4.logweight.values)
     if verbose; println("✓ WangLandauEnsemble from bins with init"); end
 
     # Test 5: Constructor from bins with custom logf

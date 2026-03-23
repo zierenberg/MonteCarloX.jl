@@ -48,7 +48,10 @@ export  Measurement,
 # Binned utilities
 include("structures/binned_object.jl")
 export  BinnedObject,
+        DiscreteBinning,
+        ContinuousBinning,
         get_centers,
+        get_edges,
         get_values,
         set!
 
@@ -120,6 +123,8 @@ export  AbstractKineticMonteCarlo,
         step!,
         next_time,
         next_event,
+        event_source,
+        modify!,
         advance!
 
 include("algorithms/gillespie.jl")

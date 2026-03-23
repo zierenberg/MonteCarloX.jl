@@ -35,7 +35,7 @@ function test_multicanonical_accept(; verbose=false)
     # reset
     reset!(alg)
     pass &= alg.accepted == 0
-    pass &= all(iszero, ensemble(alg).histogram.weights)
+    pass &= all(iszero, ensemble(alg).histogram.values)
     
     return pass
 end
@@ -49,31 +49,31 @@ function test_multicanonical_weight_update_inplace(; verbose=false)
     lw = BinnedObject(bins, 0.0)
     alg = Multicanonical(rng, lw)
 
-    w_before = copy(ensemble(alg).logweight.weights)
-    ensemble(alg).histogram.weights .= [0.2, 0.8, 1.1, 2.5]
+    w_before = copy(ensemble(alg).logweight.values)
+    ensemble(alg).histogram.values .= [0.2, 0.8, 1.1, 2.5]
 
     if verbose
         # print the indices of the bins that are being updated
-        println("logweight weights:", ensemble(alg).logweight.weights)
-        println("histogram weights:", ensemble(alg).histogram.weights)
+        println("logweight weights:", ensemble(alg).logweight.values)
+        println("histogram weights:", ensemble(alg).histogram.values)
     end
 
     pass &= update!(ensemble(alg)) === nothing
 
     expected = copy(w_before)
     for i in eachindex(expected)
-        h = ensemble(alg).histogram.weights[i]
+        h = ensemble(alg).histogram.values[i]
         if h > 0
             expected[i] -= log(h)
         end
     end
 
-    pass &= all(isapprox.(ensemble(alg).logweight.weights, expected))
+    pass &= all(isapprox.(ensemble(alg).logweight.values, expected))
 
     if verbose
         println("Multicanonical in-place update:")
         println("  before: $(w_before)")
-        println("  after:  $(ensemble(alg).logweight.weights)")
+        println("  after:  $(ensemble(alg).logweight.values)")
     end
 
     return pass
@@ -126,7 +126,7 @@ function test_multicanonical_accept_out_of_bounds(; verbose=false)
 
     steps_before = alg.steps
     accepted_before = alg.accepted
-    hist_before = copy(ensemble(alg).histogram.weights)
+    hist_before = copy(ensemble(alg).histogram.values)
 
     pass = try
         accept!(alg, x_new, x_old)
@@ -136,7 +136,7 @@ function test_multicanonical_accept_out_of_bounds(; verbose=false)
     end
     pass &= alg.steps == steps_before
     pass &= alg.accepted == accepted_before
-    pass &= all(ensemble(alg).histogram.weights .== hist_before)
+    pass &= all(ensemble(alg).histogram.values .== hist_before)
 
     if verbose
         println("Multicanonical out-of-bounds delegated to BinnedObject: $(pass)")
@@ -156,16 +156,16 @@ function test_multicanonical_set_logweight_range_function(; verbose=false)
     if verbose&pass; println("✓ Multicanonical uses GLOBAL_RNG"); end
 
     pass = true
-    fill!(ensemble(alg).logweight.weights, 0.0)
+    fill!(ensemble(alg).logweight.values, 0.0)
 
     pass &= set!(logweight(alg), (1.0, 4.0), x -> 10.0 + x) === nothing
     expected = [0.0, 11.5, 12.5, 13.5, 0.0, 0.0]
-    pass &= all(isapprox.(ensemble(alg).logweight.weights, expected))
+    pass &= all(isapprox.(ensemble(alg).logweight.values, expected))
     if verbose&pass; println("✓ set!(logweight(alg), range, func) works only in restricted range"); end
 
     pass &= set!(logweight(alg), 0.0:1.0:6.0, x -> -x^2) === nothing
-    centers = collect(ensemble(alg).histogram.bins[1])
-    pass &= all(isapprox.(ensemble(alg).logweight.weights, -centers.^2))
+    centers = get_centers(ensemble(alg).histogram)
+    pass &= all(isapprox.(ensemble(alg).logweight.values, -centers.^2))
     if verbose&pass; println("✓ set!(logweight(alg), range, func) works for full range"); end
 
     # set logweight so that move is not accepted
