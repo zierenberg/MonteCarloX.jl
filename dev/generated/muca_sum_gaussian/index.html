@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Multicanonical: Sum of Gaussians · MonteCarloX</title><meta name="title" content="Multicanonical: Sum of Gaussians · MonteCarloX"/><meta property="og:title" content="Multicanonical: Sum of Gaussians · MonteCarloX"/><meta property="twitter:title" content="Multicanonical: Sum of Gaussians · MonteCarloX"/><meta name="description" content="Documentation for MonteCarloX."/><meta property="og:description" content="Documentation for MonteCarloX."/><meta property="twitter:description" content="Documentation for MonteCarloX."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><script src="../../assets/custom.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">MonteCarloX</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Getting Started</a></li><li><span class="tocitem">Guides</span><ul><li><a class="tocitem" href="../../monte_carlo_fundamentals/">Monte Carlo Fundamentals</a></li><li><a class="tocitem" href="../../importance_sampling_algorithms/">Importance Sampling</a></li><li><a class="tocitem" href="../../continuous_time_sampling_algorithms/">Continuous-Time Sampling</a></li><li><a class="tocitem" href="../../measurements/">Measurements</a></li><li><a class="tocitem" href="../../build_your_own_system/">Build Your Own System</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><input class="collapse-toggle" id="menuitem-3-1" type="checkbox"/><label class="tocitem" for="menuitem-3-1"><span class="docs-label">Getting Started with Examples</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../coin_flip/">Coin Flip (Bayesian inference)</a></li><li><a class="tocitem" href="../importance_Ising2D/">Importance sampling: Ising Model</a></li><li><a class="tocitem" href="../gillespie_birth_death/">Birth-Death Process (Gillespie)</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-2" type="checkbox"/><label class="tocitem" for="menuitem-3-2"><span class="docs-label">Spin Systems</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../importance_Ising2D/">Importance sampling: Ising 2D</a></li><li><a class="tocitem" href="../muca_Ising2D/">Multicanonical sampling: Ising 2D</a></li><li><a class="tocitem" href="../muca_BlumeCapel/">Multicanonical sampling: Blume-Capel</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-3" type="checkbox"/><label class="tocitem" for="menuitem-3-3"><span class="docs-label">Bayesian Inference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../coin_flip/">Importance sampling: Coin Flip</a></li><li><a class="tocitem" href="../house_price_prediction/">Importance sampling: House Price Prediction</a></li><li><a class="tocitem" href="../eight_schools/">Hierarchical sampling: Eight Schools</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-4" type="checkbox"/><label class="tocitem" for="menuitem-3-4"><span class="docs-label">Stochastic Processes</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../kmc_poisson/">Gillespie: Poisson Process</a></li><li><a class="tocitem" href="../gillespie_dimerization/">Gillespie: Dimerization Reaction</a></li><li><a class="tocitem" href="../muca_OU/">Multicanonical: Ornstein-Uhlenbeck</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-5" type="checkbox" checked/><label class="tocitem" for="menuitem-3-5"><span class="docs-label">Large Deviation Theory</span><i class="docs-chevron"></i></label><ul class="collapsed"><li class="is-active"><a class="tocitem" href>Multicanonical: Sum of Gaussians</a><ul class="internal"><li><a class="tocitem" href="#CI-parameters"><span>CI parameters</span></a></li><li><a class="tocitem" href="#Parameters"><span>Parameters</span></a></li><li><a class="tocitem" href="#System-definition"><span>System definition</span></a></li><li><a class="tocitem" href="#Direct-sampling"><span>Direct sampling</span></a></li><li><a class="tocitem" href="#Importance-sampling-with-Metropolis"><span>Importance sampling with Metropolis</span></a></li><li><a class="tocitem" href="#Multicanonical-sampling-—-flat-histogram"><span>Multicanonical sampling — flat histogram</span></a></li><li><a class="tocitem" href="#Multicanonical-with-known-weights"><span>Multicanonical with known weights</span></a></li><li><a class="tocitem" href="#Multicanonical-iteration"><span>Multicanonical iteration</span></a></li><li><a class="tocitem" href="#Reweighting-to-a-biased-ensemble"><span>Reweighting to a biased ensemble</span></a></li></ul></li><li><a class="tocitem" href="../muca_OU/">Multicanonical: Ornstein-Uhlenbeck</a></li></ul></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../systems/">Systems</a></li><li><a class="tocitem" href="../../weights/">Weights</a></li><li><a class="tocitem" href="../../helper/">Helper</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li><a class="is-disabled">Large Deviation Theory</a></li><li class="is-active"><a href>Multicanonical: Sum of Gaussians</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Multicanonical: Sum of Gaussians</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/zierenberg/MonteCarloX.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/zierenberg/MonteCarloX.jl/blob/main/docs/src/examples/large_deviation_theory/muca_sum_gaussian.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Large-Deviation-Theory:-Sum-of-Gaussian-Random-Variables"><a class="docs-heading-anchor" href="#Large-Deviation-Theory:-Sum-of-Gaussian-Random-Variables">Large Deviation Theory: Sum of Gaussian Random Variables</a><a id="Large-Deviation-Theory:-Sum-of-Gaussian-Random-Variables-1"></a><a class="docs-heading-anchor-permalink" href="#Large-Deviation-Theory:-Sum-of-Gaussian-Random-Variables" title="Permalink"></a></h1><p>Large deviation theory (LDT) describes the probability of observing rare, atypical fluctuations of macroscopic observables far from their mean. For a sum <span>$S_N = \sum_{i=1}^N X_i$</span> of i.i.d. random variables, the central limit theorem governs typical fluctuations, but LDT governs the exponentially rare tails.</p><p>This example uses the sum of <span>$N$</span> Gaussian random variables as a tractable benchmark — the exact distribution is known analytically — and demonstrates three sampling strategies:</p><ol><li><strong>Direct sampling</strong> — reference</li><li><strong>Importance sampling</strong> via Metropolis with a biasing field <span>$\beta$</span></li><li><strong>Multicanonical sampling</strong> — flat histogram across the full distribution</li></ol><pre><code class="language-julia hljs">using Random, Distributions
+using StatsBase, LinearAlgebra
+using MonteCarloX
+using Plots, ProgressMeter</code></pre><h2 id="CI-parameters"><a class="docs-heading-anchor" href="#CI-parameters">CI parameters</a><a id="CI-parameters-1"></a><a class="docs-heading-anchor-permalink" href="#CI-parameters" title="Permalink"></a></h2><pre><code class="language-julia hljs">const CI_MODE = get(ENV, &quot;MCX_SMOKE&quot;, get(ENV, &quot;MCX_CI&quot;, &quot;false&quot;)) == &quot;true&quot;
+
+n_direct   = CI_MODE ? 1_000   : 100_000
+n_therm    = CI_MODE ? 100     : 10_000
+n_metro    = CI_MODE ? 1_000   : 1_000_000
+n_muca     = CI_MODE ? 1_000   : 10_000_000
+n_muca_known = CI_MODE ? 1_000 : 50_000_000
+n_iter     = CI_MODE ? 3       : 10
+n_iter_steps = CI_MODE ? 1_000 : 5_000_000</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">5000000</code></pre><h2 id="Parameters"><a class="docs-heading-anchor" href="#Parameters">Parameters</a><a id="Parameters-1"></a><a class="docs-heading-anchor-permalink" href="#Parameters" title="Permalink"></a></h2><pre><code class="language-julia hljs">μ, σ, N = 0.0, 1.0, 100
+
+# exact distribution of S_N is Normal(N*μ, sqrt(N)*σ)
+pdf_sum     = Normal(N*μ, sqrt(N)*σ)
+std_sum     = sqrt(N)*σ
+bins_sum    = (N*μ - 10*std_sum) : (std_sum/10) : (N*μ + 10*std_sum)
+centers_sum = collect(bins_sum[1:end-1] .+ diff(collect(bins_sum))./2)
+logpdf_sum  = logpdf.(pdf_sum, centers_sum)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">200-element Vector{Float64}:
+ -52.72277362619871
+ -51.732773626198714
+ -50.75277362619872
+ -49.78277362619872
+ -48.822773626198725
+ -47.87277362619871
+ -46.93277362619872
+ -46.00277362619872
+ -45.08277362619872
+ -44.172773626198726
+   ⋮
+ -45.08277362619872
+ -46.00277362619872
+ -46.93277362619872
+ -47.87277362619871
+ -48.822773626198725
+ -49.78277362619872
+ -50.75277362619872
+ -51.732773626198714
+ -52.72277362619871</code></pre><h2 id="System-definition"><a class="docs-heading-anchor" href="#System-definition">System definition</a><a id="System-definition-1"></a><a class="docs-heading-anchor-permalink" href="#System-definition" title="Permalink"></a></h2><p>The system state is a vector of <span>$N$</span> Gaussian random variables together with their running sum. Only the sum enters the sampling weight; the individual variables evolve under their own Gaussian prior via a Metropolis-within-Gibbs step.</p><pre><code class="language-julia hljs">mutable struct SumGaussianRVs
+    logpdf_rv :: Function
+    rvs       :: Vector{Float64}
+    sum_rvs   :: Float64
+    function SumGaussianRVs(rng, N; μ=0.0, σ=1.0)
+        dist = Normal(μ, σ)
+        rvs  = rand(rng, dist, N)
+        new(x -&gt; logpdf(dist, x), rvs, sum(rvs))
+    end
+end
+
+sum_rvs(sys::SumGaussianRVs) = sys.sum_rvs</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">sum_rvs (generic function with 1 method)</code></pre><p>Each update proposes a move for one randomly chosen variable. The proposal is first filtered by the Gaussian prior (Metropolis-within-Gibbs), then accepted by the sampling algorithm based on the sum.</p><pre><code class="language-julia hljs">function update!(sys::SumGaussianRVs, alg::AbstractImportanceSampling; δ=0.5)
+    idx    = rand(alg.rng, 1:length(sys.rvs))
+    rv_old = sys.rvs[idx]
+    rv_new = rv_old + δ * (2*rand(alg.rng) - 1)
+    if rand(alg.rng) &lt; exp(sys.logpdf_rv(rv_new) - sys.logpdf_rv(rv_old))
+        sum_new = sys.sum_rvs + (rv_new - rv_old)
+        if accept!(alg, sum_new, sys.sum_rvs)
+            sys.sum_rvs  = sum_new
+            sys.rvs[idx] = rv_new
+        end
+    else
+        alg.steps += 1
+    end
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">update! (generic function with 1 method)</code></pre><h2 id="Direct-sampling"><a class="docs-heading-anchor" href="#Direct-sampling">Direct sampling</a><a id="Direct-sampling-1"></a><a class="docs-heading-anchor-permalink" href="#Direct-sampling" title="Permalink"></a></h2><p>We draw independent sums as a reference distribution.</p><pre><code class="language-julia hljs">direct_samples = [sum(μ .+ σ .* randn(MersenneTwister(i), N)) for i in 1:n_direct]
+hist_direct    = normalize(fit(Histogram, direct_samples, bins_sum); mode=:pdf)
+
+plot(hist_direct; st=:bar, linewidth=0, alpha=0.6,
+     label=&quot;Direct samples&quot;, xlabel=&quot;S_N&quot;, ylabel=&quot;Density&quot;,
+     title=&quot;Direct sampling vs exact&quot;, size=(600, 250), margin=5Plots.mm)
+plot!(centers_sum, pdf.(pdf_sum, centers_sum);
+      lw=2, color=:black, ls=:dash, label=&quot;Exact&quot;)</code></pre><img src="6bc09d4e.svg" alt="Example block output"/><h2 id="Importance-sampling-with-Metropolis"><a class="docs-heading-anchor" href="#Importance-sampling-with-Metropolis">Importance sampling with Metropolis</a><a id="Importance-sampling-with-Metropolis-1"></a><a class="docs-heading-anchor-permalink" href="#Importance-sampling-with-Metropolis" title="Permalink"></a></h2><p>A biasing field <span>$\beta$</span> tilts the sampling distribution toward larger (<span>$\beta &gt; 0$</span>) or smaller (<span>$\beta &lt; 0$</span>) values of <span>$S_N$</span>. At <span>$\beta = 0$</span> this reduces to uniform sampling of the Gaussian.</p><pre><code class="language-julia hljs">function run_metropolis(; β=0.0)
+    sys  = SumGaussianRVs(MersenneTwister(23), N; μ=μ, σ=σ)
+    alg  = Metropolis(MersenneTwister(42); β=β)
+    meas = Measurements([:sum =&gt; sum_rvs =&gt; fit(Histogram, [], bins_sum)], interval=1)
+    for _ in 1:n_therm;  update!(sys, alg); end
+    for i in 1:n_metro;  update!(sys, alg); measure!(meas, sys, i); end
+    println(&quot;β = $(β):  acceptance = &quot;, round(acceptance_rate(alg); digits=3))
+    return meas
+end
+
+βs      = [-0.5, 0.0, 0.5]
+results = Dict(β =&gt; run_metropolis(β=β) for β in βs)
+
+p_is = plot(centers_sum, pdf.(pdf_sum, centers_sum);
+            lw=2, color=:black, ls=:dash, label=&quot;Exact&quot;,
+            xlabel=&quot;S_N&quot;, ylabel=&quot;Density&quot;,
+            title=&quot;Importance sampling&quot;, size=(600, 250), margin=5Plots.mm)
+for β in βs
+    w    = results[β][:sum].data.weights
+    norm = sum(w) * step(bins_sum)
+    plot!(p_is, centers_sum, w ./ norm; lw=2, label=&quot;β = $β&quot;)
+end
+p_is</code></pre><img src="f63a7292.svg" alt="Example block output"/><h2 id="Multicanonical-sampling-—-flat-histogram"><a class="docs-heading-anchor" href="#Multicanonical-sampling-—-flat-histogram">Multicanonical sampling — flat histogram</a><a id="Multicanonical-sampling-—-flat-histogram-1"></a><a class="docs-heading-anchor-permalink" href="#Multicanonical-sampling-—-flat-histogram" title="Permalink"></a></h2><p>With flat weights (<span>$w = 1$</span>) the multicanonical algorithm samples the full distribution uniformly, including the exponentially rare tails. This is equivalent to <span>$\beta = 0$</span> importance sampling but achieved without knowing the target distribution in advance.</p><pre><code class="language-julia hljs">sys_muca0 = SumGaussianRVs(MersenneTwister(23), N; μ=μ, σ=σ)
+alg_muca0 = Multicanonical(MersenneTwister(100), bins_sum; init=0.0)
+
+for _ in 1:n_therm;  update!(sys_muca0, alg_muca0); end
+reset!(alg_muca0)
+for _ in 1:n_muca;   update!(sys_muca0, alg_muca0); end
+println(&quot;MUCA (flat):  acceptance = &quot;, round(acceptance_rate(alg_muca0); digits=3))
+
+hist_muca0 = alg_muca0.ensemble.histogram.values
+dist_muca0 = hist_muca0 / sum(hist_muca0) / step(bins_sum)
+plot(centers_sum, dist_muca0; lw=2, label=&quot;MUCA (flat weights)&quot;,
+     xlabel=&quot;S_N&quot;, ylabel=&quot;Density&quot;,
+     title=&quot;Multicanonical flat histogram&quot;, size=(600, 250), margin=5Plots.mm)
+plot!(centers_sum, pdf.(pdf_sum, centers_sum); lw=2, color=:black, ls=:dash, label=&quot;Exact&quot;)</code></pre><img src="c3bb8f4b.svg" alt="Example block output"/><h2 id="Multicanonical-with-known-weights"><a class="docs-heading-anchor" href="#Multicanonical-with-known-weights">Multicanonical with known weights</a><a id="Multicanonical-with-known-weights-1"></a><a class="docs-heading-anchor-permalink" href="#Multicanonical-with-known-weights" title="Permalink"></a></h2><p>If the target distribution is known, we can initialise the weights to the exact log-PDF and add linear tails to prevent the chain running away at the boundaries.</p><pre><code class="language-julia hljs">sys_known = SumGaussianRVs(MersenneTwister(42), N; μ=μ, σ=σ)
+alg_known = Multicanonical(MersenneTwister(42), bins_sum)
+lw        = logweight(alg_known)
+cs        = get_centers(lw)
+
+set!(lw, (first(cs), last(cs)), x -&gt; -logpdf(pdf_sum, x))
+
+x_left  = -3*std_sum
+x_right = +3*std_sum
+set!(lw, (first(cs), x_left),  x -&gt; lw(x_left)  + (x - x_left)  * 2.0)
+set!(lw, (x_right,  last(cs)), x -&gt; lw(x_right) - (x - x_right) * 2.0)
+
+plot(cs, get_values(lw); lw=2, label=&quot;Initialised logweight&quot;,
+     xlabel=&quot;S_N&quot;, ylabel=&quot;log w(S_N)&quot;,
+     title=&quot;Logweight vs exact log-PDF&quot;, size=(600, 250), margin=5Plots.mm)
+plot!(cs, -logpdf_sum; lw=2, color=:black, ls=:dash, label=&quot;Exact −log PDF&quot;)
+
+for _ in 1:n_therm;      update!(sys_known, alg_known; δ=0.1); end
+reset!(alg_known)
+for _ in 1:n_muca_known; update!(sys_known, alg_known; δ=0.1); end
+println(&quot;MUCA (known): acceptance = &quot;, round(acceptance_rate(alg_known); digits=3))
+
+hist_known = alg_known.ensemble.histogram.values
+dist_known = hist_known / sum(hist_known) / step(bins_sum)
+plot(centers_sum, dist_known; lw=2, label=&quot;MUCA (known weights)&quot;,
+     xlabel=&quot;S_N&quot;, ylabel=&quot;Density&quot;,
+     title=&quot;MUCA with exact initialisation&quot;, size=(600, 250), margin=5Plots.mm)
+plot!(centers_sum, pdf.(pdf_sum, centers_sum); lw=2, color=:black, ls=:dash, label=&quot;Exact&quot;)</code></pre><img src="8aca8218.svg" alt="Example block output"/><h2 id="Multicanonical-iteration"><a class="docs-heading-anchor" href="#Multicanonical-iteration">Multicanonical iteration</a><a id="Multicanonical-iteration-1"></a><a class="docs-heading-anchor-permalink" href="#Multicanonical-iteration" title="Permalink"></a></h2><p>Starting from flat weights, the algorithm iteratively refines the log-weights until the histogram is flat across the full support. Linear boundary tails are reapplied after each iteration to prevent the chain escaping the binned region.</p><pre><code class="language-julia hljs">sys_iter = SumGaussianRVs(MersenneTwister(42), N; μ=μ, σ=σ)
+alg_iter = Multicanonical(MersenneTwister(42), bins_sum)
+
+iter_hists  = BinnedObject[]
+iter_lws    = BinnedObject[]
+iter_accept = Float64[]
+
+lw_iter  = logweight(alg_iter)
+cs_iter  = get_centers(lw_iter)
+x_left   = first(bins_sum) + std_sum
+x_right  = last(bins_sum)  - std_sum
+i_left   = searchsortedfirst(cs_iter, x_left)
+i_right  = searchsortedlast(cs_iter,  x_right)
+
+@showprogress 1 &quot;Iterating MUCA...&quot; for _ in 1:n_iter
+    for _ in 1:n_therm;      update!(sys_iter, alg_iter); end
+    reset!(alg_iter)
+    for _ in 1:n_iter_steps; update!(sys_iter, alg_iter); end
+
+    MonteCarloX.update!(ensemble(alg_iter); mode=:simple)
+
+    wl = get_values(lw_iter)[i_left]
+    wr = get_values(lw_iter)[i_right]
+    set!(lw_iter, (first(cs_iter), cs_iter[i_left]),  x -&gt; wl + (x - cs_iter[i_left]) * 2.0)
+    set!(lw_iter, (cs_iter[i_right], last(cs_iter)),  x -&gt; wr - (x - cs_iter[i_right]) * 2.0)
+
+    push!(iter_hists,  deepcopy(ensemble(alg_iter).histogram))
+    push!(iter_lws,    deepcopy(ensemble(alg_iter).logweight))
+    push!(iter_accept, acceptance_rate(alg_iter))
+end
+
+plot(iter_accept; xlabel=&quot;Iteration&quot;, ylabel=&quot;Acceptance rate&quot;,
+     title=&quot;Convergence of acceptance rate&quot;, label=nothing,
+     size=(600, 220), margin=5Plots.mm)</code></pre><img src="78ec0266.svg" alt="Example block output"/><p>Each panel shows the evolution of the histogram (left) and the estimated log-DOS against the exact reference (right) over iterations.</p><pre><code class="language-julia hljs">function plot_muca_convergence(hists, lws; ref_logpdf=logpdf_sum)
+    n    = length(hists)
+    cols = palette(:viridis, max(n,2))[1:n]
+    xs   = get_centers(hists[1].bins[1])
+    i0   = searchsortedlast(xs, 0.0)
+
+    p1 = plot(xlabel=&quot;S_N&quot;, ylabel=&quot;Counts&quot;, title=&quot;Histograms&quot;, legend=false)
+    for i in 1:n
+        plot!(p1, xs, hists[i].values; lw=2, color=cols[i])
+    end
+
+    p2 = plot(xlabel=&quot;S_N&quot;, ylabel=&quot;-log w&quot;, title=&quot;Log-DOS vs exact&quot;, legend=:topright)
+    for i in 1:n
+        w = -lws[i].values .+ lws[i].values[i0]
+        plot!(p2, xs, w; lw=2, color=cols[i], label=&quot;&quot;)
+    end
+    plot!(p2, xs, ref_logpdf .- ref_logpdf[i0];
+          lw=2, color=:black, ls=:dash, label=&quot;Exact&quot;)
+
+    return plot(p1, p2; layout=(1,2), size=(900, 280), margin=4Plots.mm)
+end
+
+plot_muca_convergence(iter_hists, iter_lws)</code></pre><img src="037badd4.svg" alt="Example block output"/><h2 id="Reweighting-to-a-biased-ensemble"><a class="docs-heading-anchor" href="#Reweighting-to-a-biased-ensemble">Reweighting to a biased ensemble</a><a id="Reweighting-to-a-biased-ensemble-1"></a><a class="docs-heading-anchor-permalink" href="#Reweighting-to-a-biased-ensemble" title="Permalink"></a></h2><p>A single multicanonical run can be reweighted post-hoc to any target ensemble with biasing field <span>$\beta$</span>, recovering the same result as a dedicated Metropolis run at that <span>$\beta$</span>.</p><pre><code class="language-julia hljs">β_rw    = 0.5
+hist_rw = deepcopy(ensemble(alg_iter).histogram)
+for i in eachindex(hist_rw.values)
+    c = hist_rw.bins[1].centers[i]
+    hist_rw.values[i] *= exp(-β_rw * c - iter_lws[end].values[i])
+end
+norm_rw = sum(hist_rw.values) * step(bins_sum)
+
+w_metro = results[β_rw][:sum].data.weights
+norm_m  = sum(w_metro) * step(bins_sum)
+
+plot(centers_sum, hist_rw.values ./ norm_rw;
+     lw=2, color=:black, label=&quot;MUCA reweighted β=$β_rw&quot;,
+     xlabel=&quot;S_N&quot;, ylabel=&quot;Density&quot;,
+     title=&quot;Reweighting vs direct Metropolis&quot;, size=(600, 250), margin=5Plots.mm)
+plot!(centers_sum, w_metro ./ norm_m;
+      lw=2, color=:steelblue, ls=:dash, label=&quot;Metropolis β=$β_rw&quot;)</code></pre><img src="063a3312.svg" alt="Example block output"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../muca_OU/">« Multicanonical: Ornstein-Uhlenbeck</a><a class="docs-footer-nextpage" href="../muca_OU/">Multicanonical: Ornstein-Uhlenbeck »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 23 March 2026 10:59">Monday 23 March 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
