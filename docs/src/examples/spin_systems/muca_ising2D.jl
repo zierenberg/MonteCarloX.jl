@@ -131,5 +131,5 @@ end
 # For true parallelism, run the standalone MPI script in the same folder:
 # ```bash
 # mpiexec -n 4 julia --project=docs \
-#     docs/src/examples/spin_systems/muca_ising2D_mpi.jl
+#     docs/src/examples/spin_systems/muca_Ising2D_mpi.jl
 # ```
