@@ -15,6 +15,7 @@ using MonteCarloX: AbstractSystem,
                    AbstractHeatBath,
                    Multicanonical,
                    BinnedObject,
+                   modify!,
                    accept!,
                    logistic
 

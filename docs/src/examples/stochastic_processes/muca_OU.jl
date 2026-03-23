@@ -21,8 +21,9 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 # providing an exact reference against which we validate three sampling
 # strategies: direct sampling, biased Metropolis, and multicanonical iteration.
 
-using Random, Distributions, StatsBase, Plots, ProgressMeter
+using Random, Distributions, StatsBase, LinearAlgebra
 using MonteCarloX
+using Plots, ProgressMeter
 
 # ## Parameters
 
