@@ -48,18 +48,18 @@ end
 - `step!`: one event at a time (full manual control)
 - `advance!`: run until `total_time`, with optional callbacks (`measure!`, `update!`)
 
-Example with explicit state + rates callback:
+Example with explicit state + event source:
 
 ```julia
 using Random
 using MonteCarloX
 
 sys = Dict(:N => 30)
-rates(sys, t) = [0.2 * sys[:N], 0.1 * sys[:N]]
+event_source(sys::Dict{Symbol,Int}) = [0.2 * sys[:N], 0.1 * sys[:N]]
 
 alg = Gillespie(MersenneTwister(11))
 
-update_cb = (state, event, t) -> begin
+modify_cb = (state, event, t) -> begin
 	if event == 1
 		state[:N] += 1
 	elseif event == 2
@@ -67,7 +67,7 @@ update_cb = (state, event, t) -> begin
 	end
 end
 
-advance!(alg, sys, 20.0; rates=rates, update!=update_cb)
+advance!(alg, sys, 20.0; modify!=modify_cb)
 ```
 
 ## Event sources supported

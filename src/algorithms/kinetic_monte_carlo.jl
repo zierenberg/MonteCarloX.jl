@@ -220,158 +220,58 @@ If event is nothing, then this is returned as well.
     return t_new, event
 end
 
-# Internal loop shared by all `advance!` overloads (intentionally undocumented).
-function _advance_loop!(;
-    alg::AbstractKineticMonteCarlo,
-    total_time,
-    t0::Real,
-    setup!::Union{Nothing,Function}=nothing,
-    step_fn::Function,
-    on_event!::Union{Nothing,Function}=nothing,
-)
-    alg.time = float(t0)
-    setup! !== nothing && setup!()
+"""
+    event_source(sys) -> Union{AbstractVector, AbstractEventHandler, Function}
 
-    while alg.time < total_time
-        t_new, event = step_fn()
-        if event === nothing || !isfinite(t_new)
-            return t_new
-        end
-        on_event! !== nothing && on_event!(event, t_new)
-    end
+Return the event source for system `sys`. Must be implemented by the user.
+"""
+function event_source end
 
-    return alg.time
-end
+event_source(sys::Union{AbstractVector, AbstractEventHandler, Function}) = sys
 
 """
-    advance!(alg::AbstractKineticMonteCarlo, rates::AbstractVector, total_time; t0=0, update!=nothing)
+    modify!(sys, event, t)
 
-Advance a continuous-time process with raw rates until `total_time`.
-
-If `update!` is provided, it is called as `update!(rates, event, t_new)`
-after each sampled event.
+Apply `event` to system `sys` at time `t`. Default is a no-op.
 """
-function advance!(
-    alg::AbstractKineticMonteCarlo,
-    rates::AbstractVector,
-    total_time;
-    t0 = 0.0,
-    update! = nothing,
-)
-    return _advance_loop!(;
-        alg=alg,
-        total_time=total_time,
-        t0=t0,
-        step_fn=() -> step!(alg, rates),
-        on_event! = update! === nothing ? nothing : (event, t_new) -> update!(rates, event, t_new),
-    )
-end
+modify!(sys, event, t) = nothing
 
 """
-    advance!(alg::AbstractKineticMonteCarlo, rates::AbstractWeights, total_time; t0=0, update!=nothing)
+    measure!(sys, event, t)
 
-Advance a continuous-time process with weighted rates until `total_time`.
-
-If `update!` is provided, it is called as `update!(rates, event, t_new)`
-after each sampled event.
+Observe system `sys` at time `t` before `modify!`. Default is a no-op.
 """
-function advance!(
-    alg::AbstractKineticMonteCarlo,
-    rates::AbstractWeights,
-    total_time;
-    t0 = 0.0,
-    update! = nothing,
-)
-    return _advance_loop!(;
-        alg=alg,
-        total_time=total_time,
-        t0=t0,
-        step_fn=() -> step!(alg, rates),
-        on_event! = update! === nothing ? nothing : (event, t_new) -> update!(rates, event, t_new),
-    )
-end
+measure!(sys, event, t) = nothing
 
 """
-    advance!(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerRate, total_time; t0=0, update!=nothing)
+    advance!(alg::AbstractKineticMonteCarlo, sys, total_time; t0=0, measure!=measure!, modify!=modify!)
 
-Advance a continuous-time process with an event-handler backend until `total_time`.
+Advance system `sys` using `alg` until `total_time`.
 
-If `update!` is provided, it is called as
-`update!(event_handler, event, t_new)` after each sampled event.
-"""
-function advance!(
-    alg::AbstractKineticMonteCarlo,
-    event_handler::AbstractEventHandlerRate,
-    total_time;
-    t0 = 0.0,
-    update! = nothing,
-)
-    return _advance_loop!(;
-        alg=alg,
-        total_time=total_time,
-        t0=t0,
-        step_fn=() -> step!(alg, event_handler),
-        on_event! = update! === nothing ? nothing : (event, t_new) -> update!(event_handler, event, t_new),
-    )
-end
+Loop order per step:
+1. `step!`    — draw next event from `event_source(sys)`
+2. `measure!` — observe before modification: `measure!(sys, event, t)`
+3. `modify!`  — apply event to state:        `modify!(sys, event, t)`
 
-"""
-    advance!(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerTime, total_time; t0=0, update!=nothing)
-
-Advance a continuous-time process with a time-event handler until `total_time`.
-
-If `update!` is provided, it is called as
-`update!(event_handler, event, t_new)` after each sampled event.
-"""
-function advance!(
-    alg::AbstractKineticMonteCarlo,
-    event_handler::AbstractEventHandlerTime,
-    total_time;
-    t0 = 0.0,
-    update! = nothing,
-)
-    setup! = () -> set_time!(event_handler, alg.time)
-    return _advance_loop!(;
-        alg=alg,
-        total_time=total_time,
-        t0=t0,
-        setup! = setup!,
-        step_fn=() -> step!(alg, event_handler),
-        on_event! = update! === nothing ? nothing : (event, t_new) -> update!(event_handler, event, t_new),
-    )
-end
-
-"""
-    advance!(alg::AbstractKineticMonteCarlo, sys, total_time; rates, t0=0, measure!=nothing, update!=nothing)
-
-Advance a model system where rates are provided explicitly via
-`rates(sys, t)` callback.
-
-If `measure!` is provided, it is called before update as `measure!(sys, t_new, event)`.
-If `update!` is provided, it is called as `update!(sys, event, t_new)`.
-
-This two-stage interface is useful for kinetic simulations where measurements are
-defined at event times before the event modifies the state.
+Stops early if the event source is exhausted or total time is reached.
 """
 function advance!(
     alg::AbstractKineticMonteCarlo,
     sys,
     total_time;
-    rates::Function,
     t0 = 0.0,
-    measure! = nothing,
-    update! = nothing,
+    measure! = measure!,
+    modify! = modify!,
 )
-    on_event! = (event, t_new) -> begin
-        measure! !== nothing && measure!(sys, t_new, event)
-        update! !== nothing && update!(sys, event, t_new)
-    end
+    alg.time = float(t0)
+    src = event_source(sys)
+    src isa AbstractEventHandlerTime && set_time!(src, alg.time)
 
-    return _advance_loop!(;
-        alg=alg,
-        total_time=total_time,
-        t0=t0,
-        step_fn=() -> step!(alg, t -> rates(sys, t)),
-        on_event! = on_event!,
-    )
+    while alg.time < total_time
+        t_new, event = step!(alg, src)
+        isnothing(event) && return alg.time
+        measure!(sys, event, t_new)
+        modify!(sys, event, t_new)
+    end
+    return alg.time
 end

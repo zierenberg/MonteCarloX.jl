@@ -197,14 +197,14 @@ end
 
 @inline delta_energy(sys::IsingGraph, Δpair, Δspin, i) = -Δpair - delta_field_interactions(sys, Δspin, i)
 
-function modify!(sys::IsingGraph, i, Δpair, Δspin)
+function MonteCarloX.modify!(sys::IsingGraph, i, Δpair, Δspin)
     sys.spins[i] = -sys.spins[i]
     sys.sum_pair_interactions += Δpair
     sys.sum_spins += Δspin
     return nothing
 end
 
-function modify!(sys::Union{IsingGraphCouplingUniformField,IsingGraphCouplingVectorField}, i, Δpair, Δspin)
+function MonteCarloX.modify!(sys::Union{IsingGraphCouplingUniformField,IsingGraphCouplingVectorField}, i, Δpair, Δspin)
     sys.spins[i] = -sys.spins[i]
     sys.sum_pair_interactions += Δpair
     sys.sum_spins += Δspin
@@ -361,14 +361,14 @@ end
 
 @inline delta_energy(sys::IsingMatrix, Δpair, Δspin, i) = -Δpair - delta_field_interactions(sys, Δspin, i)
 
-function modify!(sys::IsingMatrix, i, Δpair, Δspin)
+function MonteCarloX.modify!(sys::IsingMatrix, i, Δpair, Δspin)
     sys.spins[i] = -sys.spins[i]
     sys.sum_pair_interactions += Δpair
     sys.sum_spins += Δspin
     return nothing
 end
 
-function modify!(sys::Union{IsingMatrixCouplingUniformField,IsingMatrixCouplingVectorField}, i, Δpair, Δspin)
+function MonteCarloX.modify!(sys::Union{IsingMatrixCouplingUniformField,IsingMatrixCouplingVectorField}, i, Δpair, Δspin)
     sys.spins[i] = -sys.spins[i]
     sys.sum_pair_interactions += Δpair
     sys.sum_spins += Δspin
@@ -490,7 +490,7 @@ end
 
 @inline delta_energy(sys::IsingLatticeOptim, Δpair, Δspin, i) = -Δpair
 
-function modify!(sys::IsingLatticeOptim, i, Δpair, Δspin)
+function MonteCarloX.modify!(sys::IsingLatticeOptim, i, Δpair, Δspin)
     @inbounds sys.spins[i] = -sys.spins[i]
     sys.sum_pair_interactions += Δpair
     sys.sum_spins += Δspin

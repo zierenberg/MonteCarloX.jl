@@ -4,6 +4,12 @@ using StatsBase
 using StaticArrays
 using Test
 
+mutable struct ExplicitSourceTestSystem
+    N::Int
+end
+
+MonteCarloX.event_source(sys::ExplicitSourceTestSystem) = [0.42, 0.40]
+
 function test_gillespie_constructors(; verbose=false)
     rng = MersenneTwister(42)
     alg = Gillespie(rng)
@@ -138,12 +144,12 @@ function test_kmc_advance_and_statistics(; verbose=false)
     alg = Gillespie(MersenneTwister(11))
 
     callback_count = Ref(0)
-    function update_rates!(r, event, t)
+    function modify_rates!(r, event, t)
         callback_count[] += 1
         return nothing
     end
 
-    t_final = advance!(alg, rates, 10.0; update! = update_rates!)
+    t_final = advance!(alg, rates, 10.0; modify! = modify_rates!)
 
     pass = true
     pass &= t_final > 10.0
@@ -189,7 +195,7 @@ function test_advance_time_event_queue_progress(; verbose=false)
     add!(q, (2.5, 2))
 
     seen = Int[]
-    t_final = advance!(alg, q, 3.0; update! = (handler, event, t) -> push!(seen, event))
+    t_final = advance!(alg, q, 3.0; measure! = (handler, event, t) -> push!(seen, event))
 
     pass = t_final == Inf && alg.time == Inf && alg.steps == 3 && seen == [1, 2]
 
@@ -201,20 +207,19 @@ function test_advance_time_event_queue_progress(; verbose=false)
 end
 
 function test_kmc_advance_with_explicit_rates_callback(; verbose=false)
-    sys = Dict(:N => 10)
-    local_rates(sys,t) = [0.42, 0.40]
+    sys = ExplicitSourceTestSystem(10)
 
     alg = Gillespie(MersenneTwister(99))
     measured_N = Int[]
-    updated_N_before = Int[]
+    modified_N_before = Int[]
 
-    measure_cb = (state, t, event) -> push!(measured_N, state[:N])
-    function update_cb(state, event, t)
-        push!(updated_N_before, state[:N])
+    measure_cb = (state, event, t) -> push!(measured_N, state.N)
+    function modify_cb(state, event, t)
+        push!(modified_N_before, state.N)
         if event == 1
-            state[:N] += 1
+            state.N += 1
         elseif event == 2
-            state[:N] = max(0, state[:N] - 1)
+            state.N = max(0, state.N - 1)
         end
         return nothing
     end
@@ -223,15 +228,14 @@ function test_kmc_advance_with_explicit_rates_callback(; verbose=false)
         alg,
         sys,
         30.0;
-        rates = local_rates,
         measure! = measure_cb,
-        update! = update_cb,
+        modify! = modify_cb,
     )
 
     pass = true
     pass &= t_final > 30.0
-    pass &= length(measured_N) == length(updated_N_before)
-    pass &= measured_N == updated_N_before
+    pass &= length(measured_N) == length(modified_N_before)
+    pass &= measured_N == modified_N_before
     pass &= alg.steps == length(measured_N)
     pass &= alg.time == t_final
 
@@ -372,7 +376,7 @@ function test_kmc_step_and_advance_zero_rate_edges(; verbose=false)
     alg_adv = Gillespie(MersenneTwister(2029))
     seen_events = Any[]
     seen_times = Float64[]
-    t_adv = advance!(alg_adv, [0.0], 10.0; update! = (r, e, t) -> begin
+    t_adv = advance!(alg_adv, [0.0], 10.0; measure! = (r, e, t) -> begin
         push!(seen_events, e)
         push!(seen_times, t)
     end)
@@ -418,7 +422,7 @@ function test_kmc_two_rate_vector_and_weights_paths(; verbose=false)
     alg_w_zero = Gillespie(MersenneTwister(3031))
     rates_w_zero = ProbabilityWeights([0.0, 0.0])
     seen = Any[]
-    t_adv = advance!(alg_w_zero, rates_w_zero, 10.0; update! = (r, e, t) -> push!(seen, e))
+    t_adv = advance!(alg_w_zero, rates_w_zero, 10.0; measure! = (r, e, t) -> push!(seen, e))
     pass &= t_adv == Inf
     pass &= alg_w_zero.time == Inf
     pass &= alg_w_zero.steps == 1
@@ -471,7 +475,7 @@ function test_kmc_time_event_handler_paths(; verbose=false)
     alg2 = Gillespie(MersenneTwister(4041))
     observed = Tuple{Int, Float64}[]
 
-    t_final = advance!(alg2, queue2, 10.0; t0 = 1.0, update! = (q, e, t) -> push!(observed, (e, t)))
+    t_final = advance!(alg2, queue2, 10.0; t0 = 1.0, measure! = (q, e, t) -> push!(observed, (e, t)))
     pass &= t_final == Inf
     pass &= alg2.steps == 2
     pass &= length(observed) == 1

@@ -66,6 +66,6 @@ BoltzmannEnsemble
 FunctionEnsemble
 BinnedObject
 get_centers(bo::BinnedObject, dim::Int=1)
-Base.values(bo::BinnedObject)
+get_values(bo::BinnedObject)
 Base.zero(lw::BinnedObject)
 ```

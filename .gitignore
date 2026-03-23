@@ -2,11 +2,15 @@
 *.jl.cov
 *.jl.mem
 .DS_Store
-/Manifest.toml
 /dev/
 /docs/build/
 /docs/site/
+docs/src/generated/
 
 settings.json
 .vscode/
-**/Manifest.toml
+
+Manifest.toml
+docs/Manifest.toml
+examples/Manifest.toml
+SpinSystems/Manifest.toml
