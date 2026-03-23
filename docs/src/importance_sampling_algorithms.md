@@ -3,7 +3,8 @@
 Importance sampling in MonteCarloX is built around **local proposals + acceptance rules**.
 The defining feature is a **discrete-step** update loop (proposal → decision → update).
 
-While this is most commonly used for equilibrium sampling, the same machinery can be used in non-equilibrium protocols by changing parameters or target weights over steps.
+While this is most commonly used for equilibrium sampling, the same machinery can be used
+in non-equilibrium protocols by changing parameters or target weights over steps.
 
 ## Mental model
 
@@ -18,38 +19,34 @@ The core API function is `accept!`.
 
 ## Target distribution and acceptance rule
 
-Let \(\pi(x)\) be the target density (or mass function) on the state space.
+Let ``\pi(x)`` be the target density (or mass function) on the state space.
 
 - Bayesian example:
-
-\[
-\pi(\theta)=p(\theta\mid\mathcal D).
-\]
+```math
+\pi(\theta) = p(\theta \mid \mathcal{D}).
+```
 
 - Statistical-mechanics microstate example:
-
-\[
-\pi(x)=p(x\mid\beta)=\frac{e^{-\beta E(x)}}{Z(\beta)}.
-\]
+```math
+\pi(x) = p(x \mid \beta) = \frac{e^{-\beta E(x)}}{Z(\beta)}.
+```
 
 Metropolis-Hastings acceptance is
+```math
+\alpha(x \to x') = \min\!\left(1, \frac{\pi(x')\, q(x \mid x')}{\pi(x)\, q(x' \mid x)}\right).
+```
 
-\[
-\alpha(x\to x')=\min\!\left(1,\frac{\pi(x')\,q(x\mid x')}{\pi(x)\,q(x'\mid x)}\right).
-\]
-
-For symmetric local proposals \(q\), this reduces to \(\pi(x')/\pi(x)\).
+For symmetric local proposals ``q``, this reduces to ``\pi(x') / \pi(x)``.
 
 ### Unified view: Bayesian and statistical-physics targets
 
-The same sampler is used in both domains by changing only the callable
-log target score:
+The same sampler is used in both domains by changing only the callable log target score:
 
 - Bayesian inference: `logweight(theta) = logposterior(theta) = loglikelihood(theta) + logprior(theta)`
 - Statistical mechanics: `logweight(x) = -beta * E(x)`
 
-In MonteCarloX this callable is carried by the algorithm as the `ensemble`
-object, and can also be accessed as `logweight(alg)`.
+In MonteCarloX this callable is carried by the algorithm as the `ensemble` object,
+and can also be accessed as `logweight(alg)`.
 
 Both views are important:
 - `ensemble(alg)` is the architecture-level object
@@ -70,7 +67,6 @@ They refer to the same callable value.
 - accept less favorable moves with probability `exp(log_ratio)`
 
 ### Minimal usage
-
 ```julia
 using Random
 using MonteCarloX
@@ -90,9 +86,9 @@ println(acceptance_rate(alg))
 
 ### Bayesian example (primary)
 
-Coin-flip posterior with local random-walk proposals on theta:
+Coin-flip posterior with local random-walk proposals on ``\theta``:
 
-- \(\pi(\theta)=p(\theta\mid\text{data})\propto p(\text{data}\mid\theta)p(\theta)\)
+- ``\pi(\theta) = p(\theta \mid \text{data}) \propto p(\text{data} \mid \theta)\, p(\theta)``
 - implementation target: `logposterior(theta)`
 
 Repository example: `examples/bayesian_coin_flip.ipynb`
@@ -101,29 +97,29 @@ Repository example: `examples/bayesian_coin_flip.ipynb`
 
 Ising microstate sampling:
 
-- state \(x\) = spin configuration
-- target \(\pi(x)=e^{-\beta E(x)}/Z(\beta)\)
+- state ``x`` = spin configuration
+- target ``\pi(x) = e^{-\beta E(x)} / Z(\beta)``
 - local proposal: spin flip
 
 Repository example: `examples/spin_systems/metropolis_ising2D.ipynb`
 
 Energy-variable view (same physics):
+```math
+p(E \mid \beta) = \frac{\Omega(E)\, e^{-\beta E}}{Z(\beta)},
+```
 
-\[
-p(E\mid\beta)=\frac{\Omega(E)e^{-\beta E}}{Z(\beta)},
-\]
-
-where \(\Omega(E)\) is the density of states.
+where ``\Omega(E)`` is the density of states.
 
 ## Glauber
 
 Same proposal style as Metropolis, but uses logistic acceptance.
-Useful when that acceptance rule is the natural one for your dynamics/modeling convention.
+Useful when that acceptance rule is the natural one for your dynamics or modeling convention.
 
 ## HeatBath
 
 Draws from local conditional probabilities instead of accept/reject.
-For Ising-like models this often means directly sampling local spin values from conditional weights.
+For Ising-like models this often means directly sampling local spin values from
+conditional weights.
 
 ## Generalized ensembles
 
@@ -133,8 +129,7 @@ These methods adapt or use non-canonical weights to improve exploration.
 
 - keeps a histogram of visited bins
 - updates tabulated log-weights from histogram information
-- useful for broad energy exploration / barrier crossing
-
+- useful for broad energy exploration and barrier crossing
 ```julia
 using Random
 using MonteCarloX
@@ -151,7 +146,6 @@ set!(ensemble(alg), -10:2:10, x -> 0.0)
 
 - updates log-density-of-states estimate at visited bins
 - progressively refines modification factor (`logf` via `update!(ensemble(alg))` between stages)
-
 ```julia
 using Random
 using MonteCarloX
@@ -167,7 +161,7 @@ alg = WangLandau(MersenneTwister(3), lw; logf=1.0)
 
 - Start with `Metropolis` for standard equilibrium sampling.
 - Use `HeatBath` when conditional local probabilities are natural and cheap.
-- Use `Multicanonical`/`WangLandau` when canonical sampling gets stuck or explores too narrowly.
+- Use `Multicanonical` or `WangLandau` when canonical sampling gets stuck or explores too narrowly.
 
 ## Example map (algorithm ↔ application)
 
@@ -175,11 +169,10 @@ alg = WangLandau(MersenneTwister(3), lw; logf=1.0)
 - **Bayesian regression posterior** (`Metropolis`): `examples/house_price_prediction.ipynb`
 - **Canonical spin sampling** (`Metropolis`): `examples/spin_systems/metropolis_ising2D.ipynb`
 - **Generalized-ensemble exploration** (`Multicanonical`, `WangLandau`):
-    - `examples/spin_systems/muca_ising2D.ipynb`
-    - `examples/muca_LDT_gaussian_rngs.ipynb`
+  - `examples/spin_systems/muca_ising2D.ipynb`
+  - `examples/muca_LDT_gaussian_rngs.ipynb`
 
 ## API reference
-
 ```@docs
 AbstractImportanceSampling
 AbstractMetropolis

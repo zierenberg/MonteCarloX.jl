@@ -1,11 +1,8 @@
 # Build Your Own System
-
 This is the most practical way to start with MonteCarloX.
 
 ## Minimal goal
-
 To run a custom model with MonteCarloX, you typically need:
-
 1. A state type (your system)
 2. A way to evaluate local quantities used by your update
 3. An update function that calls MonteCarloX algorithm primitives (`accept!` or `step!`)
@@ -13,30 +10,25 @@ To run a custom model with MonteCarloX, you typically need:
 You do **not** need to implement the full framework at once.
 
 ## Core abstractions in practice
-
 When building a model package, these abstractions define responsibilities.
 
 ### `AbstractSystem`
-
 Owns:
-
 - state variables
 - model parameters
 - model-specific observables (for example energy)
 - model-specific local update ingredients
 
 Should not own:
-
 - generic sampling logic
 
 ### `AbstractEnsemble`
-
 Encodes relative probability for equilibrium sampling.
-
 In canonical form,
-\[
-\pi(x)=\frac{e^{-\beta E(x)}}{Z(\beta)}
-\]
+```math
+\pi(x) = \frac{e^{-\beta E(x)}}{Z(\beta)}
+```
+
 up to additive constants in log space.
 
 - canonical ensemble: `BoltzmannEnsemble(β)`
@@ -45,22 +37,18 @@ up to additive constants in log space.
 Algorithms use local log-weight differences, so they remain model-agnostic.
 
 ### `AbstractAlgorithm`
-
 Owns sampler state and statistics.
 
 Examples:
-
 - `Metropolis`, `Glauber`, `HeatBath`
 - `Multicanonical`, `WangLandau`
 - `Gillespie`
 
 Typical fields include RNG, counters (`steps`, `accepted`) and/or simulation time.
-
 Update mechanics are model-side functions (for example `spin_flip!`) that call
 algorithm primitives (`accept!`, `step!`, ...).
 
 ## Example: minimal scalar model (`energy(x)`) with Metropolis
-
 ```julia
 using Random
 using MonteCarloX
@@ -80,16 +68,15 @@ end
 rng = MersenneTwister(42)
 alg = Metropolis(rng; β=1.0)  # uses BoltzmannEnsemble(β)
 x = 0.0
-
 for _ in 1:10_000
     x = local_update(x, alg)
 end
 ```
 
-This is the smallest possible pattern: define `energy(x)`, derive `ΔE`, and let a framework algorithm (`Metropolis`) handle acceptance.
+This is the smallest possible pattern: define `energy(x)`, derive `ΔE`, and let a
+framework algorithm (`Metropolis`) handle acceptance.
 
 ## Checklist for importance-sampling systems
-
 - Define your system state type.
 - Define local proposal/update logic.
 - Compute local old/new quantity (or delta) needed by `accept!`.
@@ -98,7 +85,6 @@ This is the smallest possible pattern: define `energy(x)`, derive `ΔE`, and let
 For many models, this is enough.
 
 ## Example: birth-death system with Gillespie
-
 ```julia
 using Random
 using MonteCarloX
@@ -126,7 +112,6 @@ end
 
 alg = Gillespie(MersenneTwister(7))
 sys = BirthDeathState(25, 0.2, 0.1)
-
 for _ in 1:10_000
     t, event = step!(alg, rates(sys, alg.time))
     event === nothing && break
@@ -135,11 +120,9 @@ end
 ```
 
 Same system with callback-style integration:
-
 ```julia
 alg = Gillespie(MersenneTwister(8))
 sys = BirthDeathState(25, 0.2, 0.1)
-
 advance!(
     alg,
     sys,
@@ -150,23 +133,21 @@ advance!(
 ```
 
 ## Checklist for continuous-time systems
-
 - Define state type.
 - Define `rates(state, t)` that returns event rates.
 - Define event-application logic for sampled event indices.
 - Use `step!` for manual loops or `advance!` for callback-based loops.
 
 ## Where `Measurements` fit
-
 `Measurements` are optional helpers.
-You can record observables manually in vectors, or use `Measurement`/`Measurements` for scheduling convenience.
+You can record observables manually in vectors, or use `Measurement`/`Measurements`
+for scheduling convenience.
 
 ## Real model reference
-
-For a production-ready system implementation, inspect `SpinSystems` (for example Ising), where model logic is separated cleanly from MonteCarloX algorithms.
+For a production-ready system implementation, inspect `SpinSystems`
+(for example Ising), where model logic is separated cleanly from MonteCarloX algorithms.
 
 ## Abstractions API reference
-
 ```@docs
 AbstractSystem
 AbstractEnsemble
