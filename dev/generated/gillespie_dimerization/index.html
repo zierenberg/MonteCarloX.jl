@@ -55,7 +55,7 @@ plot(measurement_times, A_t;  lw=2, label=&quot;A&quot;,
      title=&quot;Reversible dimerization trajectory&quot;,
      size=(700, 280), margin=5Plots.mm)
 plot!(measurement_times, B_t;  lw=2, label=&quot;B&quot;)
-plot!(measurement_times, AB_t; lw=2, label=&quot;AB&quot;)</code></pre><img src="cd566e9a.svg" alt="Example block output"/><h2 id="Equilibrium-statistics"><a class="docs-heading-anchor" href="#Equilibrium-statistics">Equilibrium statistics</a><a id="Equilibrium-statistics-1"></a><a class="docs-heading-anchor-permalink" href="#Equilibrium-statistics" title="Permalink"></a></h2><p>Time-averaged counts after the system has equilibrated. The law of mass action predicts <span>$\langle AB \rangle / (\langle A\rangle\langle B\rangle) = k_\text{on}/k_\text{off}$</span>.</p><pre><code class="language-julia hljs">t_eq  = T / 4   ## discard first quarter as transient
+plot!(measurement_times, AB_t; lw=2, label=&quot;AB&quot;)</code></pre><img src="5d6722fe.svg" alt="Example block output"/><h2 id="Equilibrium-statistics"><a class="docs-heading-anchor" href="#Equilibrium-statistics">Equilibrium statistics</a><a id="Equilibrium-statistics-1"></a><a class="docs-heading-anchor-permalink" href="#Equilibrium-statistics" title="Permalink"></a></h2><p>Time-averaged counts after the system has equilibrated. The law of mass action predicts <span>$\langle AB \rangle / (\langle A\rangle\langle B\rangle) = k_\text{on}/k_\text{off}$</span>.</p><pre><code class="language-julia hljs">t_eq  = T / 4   ## discard first quarter as transient
 i_eq  = searchsortedfirst(measurement_times, t_eq)
 
 A_eq  = mean(A_t[i_eq:end])

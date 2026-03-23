@@ -25,11 +25,11 @@ println(&quot;Matrix-coupling Ising:&quot;)
 @btime spin_flip!($sys_matrix, $alg_bench)
 println(&quot;Optimized 2D Ising:&quot;)
 @btime spin_flip!($sys_optim,  $alg_bench)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Graph-based Ising:
-  194.168 ns (0 allocations: 0 bytes)
+  194.610 ns (0 allocations: 0 bytes)
 Matrix-coupling Ising:
-  236.561 ns (0 allocations: 0 bytes)
+  236.042 ns (0 allocations: 0 bytes)
 Optimized 2D Ising:
-  174.965 ns (0 allocations: 0 bytes)</code></pre><p>The optimized implementation is significantly faster because it exploits the fixed lattice geometry to avoid graph traversal and sparse matrix lookups. The graph-based version is the most flexible — it works for any lattice geometry or connectivity without any code changes.</p><h2 id="Custom-acceptance-rule"><a class="docs-heading-anchor" href="#Custom-acceptance-rule">Custom acceptance rule</a><a id="Custom-acceptance-rule-1"></a><a class="docs-heading-anchor-permalink" href="#Custom-acceptance-rule" title="Permalink"></a></h2><p>For the 2D Ising model <span>$\Delta E \in \{-8,-4,0,4,8\}$</span>, so we can precompute the two non-trivial acceptance probabilities and avoid calling <code>exp</code> at every step. This shows how to extend <strong>MonteCarloX.jl</strong> with a custom algorithm by implementing the <code>accept!</code> interface.</p><pre><code class="language-julia hljs">mutable struct TableMetropolis{R&lt;:AbstractRNG} &lt;: AbstractMetropolis
+  174.873 ns (0 allocations: 0 bytes)</code></pre><p>The optimized implementation is significantly faster because it exploits the fixed lattice geometry to avoid graph traversal and sparse matrix lookups. The graph-based version is the most flexible — it works for any lattice geometry or connectivity without any code changes.</p><h2 id="Custom-acceptance-rule"><a class="docs-heading-anchor" href="#Custom-acceptance-rule">Custom acceptance rule</a><a id="Custom-acceptance-rule-1"></a><a class="docs-heading-anchor-permalink" href="#Custom-acceptance-rule" title="Permalink"></a></h2><p>For the 2D Ising model <span>$\Delta E \in \{-8,-4,0,4,8\}$</span>, so we can precompute the two non-trivial acceptance probabilities and avoid calling <code>exp</code> at every step. This shows how to extend <strong>MonteCarloX.jl</strong> with a custom algorithm by implementing the <code>accept!</code> interface.</p><pre><code class="language-julia hljs">mutable struct TableMetropolis{R&lt;:AbstractRNG} &lt;: AbstractMetropolis
     rng      :: R
     p4       :: Float64
     p8       :: Float64
@@ -57,9 +57,9 @@ println(&quot;Standard Metropolis + Xoshiro:&quot;)
 @btime spin_flip!($sys_optim, $alg_bench)
 println(&quot;TableMetropolis + Xoshiro:&quot;)
 @btime spin_flip!($sys_table, $alg_table)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Standard Metropolis + Xoshiro:
-  174.899 ns (0 allocations: 0 bytes)
+  174.548 ns (0 allocations: 0 bytes)
 TableMetropolis + Xoshiro:
-  142.599 ns (0 allocations: 0 bytes)</code></pre><h2 id="Simulation-helper"><a class="docs-heading-anchor" href="#Simulation-helper">Simulation helper</a><a id="Simulation-helper-1"></a><a class="docs-heading-anchor-permalink" href="#Simulation-helper" title="Permalink"></a></h2><pre><code class="language-julia hljs">function run_chain!(sys, alg)
+  141.619 ns (0 allocations: 0 bytes)</code></pre><h2 id="Simulation-helper"><a class="docs-heading-anchor" href="#Simulation-helper">Simulation helper</a><a id="Simulation-helper-1"></a><a class="docs-heading-anchor-permalink" href="#Simulation-helper" title="Permalink"></a></h2><pre><code class="language-julia hljs">function run_chain!(sys, alg)
     N = length(sys.spins)
     measurements = Measurements([
         :energy        =&gt; energy        =&gt; Float64[],
@@ -108,15 +108,15 @@ end</code></pre><pre class="documenter-example-output"><code class="nohighlight 
 init!(sys_meta, :random, rng=MersenneTwister(seed))
 res_meta = run_chain!(sys_meta, Metropolis(MersenneTwister(seed); β=β))
 
-plot_importance_sampling([res_meta], [&quot;Metropolis&quot;])</code></pre><img src="a519bc0f.svg" alt="Example block output"/><h2 id="Heat-Bath"><a class="docs-heading-anchor" href="#Heat-Bath">Heat Bath</a><a id="Heat-Bath-1"></a><a class="docs-heading-anchor-permalink" href="#Heat-Bath" title="Permalink"></a></h2><p>The Heat Bath algorithm accepts with probability <span>$1/(1+e^{\beta\Delta E})$</span>, which corresponds to directly sampling the conditional distribution of a single spin given its neighbours. It tends to have shorter autocorrelation times than Metropolis at low temperatures.</p><pre><code class="language-julia hljs">sys_hb = IsingLatticeOptim(L, L)
+plot_importance_sampling([res_meta], [&quot;Metropolis&quot;])</code></pre><img src="8a67653f.svg" alt="Example block output"/><h2 id="Heat-Bath"><a class="docs-heading-anchor" href="#Heat-Bath">Heat Bath</a><a id="Heat-Bath-1"></a><a class="docs-heading-anchor-permalink" href="#Heat-Bath" title="Permalink"></a></h2><p>The Heat Bath algorithm accepts with probability <span>$1/(1+e^{\beta\Delta E})$</span>, which corresponds to directly sampling the conditional distribution of a single spin given its neighbours. It tends to have shorter autocorrelation times than Metropolis at low temperatures.</p><pre><code class="language-julia hljs">sys_hb = IsingLatticeOptim(L, L)
 init!(sys_hb, :random, rng=MersenneTwister(seed))
 res_hb = run_chain!(sys_hb, HeatBath(MersenneTwister(seed); β=β))
 
-plot_importance_sampling([res_hb], [&quot;HeatBath&quot;])</code></pre><img src="d8527faf.svg" alt="Example block output"/><h2 id="Glauber"><a class="docs-heading-anchor" href="#Glauber">Glauber</a><a id="Glauber-1"></a><a class="docs-heading-anchor-permalink" href="#Glauber" title="Permalink"></a></h2><p>The Glauber dynamics use the same acceptance probability as Heat Bath and are equivalent for spin-<span>$1/2$</span> systems. The distinction matters for systems with more than two spin states, where Glauber uses a linearised transition rate rather than the exact conditional distribution.</p><pre><code class="language-julia hljs">sys_gla = IsingLatticeOptim(L, L)
+plot_importance_sampling([res_hb], [&quot;HeatBath&quot;])</code></pre><img src="2e515639.svg" alt="Example block output"/><h2 id="Glauber"><a class="docs-heading-anchor" href="#Glauber">Glauber</a><a id="Glauber-1"></a><a class="docs-heading-anchor-permalink" href="#Glauber" title="Permalink"></a></h2><p>The Glauber dynamics use the same acceptance probability as Heat Bath and are equivalent for spin-<span>$1/2$</span> systems. The distinction matters for systems with more than two spin states, where Glauber uses a linearised transition rate rather than the exact conditional distribution.</p><pre><code class="language-julia hljs">sys_gla = IsingLatticeOptim(L, L)
 init!(sys_gla, :random, rng=MersenneTwister(seed))
 res_gla = run_chain!(sys_gla, Glauber(MersenneTwister(seed); β=β))
 
-plot_importance_sampling([res_gla], [&quot;Glauber&quot;])</code></pre><img src="2af56cba.svg" alt="Example block output"/><h2 id="Comparison"><a class="docs-heading-anchor" href="#Comparison">Comparison</a><a id="Comparison-1"></a><a class="docs-heading-anchor-permalink" href="#Comparison" title="Permalink"></a></h2><p>All three algorithms sample the same Boltzmann distribution. Overlaying them confirms that the choice of algorithm does not affect the physics, only the efficiency.</p><pre><code class="language-julia hljs">plot_importance_sampling(
+plot_importance_sampling([res_gla], [&quot;Glauber&quot;])</code></pre><img src="90f872a4.svg" alt="Example block output"/><h2 id="Comparison"><a class="docs-heading-anchor" href="#Comparison">Comparison</a><a id="Comparison-1"></a><a class="docs-heading-anchor-permalink" href="#Comparison" title="Permalink"></a></h2><p>All three algorithms sample the same Boltzmann distribution. Overlaying them confirms that the choice of algorithm does not affect the physics, only the efficiency.</p><pre><code class="language-julia hljs">plot_importance_sampling(
     [res_meta, res_hb, res_gla],
     [&quot;Metropolis&quot;, &quot;HeatBath&quot;, &quot;Glauber&quot;]
 )
