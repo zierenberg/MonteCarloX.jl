@@ -95,9 +95,9 @@ bo1d_cont = BinnedObject(0.0:0.5:5.0, 0.0)
 bo2d_cont = BinnedObject((0.0:0.5:5.0, 0.0:0.5:5.0), 0.0)
 ``` 
 """
-struct BinnedObject{N,T,B<:AbstractBin}
-    values :: Array{T,N}
+struct BinnedObject{N,T<:Real,B<:AbstractBin}
     bins :: NTuple{N,B}
+    values :: Array{T,N}
 end
 
 function BinnedObject(domain::AbstractRange{T}, init::S; interpretation::Symbol=:auto) where {T<:Real, S}
@@ -118,7 +118,7 @@ function BinnedObject(
     @assert all(map(b -> typeof(b) == typeof(bins[1]), bins)) "All bins must be of the same type for NTuple type stability."
     sizes = ntuple(i -> bins[i] isa DiscreteBinning ? bins[i].num : length(bins[i].edges)-1, N)
     values = fill(init, sizes...)
-    return BinnedObject{N,typeof(init),typeof(bins[1])}(values, bins)
+    return BinnedObject{N,typeof(init),typeof(bins[1])}(bins, values)
 end
 # catch for invalid domain types
 function BinnedObject(domain, init)
@@ -191,7 +191,7 @@ Return a new `BinnedObject` of the same bins as `lw` but with all values set to 
 function Base.zero(lw::BinnedObject)
     T = eltype(lw.values)
     new_values = fill(zero(T), size(lw.values))
-    return BinnedObject{length(lw.bins),T,typeof(lw.bins[1])}(new_values, lw.bins)
+    return BinnedObject{length(lw.bins),T,typeof(lw.bins[1])}(lw.bins, new_values)
 end
 
 # helper to check if two BinnedObject objects have the same binning structure

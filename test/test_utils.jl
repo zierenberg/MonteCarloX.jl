@@ -71,6 +71,16 @@ function test_log_sum(; verbose=false)
     c = log_sum(a,b)
     pass &= log(C) == c
 
+    vals = [1.2, -3.5, 0.7, -10.0]
+    c_vec = log_sum(vals)
+    pass &= isapprox(c_vec, log(sum(exp.(vals))); atol=1e-12)
+
+    big_a = BigFloat("1.234567890123456789")
+    big_b = BigFloat("1.234567890123456788")
+    big_c = log_sum(big_a, big_b)
+    pass &= big_c isa BigFloat
+    pass &= isapprox(big_c, log(exp(big_a) + exp(big_b)); rtol=big(1e-30))
+
     if verbose
         println("log_sum test pass: $(pass)")
     end

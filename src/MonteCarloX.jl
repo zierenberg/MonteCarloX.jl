@@ -19,12 +19,23 @@ export  AbstractAlgorithm,
 include("ensembles/abstract_ensemble.jl")
 export  AbstractEnsemble,
         update!
-
+        
+# Binned utilities
+include("structures/binned_object.jl")
+export  BinnedObject,
+        DiscreteBinning,
+        ContinuousBinning,
+        get_centers,
+        get_edges,
+        get_values,
+        set!
+    
 # Utilities
 include("utils.jl")
 export  log_sum,
         binary_search,
-        kldivergence
+        kldivergence,
+        distribution_from_logdos
 
 include("rng.jl")
 export  MutableRandomNumbers,
@@ -44,16 +55,6 @@ export  Measurement,
         measure!,
         reset!,
         is_complete
-
-# Binned utilities
-include("structures/binned_object.jl")
-export  BinnedObject,
-        DiscreteBinning,
-        ContinuousBinning,
-        get_centers,
-        get_edges,
-        get_values,
-        set!
 
 # Ensembles
 include("ensembles/function.jl")
@@ -112,6 +113,20 @@ export  ParallelMulticanonical,
         is_root,
         merge_histograms!,
         distribute_logweight!
+
+include("algorithms/parallel_tempering.jl")
+export  ParallelTempering,
+        ExchangeStats,
+        acceptance_rates,
+        exchange_partner,
+        pt_log_acceptance,
+        inverse_temperature,
+        set_inverse_temperature!,
+        attempt_exchange!,
+        attempt_exchange_pairs!,
+        set_betas,
+        set_betas!,
+        retune_betas!
 
 include("algorithms/wang_landau.jl")
 export  WangLandau

@@ -32,5 +32,11 @@ function logdos_exact_ising2D(L::Integer; format::Symbol=:binned)
     format === :dict   && return Dict(data)
     error("Unknown format=$format. Use :binned, :vector, or :dict.")
 end
-
 logdos_exact_ising2D(; L::Integer, format::Symbol=:binned) = logdos_exact_ising2D(L; format)
+
+""" 
+    distribution_exact_ising2D(L::Integer, β::Real)
+Exact canonical distribution for 2D Ising at inverse temperature `β`, from the exact DOS.
+"""
+distribution_exact_ising2D(L::Integer, β::Real) = 
+    MonteCarloX.distribution_from_logdos(logdos_exact_ising2D(L; format=:binned), β)
