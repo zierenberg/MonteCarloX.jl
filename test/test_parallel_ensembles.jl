@@ -62,37 +62,25 @@ function test_parallel_tempering(; verbose=false)
     @test pt.rank == 0
     @test pt.size == 1
     @test is_root(pt)
-    @test exchange_partner(pt, 0) == -1
-    @test exchange_partner(pt, 1) == -1
+    @test index(pt) == 1
+    @test isempty(pt.steps)
+    @test isempty(pt.accepted)
+    @test isempty(acceptance_rates(pt))
+    @test acceptance_rate(pt) == 0.0
 
-    out = attempt_exchange!(pt, 0.8, -10.0; rng=MersenneTwister(1), stage=0)
-    @test out.accepted == false
-    @test out.partner == -1
-    @test out.beta == 0.8
+    alg = Metropolis(MersenneTwister(10); β=0.8)
+    update!(pt, alg, -10.0)
+    @test index(pt) == 1
+    @test ensemble(alg).beta == 0.8
+    @test pt.stage == 1
+    @test isempty(pt.steps)
+    @test isempty(pt.accepted)
+
+    reset!(pt)
+    @test pt.stage == 0
+    @test index(pt) == 1
 
     betas = [1.0, 0.5, 0.2]
-    energies = [10.0, -10.0, 0.0]
-    stats = ExchangeStats(length(betas) - 1)
-    attempt_exchange_pairs!(MersenneTwister(2), betas, energies, 0; stats=stats)
-    @test betas == [0.5, 1.0, 0.2]
-    @test stats.attempts == [1, 0]
-    @test stats.accepts == [1, 0]
-    @test acceptance_rates(stats) == [1.0, 0.0]
-
-    algs = [Metropolis(MersenneTwister(10 + i); β=β) for (i, β) in enumerate([1.0, 0.5, 0.2])]
-    ens1 = ensemble(algs[1])
-    ens2 = ensemble(algs[2])
-    labels = [1, 2, 3]
-    stats2 = ExchangeStats(2)
-    attempt_exchange_pairs!(MersenneTwister(2), algs, energies, 0; stats=stats2, labels=labels)
-    @test ensemble(algs[1]) === ens2
-    @test ensemble(algs[2]) === ens1
-    @test inverse_temperature(algs[1]) == 0.5
-    @test inverse_temperature(algs[2]) == 1.0
-    @test labels == [2, 1, 3]
-    @test stats2.attempts == [1, 0]
-    @test stats2.accepts == [1, 0]
-
     rates = [0.1, 0.6]
     retune_betas!(betas, rates; target=0.3, damping=0.5)
     @test length(betas) == 3

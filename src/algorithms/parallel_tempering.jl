@@ -1,232 +1,155 @@
 using MPI
 
-mutable struct ExchangeStats
-    attempts::Vector{Int}
-    accepts::Vector{Int}
-end
-
-ExchangeStats(nedges::Integer) = ExchangeStats(zeros(Int, max(0, nedges)), zeros(Int, max(0, nedges)))
-
-function reset!(stats::ExchangeStats)
-    fill!(stats.attempts, 0)
-    fill!(stats.accepts, 0)
-    return stats
-end
-
-function acceptance_rates(stats::ExchangeStats)
-    rates = zeros(Float64, length(stats.attempts))
-    @inbounds for i in eachindex(rates)
-        rates[i] = stats.attempts[i] > 0 ? stats.accepts[i] / stats.attempts[i] : 0.0
-    end
-    return rates
-end
-
-@inline function _record_exchange!(stats::ExchangeStats, edge::Int, accepted::Bool)
-    stats.attempts[edge] += 1
-    stats.accepts[edge] += accepted
-    return nothing
-end
-
 """
     ParallelTempering <: AbstractAlgorithm
 
-Parallel tempering helper with MPI metadata and exchange bookkeeping.
-Each rank typically hosts one replica and exchanges inverse temperatures
-(`beta`) with neighboring ranks.
+Parallel tempering helper with MPI metadata and exchange bookkeeping. 
+Each rank hosts one replica. Neighbor relations are tracked through the ladder-index permutation `indices` and swaps are done for Boltzmann ensembles only.
+
+Open Challenges:
+- think about passing the full ensemble between pairs for clarity and future generalization. This should be sufficient lightweight, as it is similarly sized as a bigger float...
 """
-mutable struct ParallelTempering <: AbstractAlgorithm
+mutable struct ParallelTempering <: AbstractImportanceSampling
     comm::Any
     rank::Int
     size::Int
     root::Int
     stage::Int
-    stats::ExchangeStats
+    indices::Vector{Int}
+    steps::Vector{Int}
+    accepted::Vector{Int}
 end
 
 function ParallelTempering(comm; root::Int=0)
     rank = MPI.Comm_rank(comm)
     size = MPI.Comm_size(comm)
     0 <= root < size || throw(ArgumentError("`root` must satisfy 0 <= root < size"))
-    stats = ExchangeStats(max(0, Int(size) - 1))
-    return ParallelTempering(comm, Int(rank), Int(size), Int(root), 0, stats)
+    indices = collect(1:Int(size))
+    nedges = max(0, Int(size) - 1)
+    return ParallelTempering(comm, Int(rank), Int(size), Int(root), 0, indices, zeros(Int, nedges), zeros(Int, nedges))
+end
+
+function reset!(pt::ParallelTempering)
+    pt.stage = 0
+    pt.indices .= eachindex(pt.indices)
+    fill!(pt.steps, 0)
+    fill!(pt.accepted, 0)
+    return pt
+end
+
+function acceptance_rates(pt::ParallelTempering)
+    rates = zeros(Float64, length(pt.steps))
+    @inbounds for i in eachindex(rates)
+        rates[i] = pt.steps[i] > 0 ? pt.accepted[i] / pt.steps[i] : 0.0
+    end
+    return rates
+end
+
+function acceptance_rate(pt::ParallelTempering)
+    total_steps = sum(pt.steps)
+    return total_steps > 0 ? sum(pt.accepted) / total_steps : 0.0
+end
+
+# PT-specific accept helper: updates per-pair counters and returns decision.
+function _accept!(pt::ParallelTempering, pair_id::Int, log_ratio::Real, u::Real)
+    pt.steps[pair_id] += 1
+    accepted = (log_ratio > 0) || (u < exp(log_ratio))
+    pt.accepted[pair_id] += accepted
+    return accepted
 end
 
 @inline function is_root(pt::ParallelTempering)
     return pt.rank == pt.root
 end
 
-@inline function exchange_partner(pt::ParallelTempering, stage::Integer)
-    partner = iseven(pt.rank + Int(stage)) ? (pt.rank + 1) : (pt.rank - 1)
-    return 0 <= partner < pt.size ? partner : -1
-end
-
-@inline pt_log_acceptance(beta_i::Real, beta_j::Real, E_i::Real, E_j::Real) = (beta_i - beta_j) * (E_i - E_j)
-
 """
-    inverse_temperature(ens::BoltzmannEnsemble)
+    index(pt::ParallelTempering)
 
-Return inverse temperature `beta` for a Boltzmann ensemble.
+Ladder index currently held by this rank.
+Index 1 is the coldest end; index `pt.size` is the warmest end.
 """
-@inline inverse_temperature(ens::BoltzmannEnsemble) = ens.beta
+@inline index(pt::ParallelTempering) = pt.indices[pt.rank + 1]
 
-"""
-    inverse_temperature(alg::AbstractImportanceSampling)
+# Even stage activates pair IDs 1,3,5,... and odd stage activates 2,4,6,...
+# Pair ID k corresponds to neighboring labels (k, k+1).
+# Returns (active, pair_id, partner_index).
+function _resolve_pair(my_index::Int, stage::Int, nranks::Int)
+    first  = iseven(stage) ? 1 : 2
+    offset = my_index - first
 
-Return inverse temperature `beta` for importance-sampling algorithms
-with Boltzmann ensembles.
-"""
-@inline inverse_temperature(alg::AbstractImportanceSampling) = inverse_temperature(ensemble(alg))
-
-function set_inverse_temperature!(alg::AbstractImportanceSampling, beta::Real)
-    ens = ensemble(alg)
-    ens isa BoltzmannEnsemble || throw(ArgumentError("set_inverse_temperature! currently supports BoltzmannEnsemble only"))
-    alg.ensemble = BoltzmannEnsemble(convert(typeof(ens.beta), beta))
-    return alg
-end
-
-"""
-    attempt_exchange!(pt, beta, energy; rng=Random.default_rng(), stage=nothing)
-
-Attempt one MPI neighbor exchange for a rank-local replica. The method
-exchanges temperatures (`beta`), not states.
-
-If `stage` is omitted, alternating even/odd staging is used automatically.
-"""
-function attempt_exchange!(pt::ParallelTempering,
-                           beta::Real,
-                           energy::Real;
-                           rng::AbstractRNG=Random.default_rng(),
-                           stage=nothing)
-    st = stage === nothing ? pt.stage : Int(stage)
-    partner = exchange_partner(pt, st)
-
-    if partner < 0
-        if stage === nothing
-            pt.stage = 1 - pt.stage
-        end
-        return (accepted=false, beta=beta, partner=partner, log_ratio=0.0)
-    end
-
-    sendbuf = [float(beta), float(energy)]
-    recvbuf = similar(sendbuf)
-    tag_state = 100 + st
-    MPI.Sendrecv!(sendbuf, partner, tag_state, recvbuf, partner, tag_state, pt.comm)
-
-    beta_partner = recvbuf[1]
-    energy_partner = recvbuf[2]
-    log_ratio = pt_log_acceptance(beta, beta_partner, energy, energy_partner)
-
-    tag_acc = 200 + st
-    if pt.rank < partner
-        accepted = (log_ratio >= 0) || (rand(rng) < exp(log_ratio))
-        flag = Int32(accepted)
-        MPI.Send([flag], partner, tag_acc, pt.comm)
+    if offset >= 0 && iseven(offset) && my_index < nranks
+        return (active=true, pair_id=my_index, partner_index=my_index + 1)
+    elseif offset > 0 && isodd(offset) && my_index - 1 >= first
+        return (active=true, pair_id=my_index - 1, partner_index=my_index - 1)
     else
-        recv_flag = Vector{Int32}(undef, 1)
-        MPI.Recv!(recv_flag, partner, tag_acc, pt.comm)
-        accepted = recv_flag[1] == 1
+        return (active=false, pair_id=0, partner_index=0)
+    end
+end
+
+function _update_pair!(pt::ParallelTempering,
+                       alg::AbstractImportanceSampling,
+                       x::Real,
+                       pair_id::Int,
+                       partner_index::Int)
+    my_index = index(pt)
+    partner_rank = findfirst(==(partner_index), pt.indices) - 1
+    ens = alg.ensemble
+    ens isa BoltzmannEnsemble || throw(ArgumentError("ParallelTempering currently supports BoltzmannEnsemble only"))
+    beta = ens.beta
+
+    # Lower rank appends a shared random float drawn from the local algorithm
+    # RNG so PT swaps are reproducible from algorithm seeding alone.
+    sendbuf = pt.rank < partner_rank ?
+        [float(beta), float(x), rand(alg.rng)] :
+        [float(beta), float(x), 0.0]
+    recvbuf = similar(sendbuf)
+    MPI.Sendrecv!(sendbuf, partner_rank, pt.stage,
+                    recvbuf, partner_rank, pt.stage, pt.comm)
+
+    beta_p    = recvbuf[1]
+    x_p       = recvbuf[2]
+    u         = pt.rank < partner_rank ? sendbuf[3] : recvbuf[3]
+    ens_p     = BoltzmannEnsemble(convert(typeof(beta), beta_p))
+    log_ratio = (logweight(ens, x_p) - logweight(ens, x)) +
+            (logweight(ens_p, x) - logweight(ens_p, x_p))
+
+    if pt.rank < partner_rank
+        # Owner rank decides and records this pair attempt exactly once.
+        accepted = _accept!(pt, pair_id, log_ratio, u)
+    else
+        # Non-owner receives the decision via shared `u`; no counter update.
+        accepted = (log_ratio > 0) || (u < exp(log_ratio))
     end
 
-    edge = min(pt.rank, partner) + 1
-    _record_exchange!(pt.stats, edge, accepted)
-
-    if stage === nothing
-        pt.stage = 1 - pt.stage
+    if accepted
+        alg.ensemble = BoltzmannEnsemble(convert(typeof(beta), beta_p))
+        return partner_index
     end
 
-    beta_new = accepted ? beta_partner : beta
-    return (accepted=accepted, beta=beta_new, partner=partner, log_ratio=log_ratio)
+    return my_index
 end
 
 """
-    attempt_exchange!(pt, alg, energy; rng=alg.rng, stage=nothing)
+    update!(pt::ParallelTempering, alg::AbstractImportanceSampling, x::Real)
 
-MPI neighbor exchange for an importance-sampling algorithm with Boltzmann
-ensemble. On acceptance the algorithm temperature is updated in-place.
+Attempt one parallel-tempering swap step for scalar swap observable `x`.
 """
-function attempt_exchange!(pt::ParallelTempering, alg::AbstractImportanceSampling, energy::Real; rng::AbstractRNG=alg.rng, stage=nothing)
-    beta = inverse_temperature(alg)
-    out = attempt_exchange!(pt, beta, energy; rng=rng, stage=stage)
-    if out.accepted
-        set_inverse_temperature!(alg, out.beta)
+function update!(pt::ParallelTempering, alg::AbstractImportanceSampling, x::Real)
+    my_slot = index(pt)
+    pair = _resolve_pair(my_slot, pt.stage, pt.size)
+
+    new_slot = my_slot
+    if pair.active
+        new_slot = _update_pair!(pt, alg, x, pair.pair_id, pair.partner_index)
     end
-    return out
-end
 
-"""
-    attempt_exchange_pairs!(rng, betas, energies, stage; stats=nothing)
-
-Perform nearest-neighbor exchanges in a local replica array using an
-even/odd stage. Useful for threaded runs where multiple replicas live
-inside one process.
-"""
-function attempt_exchange_pairs!(rng::AbstractRNG,
-                                 betas::AbstractVector{<:Real},
-                                 energies::AbstractVector{<:Real},
-                                 stage::Integer;
-                                 stats::Union{Nothing,ExchangeStats}=nothing)
-    length(betas) == length(energies) || throw(ArgumentError("betas and energies must have the same length"))
-    first_i = iseven(Int(stage)) ? 1 : 2
-    last_i = length(betas) - 1
-    @inbounds for i in first_i:2:last_i
-        j = i + 1
-        log_ratio = pt_log_acceptance(betas[i], betas[j], energies[i], energies[j])
-        accepted = (log_ratio >= 0) || (rand(rng) < exp(log_ratio))
-        if accepted
-            betas[i], betas[j] = betas[j], betas[i]
-        end
-        if stats !== nothing
-            _record_exchange!(stats, i, accepted)
-        end
+    # Propagate label updates to all ranks with one collective — O(nranks) scalars
+    new_indices = MPI.Allgather(Int32(new_slot), pt.comm)
+    @inbounds for r in eachindex(pt.indices)
+        pt.indices[r] = Int(new_indices[r])
     end
-    return betas
-end
 
-"""
-    attempt_exchange_pairs!(rng, algs, energies, stage; stats, labels)
-
-Perform nearest-neighbor exchanges, swapping `ensemble` fields directly
-between adjacent algorithm objects. No new ensemble objects are allocated.
-
-When `labels` is provided (integer vector with `labels[r]` = original
-β-ladder slot for replica `r`), it is swapped alongside the ensembles.
-Stats are recorded per original adjacent temperature pair: only when
-the two slots currently hold adjacent ladder indices (`|labels[i]-labels[j]|==1`).
-"""
-function attempt_exchange_pairs!(rng::AbstractRNG,
-                                    algs::AbstractVector{<:AbstractImportanceSampling},
-                                    energies::AbstractVector{<:Real},
-                                    stage::Integer;
-                                    stats::Union{Nothing,ExchangeStats}=nothing,
-                                    labels::Union{Nothing,AbstractVector{<:Integer}}=nothing)
-    n = length(algs)
-    n == length(energies) || throw(ArgumentError("algs and energies must have the same length"))
-    first_i = iseven(Int(stage)) ? 1 : 2
-    @inbounds for i in first_i:2:(n - 1)
-        j = i + 1
-        βi = inverse_temperature(algs[i])
-        βj = inverse_temperature(algs[j])
-        log_ratio = pt_log_acceptance(βi, βj, energies[i], energies[j])
-        accepted = (log_ratio >= 0) || (rand(rng) < exp(log_ratio))
-        if accepted
-            ensi = algs[i].ensemble
-            algs[i].ensemble = algs[j].ensemble
-            algs[j].ensemble = ensi
-            if labels !== nothing
-                labeli = labels[i]
-                labels[i] = labels[j]
-                labels[j] = labeli
-            end
-        end
-        if stats !== nothing
-            if labels !== nothing
-                lo, hi = minmax(labels[i], labels[j])
-                hi == lo + 1 && _record_exchange!(stats, lo, accepted)
-            else
-                _record_exchange!(stats, i, accepted)
-            end
-        end
-    end
+    pt.stage = 1 - pt.stage
     return nothing
 end
 
@@ -316,7 +239,6 @@ function retune_betas!(betas::AbstractVector{<:Real}, rates::AbstractVector{<:Re
     beta0 = float(betas[1])
 
     @inbounds for i in 2:n
-        step = scaled[i - 1]
         betas[i] = descending ? beta0 - sum(view(scaled, 1:(i - 1))) : beta0 + sum(view(scaled, 1:(i - 1)))
     end
 

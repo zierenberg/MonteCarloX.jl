@@ -116,14 +116,9 @@ export  ParallelMulticanonical,
 
 include("algorithms/parallel_tempering.jl")
 export  ParallelTempering,
-        ExchangeStats,
+        index,
         acceptance_rates,
-        exchange_partner,
-        pt_log_acceptance,
-        inverse_temperature,
-        set_inverse_temperature!,
-        attempt_exchange!,
-        attempt_exchange_pairs!,
+        acceptance_rate,
         set_betas,
         set_betas!,
         retune_betas!
