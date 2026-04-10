@@ -240,3 +240,4 @@ Returns false for interval-based schedules (indefinite).
 is_complete(m::Measurements{K, IntervalSchedule}) where K = false  # indefinite
 is_complete(m::Measurements{K, PreallocatedSchedule}) where K = 
     m.schedule.checkpoint_idx > length(m.schedule.times)
+

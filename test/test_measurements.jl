@@ -1,6 +1,7 @@
 using MonteCarloX
 using Test
 using StatsBase
+using Random
 
 struct UnsupportedContainer end
 
@@ -353,6 +354,58 @@ function test_measurements_reset_container(; verbose=false)
     return pass
 end
 
+function test_tau_int_estimator(; verbose=false)
+    pass = true
+
+    # Zero-variance signal has no measurable decay structure.
+    pass &= integrated_autocorrelation_time(fill(1.0, 64)) == 0.5
+    pass &= tau_int(fill(1.0, 64)) == 0.5
+
+    rng = MersenneTwister(123)
+
+    # Weakly correlated white noise should stay near the minimum.
+    white = randn(rng, 4_000)
+    tau_white = integrated_autocorrelation_time(white)
+    pass &= 0.5 <= tau_white <= 2.0
+
+    # AR(1) benchmark: tau_int = 1/2 + phi/(1-phi) in the long-chain limit.
+    phi = 0.8
+    n = 6_000
+    ar = Vector{Float64}(undef, n)
+    ar[1] = randn(rng)
+    noise_scale = sqrt(1 - phi^2)
+    @inbounds for t in 2:n
+        ar[t] = phi * ar[t - 1] + noise_scale * randn(rng)
+    end
+
+    tau_ar = integrated_autocorrelation_time(ar)
+    pass &= 2.5 <= tau_ar <= 7.0
+
+    # Explicit lag cap is accepted and finite.
+    tau_capped = integrated_autocorrelation_time(ar; max_lag=50)
+    pass &= isfinite(tau_capped)
+    pass &= tau_capped >= 0.5
+
+    # max_lag must not exceed floor(n/2).
+    pass &= try
+        integrated_autocorrelation_time(randn(rng, 20); max_lag=11)
+        false
+    catch err
+        err isa ArgumentError
+    end
+
+    # For batch mode, local lag caps < 1 are skipped and reported as NaN.
+    tau_batch = integrated_autocorrelation_times([randn(rng, 20)]; min_points=2, max_lag=0)
+    pass &= length(tau_batch) == 1
+    pass &= isnan(tau_batch[1])
+
+    if verbose
+        println("tau_int estimator test pass: $(pass)")
+    end
+
+    return pass
+end
+
 function run_measurements_testsets(; verbose=false)
     @testset "Measurements" begin
         @testset "PreallocatedSchedule constructor" begin
@@ -393,6 +446,9 @@ function run_measurements_testsets(; verbose=false)
         end
         @testset "reset! measurements container" begin
             @test test_measurements_reset_container(verbose=verbose)
+        end
+        @testset "tau_int estimator" begin
+            @test test_tau_int_estimator(verbose=verbose)
         end
     end
     return true

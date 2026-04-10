@@ -79,7 +79,7 @@ end
 # core function to evaluate acceptance and update counters
 function _accept!(alg::AbstractImportanceSampling, log_ratio::Real)
     alg.steps += 1
-    accepted = log_ratio > 0 || rand(alg.rng) < exp(log_ratio)
+    accepted = (log_ratio > 0) || (rand(alg.rng) < exp(log_ratio))
     alg.accepted += accepted 
     return accepted
 end

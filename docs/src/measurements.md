@@ -47,6 +47,29 @@ measurements = Measurements([
 - `data(measurements, :energy)` — convenience accessor
 - `reset!(measurements)` — clears data and restarts schedule state
 
+## Integrated autocorrelation time
+For replica-exchange or MCMC tuning, MonteCarloX provides a compact
+integrated autocorrelation-time estimate:
+
+```julia
+using MonteCarloX
+
+energies = data(measurements, :energy)
+tauE = integrated_autocorrelation_time(energies)
+# convenience alias:
+# tauE = tau_int(energies)
+```
+
+This estimates
+
+```math
+	au_{\mathrm{int}} = \frac{1}{2} + \sum_{t\ge 1} C(t)
+```
+
+with a self-consistent lag window. Use it as a practical tuning signal
+for local decorrelation effort; short traces can be noisy. By default,
+the maximal lag is capped at `floor(n/2)`.
+
 ## API reference
 ```@docs
 Measurement
@@ -58,6 +81,9 @@ measure!
 reset!(measurement::Measurement)
 reset!(schedule::IntervalSchedule)
 reset!(measurements::Measurements)
+integrated_autocorrelation_time
+integrated_autocorrelation_times
+tau_int
 times(m::Measurements{K, PreallocatedSchedule}) where K
 data(m::Measurements{K}, key::K) where K
 is_complete

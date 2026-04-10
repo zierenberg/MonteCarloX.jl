@@ -35,7 +35,7 @@ function binary_search(sorted::AbstractVector{T}, value::T)::Int where {T <: Rea
 end
 
 """
-    log_sum(a::T,b::T)
+    log_sum(a::Real,b::Real)
 
 Return result of logarithmic sum ``c = \\ln(A+B) = a + \\ln(1+e^{|b-a|})`` where ``C =
 e^c = A+B = e^a + e^b``.
@@ -51,12 +51,25 @@ julia> exp(MonteCarloX.log_sum(log(2.), log(3.)))
 
 ```
 """
-function log_sum(a::Number, b::Number)::Float64
-    if b < a
-        return a + log(1 + exp(b - a))
-    else
-        return b + log(1 + exp(a - b))
+@inline function log_sum(a::Real, b::Real)
+    ap, bp = promote(a, b)
+    return ap > bp ? ap + log1p(exp(bp - ap)) : bp + log1p(exp(ap - bp))
+end
+
+"""
+    log_sum(values::AbstractVector{<:Real})
+
+Stable reduction of log-weights:
+`log(sum(exp.(values)))`.
+"""
+function log_sum(values::AbstractVector{<:Real})
+    n = length(values)
+    n > 0 || throw(ArgumentError("values must be non-empty"))
+    acc = values[1]
+    @inbounds for i in 2:n
+        acc = log_sum(acc, values[i])
     end
+    return acc
 end
 
 """
@@ -72,6 +85,23 @@ Numerically stable logistic sigmoid:
     end
     ex = exp(x)
     return ex / (1 + ex)
+end
+
+"""
+    distribution_from_logdos(logdos::BinnedObject, β::Real)
+
+Given a log-DOS (logarithmic density of states) as a BinnedObject, return the corresponding distribution at inverse temperature `β` by reweighting with the Boltzmann factor `exp(-β * E)` and normalizing.
+"""
+function distribution_from_logdos(logdos::BinnedObject, β::Real)
+    E = get_centers(logdos)
+    log_w = logdos.values .- β .* E
+    mask = isfinite.(log_w)
+    any(mask) || throw(ArgumentError("logdos must contain at least one finite entry"))
+    log_Z = log_sum(log_w[mask])
+
+    out = zero(logdos)
+    out.values[mask] .= exp.(log_w[mask] .- log_Z)
+    return out
 end
 
 

@@ -46,6 +46,7 @@ makedocs(;
             ],
             "Spin Systems" => [
             "Importance sampling: Ising 2D"           => "generated/importance_Ising2D.md",
+            "Parallel tempering: Ising 2D"            => "generated/pt_Ising2D.md",
             "Multicanonical sampling: Ising 2D"       => "generated/muca_Ising2D.md",
             "Multicanonical sampling: Blume-Capel"    => "generated/muca_BlumeCapel.md",
             ],

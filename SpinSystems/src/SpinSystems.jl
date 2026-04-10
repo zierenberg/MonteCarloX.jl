@@ -29,6 +29,7 @@ export AbstractSpinSystem,
        IsingLatticeOptim,
        BlumeCapel,
        logdos_exact_ising2D,
+       distribution_exact_ising2D,
        # Initialization
        init!,
        # Observables
