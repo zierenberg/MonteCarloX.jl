@@ -1,7 +1,7 @@
 # # Parallel Tempering (MPI, full-power schedule) for 2D Ising
 #
 # Run with:
-# mpiexec -n 8 julia --project=docs docs/src/examples/spin_systems/pt_Ising2D_mpi_fullpower.jl
+# mpiexec -n 8 julia --project=docs docs/src/examples/spin_systems/pt_Ising2D_fullpower_mpi.jl
 #
 # This example follows the practical strategy from
 # Bittner, Nussbaumer, Janke (PRL 101, 130603, 2008):
@@ -31,29 +31,21 @@ function sweep_replica!(sys, alg, L)
     return nothing
 end
 
-function merge_samples_by_index(all_rank_samples::Vector{Vector{Vector{Float64}}}, nindices::Int)
+function merge_samples_by_index(all_rank_samples::Vector{<:AbstractVector{<:Tuple{<:Integer,<:Real}}}, nindices::Int)
     merged = [Float64[] for _ in 1:nindices]
     for rank_samples in all_rank_samples
-        for i in 1:nindices
-            append!(merged[i], rank_samples[i])
+        for (idx, e) in rank_samples
+            1 <= idx <= nindices || throw(ArgumentError("sample index $idx out of bounds for $nindices ladders"))
+            push!(merged[idx], float(e))
         end
     end
     return merged
 end
 
 function main()
-    did_init = false
-    if !MPI.Initialized()
-        required = MPI.THREAD_FUNNELED
-        provided = MPI.Init_thread(required)
-        provided < required && error("MPI thread support insufficient: required THREAD_FUNNELED, got $(provided)")
-        did_init = true
-    end
-
     L = 8
-    nmeasurements = 30_000
+    nmeasurements = 20_000
     ntherm_init = 2_000
-    sweeps_between_exchange = 200
 
     # Fixed beta ladder (PRL strategy): acceptance is monitored, not dynamically retuned.
     Tmin = 1.5
@@ -61,7 +53,7 @@ function main()
 
     # Local decorrelation schedule between exchange attempts.
     base_post_exchange_sweeps = 100
-    min_post_exchange_sweeps = 1
+    min_post_exchange_sweeps = 10
     max_post_exchange_sweeps = 400
 
     # Re-estimate tau_int after this many exchange attempts.
@@ -71,67 +63,67 @@ function main()
 
     seed = 42
 
-    backend = MPIBackend(MPI.COMM_WORLD)
-    pt = ParallelTempering(backend, root=0)
-    nreplicas = size(pt)
+    backend = init(:MPI)
+    nreplicas = size(backend)
     nreplicas >= 2 || throw(ArgumentError("MPI PT requires at least 2 ranks"))
 
     betas = set_betas(nreplicas, inv(Tmax), inv(Tmin), :uniform)
-    beta0 = betas[rank(pt) + 1]
+    pt = ParallelTempering(betas; seed=seed, rng=MersenneTwister, backend=backend)
 
     sys = Ising([L, L])
-    alg = Metropolis(MersenneTwister(seed + rank(pt)); β=beta0)
-    init!(sys, :random; rng=alg.rng)
+    init!(sys, :random; rng=pt.alg.rng)
 
-    for _ in 1:ntherm_init
-        sweep_replica!(sys, alg, L)
+    if is_root(pt)
+        println("════════════════════════════════════════")
+        println(" PT Ising2D MPI full-power (L = $(L))  ")
+        println(" Ranks = $(nreplicas), Measurements = $(nmeasurements)")
+        println("════════════════════════════════════════")
     end
 
-    local_samples = [Float64[] for _ in 1:nreplicas]
+    for _ in 1:ntherm_init
+        sweep_replica!(sys, pt.alg, L)
+    end
+
+    local_samples = Tuple{Int,Float64}[]
     sweeps_after_exchange = fill(base_post_exchange_sweeps, nreplicas)
+    next_exchange_interval = base_post_exchange_sweeps
+    sweeps_since_exchange = 0
     exchange_counter = 0
 
     for meas in 1:nmeasurements
-        sweep_replica!(sys, alg, L)
-
+        sweep_replica!(sys, pt.alg, L)
         e = energy(sys)
-        push!(local_samples[index(pt)], e)
+        push!(local_samples, (index(pt), e))
 
-        if meas % sweeps_between_exchange == 0
-            update!(pt, alg, e)
+        sweeps_since_exchange += 1
+        if sweeps_since_exchange >= next_exchange_interval
+            update!(pt, e)
             exchange_counter += 1
-
-            idx = index(pt)
-            @inbounds for _ in 1:sweeps_after_exchange[idx]
-                sweep_replica!(sys, alg, L)
-            end
+            sweeps_since_exchange = 0
 
             if exchange_counter % adapt_every_exchanges == 0
-                all_rank_samples = gather(local_samples, pt.backend; root=pt.root)
+                optimize_exchange_interval!(
+                    pt,
+                    local_samples,
+                    sweeps_after_exchange;
+                    base_sweeps=base_post_exchange_sweeps,
+                    min_sweeps=min_post_exchange_sweeps,
+                    max_sweeps=max_post_exchange_sweeps,
+                    min_points=tau_min_points,
+                    max_lag=tau_lag_cap,
+                )
 
-                if is_root(pt)
-                    merged = merge_samples_by_index(all_rank_samples, nreplicas)
-                    taus = integrated_autocorrelation_times(merged;
-                                                            min_points=tau_min_points,
-                                                            max_lag=tau_lag_cap)
-
-                    finite_taus = filter(isfinite, taus)
-                    tau_ref = isempty(finite_taus) ? 1.0 : median(finite_taus)
-
-                    @inbounds for i in eachindex(sweeps_after_exchange)
-                        scale = isfinite(taus[i]) ? taus[i] / tau_ref : 1.0
-                        target = round(Int, base_post_exchange_sweeps * scale)
-                        sweeps_after_exchange[i] = clamp(target, min_post_exchange_sweeps, max_post_exchange_sweeps)
-                    end
-                end
-
-                broadcast!(sweeps_after_exchange, pt.root, pt.backend)
+                # Propose a rank-local interval from the current ladder index,
+                # then synchronize to one global interval via max-reduction.
+                interval_buf = [sweeps_after_exchange[index(pt)]]
+                MonteCarloX.allreduce!(interval_buf, max, pt)
+                next_exchange_interval = only(interval_buf)
             end
         end
     end
 
     exch = exchange_stats_at_root(pt)
-    all_samples = gather(local_samples, pt.backend; root=pt.root)
+    all_samples = gather(local_samples, backend; root=pt.root)
 
     if is_root(pt)
         energy_samples = merge_samples_by_index(all_samples, nreplicas)
@@ -140,9 +132,8 @@ function main()
                                                       max_lag=tau_lag_cap)
 
         println("PT Ising2D MPI full-power finished")
-        println("L = $(L), ranks = $(nreplicas), measurements = $(nmeasurements)")
+        println("L = $(L), ranks = $(nreplicas), measurements = $(nmeasurements), exchanges = $(exchange_counter)")
         println("beta range = [$(round(minimum(betas), digits=4)), $(round(maximum(betas), digits=4))]")
-        println("mean |m| per spin = $(round(mean_abs_m, digits=5))")
 
         println("\nExchange acceptance by neighboring betas:")
         for i in eachindex(exch.rates)
@@ -155,8 +146,8 @@ function main()
             tau_print = isfinite(taus_final[i]) ? round(taus_final[i], digits=3) : NaN
             println("  beta[$i] = ", round(betas[i], digits=4),
                     ": tau_int(E) = ", tau_print,
-                    ", sweeps = ", sweeps_after_exchange[i],
-                    ", samples = ", length(energy_samples[i]))
+                    ", sweeps (last estimate) = ", sweeps_after_exchange[i],
+                    ", samples (total) = ", length(energy_samples[i]))
         end
 
         println("\nMean energy comparison (measured vs exact):")
@@ -174,9 +165,7 @@ function main()
         end
     end
 
-    if did_init
-        finalize!(pt.backend)
-    end
+    finalize!(backend)
     return nothing
 end
 

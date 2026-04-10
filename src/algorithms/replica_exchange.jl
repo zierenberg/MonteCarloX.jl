@@ -104,6 +104,12 @@ broadcast!(values, root::Int, ::ReplicaExchangeVector) = values
 gather(value, rx::ReplicaExchangeMessage; root::Int) = gather(value, rx.backend; root=root)
 gather(value, ::ReplicaExchangeVector; root::Int) = [value]
 
+gather_at_root(value, rx::ReplicaExchangeMessage) = gather(value, rx.backend; root=rx.root)
+gather_at_root(value, ::ReplicaExchangeVector) = [value]
+
+broadcast_from_root!(values, rx::ReplicaExchangeMessage) = broadcast!(values, rx.root, rx.backend)
+broadcast_from_root!(values, ::ReplicaExchangeVector) = values
+
 function exchange_stats_at_root(rx::ReplicaExchangeMessage)
     steps_total = reduce(rx.steps, +, rx.root, rx)
     accepted_total = reduce(rx.accepted, +, rx.root, rx)

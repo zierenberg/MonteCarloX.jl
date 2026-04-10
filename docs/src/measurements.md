@@ -62,9 +62,9 @@ tauE = integrated_autocorrelation_time(energies)
 
 This estimates
 
-$$
-tau_{\mathrm{int}} = \frac{1}{2} + \sum_{t\ge 1} C(t),
-$$
+```math
+	au_{\mathrm{int}} = \frac{1}{2} + \sum_{t\ge 1} C(t)
+```
 
 with a self-consistent lag window. Use it as a practical tuning signal
 for local decorrelation effort; short traces can be noisy. By default,

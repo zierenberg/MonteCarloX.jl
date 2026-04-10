@@ -139,13 +139,16 @@ export  ParallelMulticanonical,
 include("algorithms/replica_exchange.jl")
 export  ReplicaExchange,
         ReplicaExchangeMessage,
-        ReplicaExchangeVector
+    ReplicaExchangeVector,
+    gather_at_root,
+    broadcast_from_root!
 
 include("algorithms/parallel_tempering.jl")
 export  ParallelTempering,
         ParallelTemperingMessage,
         ParallelTemperingVector,
         index,
+    optimize_exchange_interval!,
         acceptance_rates,
         acceptance_rate,
         exchange_stats_at_root,
