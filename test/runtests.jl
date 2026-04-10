@@ -47,4 +47,8 @@ using Random
     include("test_kinetic_monte_carlo.jl")
     run_kinetic_monte_carlo_testsets()
 
+    # checkpointing
+    include("test_checkpointing.jl")
+    run_checkpointing_testsets()
+
 end

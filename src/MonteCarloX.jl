@@ -19,9 +19,10 @@ export  AbstractAlgorithm,
 include("ensembles/abstract_ensemble.jl")
 export  AbstractEnsemble,
         update!
-        
-# Binned utilities
-include("structures/binned_object.jl")
+
+# ── Infrastructure ──────────────────────────────────────────────────────────
+
+include("infrastructure/binned_object.jl")
 export  BinnedObject,
         DiscreteBinning,
         ContinuousBinning,
@@ -29,21 +30,42 @@ export  BinnedObject,
         get_edges,
         get_values,
         set!
-    
-# Utilities
-include("utils.jl")
+
+include("infrastructure/utils.jl")
 export  log_sum,
         binary_search,
         kldivergence,
         distribution_from_logdos
 
-include("rng.jl")
+include("infrastructure/rng.jl")
 export  MutableRandomNumbers,
         reset!
 
-# include("tools/reweighting.jl")
+include("infrastructure/message_backend.jl")
+export  AbstractMessageBackend,
+        MPIBackend,
+        DistributedBackend,
+        init,
+        finalize!,
+        rank,
+        size,
+        exchange_packet,
+        allreduce!,
+        reduce,
+        allgather,
+        bcast!,
+        gather,
+        barrier
 
-# Measurement framework
+include("infrastructure/checkpointing.jl")
+export  CheckpointSession,
+        init_checkpoint,
+        checkpoint!,
+        restore,
+        relink!
+
+# ── Measurements ────────────────────────────────────────────────────────────
+
 include("measurements/measurements.jl")
 include("measurements/autocorrelations.jl")
 export  Measurement,
@@ -52,7 +74,7 @@ export  Measurement,
         IntervalSchedule,
         PreallocatedSchedule,
         integrated_autocorrelation_time,
-        integrated_autocorrelation_times, #TODO:L this needs to be solved in PT
+        integrated_autocorrelation_times, #TODO: this needs to be solved in PT
         tau_int,
         times,
         data,
@@ -60,7 +82,8 @@ export  Measurement,
         reset!,
         is_complete
 
-# Ensembles
+# ── Ensembles ───────────────────────────────────────────────────────────────
+
 include("ensembles/function.jl")
 export  FunctionEnsemble
 
@@ -73,7 +96,8 @@ export  MulticanonicalEnsemble
 include("ensembles/wang_landau.jl")
 export  WangLandauEnsemble
 
-# Event handlers (non-equilibrium)
+# ── Event handlers (non-equilibrium) ────────────────────────────────────────
+
 include("event_handler/abstractions.jl")
 export  AbstractEventHandlerRate,
         AbstractEventHandlerTime
@@ -90,8 +114,9 @@ export  EventQueue,
         set_time!,
         add!
 
-# Algorithms (equilibrium)
-include("algorithms/importance_sampling.jl") # Core importance sampling functions (accept!, etc.)
+# ── Algorithms (equilibrium) ────────────────────────────────────────────────
+
+include("algorithms/importance_sampling.jl")
 export  AbstractImportanceSampling,
         AbstractHeatBath,
         ImportanceSampling,
@@ -101,7 +126,7 @@ export  AbstractImportanceSampling,
         acceptance_rate,
         reset!
 
-include("algorithms/metropolis.jl") # Metropolis importance sampling
+include("algorithms/metropolis.jl")
 export  AbstractMetropolis,
         Metropolis,
         Glauber
@@ -111,22 +136,6 @@ export  HeatBath
 
 include("algorithms/multicanonical.jl")
 export  Multicanonical
-
-include("algorithms/message_backend.jl")
-export  AbstractMessageBackend,
-        MPIBackend,
-        DistributedBackend,
-    init,
-    finalize!,
-        rank,
-        size,
-        exchange_packet,
-        allreduce!,
-    reduce,
-        allgather,
-        bcast!,
-        gather,
-    barrier
 
 include("algorithms/parallel_multicanonical.jl")
 export  ParallelMulticanonical,
@@ -139,16 +148,16 @@ export  ParallelMulticanonical,
 include("algorithms/replica_exchange.jl")
 export  ReplicaExchange,
         ReplicaExchangeMessage,
-    ReplicaExchangeVector,
-    gather_at_root,
-    broadcast_from_root!
+        ReplicaExchangeVector,
+        gather_at_root,
+        broadcast_from_root!
 
 include("algorithms/parallel_tempering.jl")
 export  ParallelTempering,
         ParallelTemperingMessage,
         ParallelTemperingVector,
         index,
-    optimize_exchange_interval!,
+        optimize_exchange_interval!,
         acceptance_rates,
         acceptance_rate,
         exchange_stats_at_root,
@@ -161,7 +170,8 @@ export  ParallelTempering,
 include("algorithms/wang_landau.jl")
 export  WangLandau
 
-# Algorithms (non-equilibrium)
+# ── Algorithms (non-equilibrium) ────────────────────────────────────────────
+
 include("algorithms/kinetic_monte_carlo.jl")
 export  AbstractKineticMonteCarlo,
         next,

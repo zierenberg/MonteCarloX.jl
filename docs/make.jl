@@ -37,6 +37,7 @@ makedocs(;
             "Continuous-Time Sampling"            => "continuous_time_sampling_algorithms.md",
             "Measurements"                        => "measurements.md",
             "Build Your Own System"               => "build_your_own_system.md",
+            "Checkpointing"                      => "checkpointing.md",
         ],
         "Examples" => [
             "Getting Started with Examples" => [
