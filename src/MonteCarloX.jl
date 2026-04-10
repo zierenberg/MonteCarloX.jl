@@ -124,7 +124,7 @@ export  AbstractMessageBackend,
         allreduce!,
     reduce,
         allgather,
-        broadcast!,
+        bcast!,
         gather,
     barrier
 

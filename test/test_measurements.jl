@@ -394,6 +394,11 @@ function test_tau_int_estimator(; verbose=false)
         err isa ArgumentError
     end
 
+    # For batch mode, local lag caps < 1 are skipped and reported as NaN.
+    tau_batch = integrated_autocorrelation_times([randn(rng, 20)]; min_points=2, max_lag=0)
+    pass &= length(tau_batch) == 1
+    pass &= isnan(tau_batch[1])
+
     if verbose
         println("tau_int estimator test pass: $(pass)")
     end

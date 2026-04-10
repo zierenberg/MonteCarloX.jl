@@ -29,6 +29,12 @@ function test_parallel_multicanonical(; verbose=false)
     @test size(pmuca) == 1
     @test is_root(pmuca)
 
+    pmuca_algfirst = ParallelMulticanonical(muca, MPIBackend(MPI.COMM_WORLD), root=0)
+    @test pmuca_algfirst isa ParallelMulticanonicalMessage
+
+    pmuca_mode = ParallelMulticanonical(muca, :MPI, root=0)
+    @test pmuca_mode isa ParallelMulticanonicalMessage
+
     pmuca_nonroot = ParallelMulticanonical(DummyBackend(1, 2), muca; root=0)
     @test !is_root(pmuca_nonroot)
 
@@ -69,6 +75,14 @@ function test_parallel_multicanonical(; verbose=false)
     distribute_logweight!(pmucav)
     @test all(ensemble(alg2).logweight.values .== [1.0, 2.0, 3.0, 4.0])
 
+    @test barrier(pmucav) === nothing
+    @test allgather(7, pmucav) == [7]
+    v = [3.0, 4.0]
+    @test allreduce!(v, +, pmucav) === v
+    @test reduce(v, +, 0, pmucav) == [3.0, 4.0]
+    @test MonteCarloX.bcast!(v, 0, pmucav) === v
+    @test gather(9, pmucav; root=0) == [9]
+
     if verbose
         println("ParallelMulticanonical tests completed")
     end
@@ -105,6 +119,12 @@ function test_parallel_tempering(; verbose=false)
     @test pt.stage == 0
     @test index(pt) == 1
 
+    rx_comm = ReplicaExchange(alg, MPI.COMM_WORLD; root=0)
+    @test rx_comm isa ReplicaExchangeMessage
+
+    pt_mode = ParallelTempering(alg, :MPI; root=0)
+    @test pt_mode isa ParallelTemperingMessage
+
     betas = [1.0, 0.5, 0.2]
     rates = [0.1, 0.6]
     retune_betas!(betas, rates; target=0.3, damping=0.5)
@@ -133,6 +153,9 @@ function test_parallel_tempering(; verbose=false)
     update!(v_pt, [-10.0, -8.0])
     @test v_pt.stage == 1
     @test sum(v_pt.steps) >= 0
+    @test gather_at_root(5, v_pt) == [5]
+    arr = [1, 2]
+    @test broadcast_from_root!(arr, v_pt) === arr
 
     v_pt2 = ParallelTempering([1.0, 0.5]; seed=123, rng=MersenneTwister)
     @test v_pt2 isa ParallelTemperingVector

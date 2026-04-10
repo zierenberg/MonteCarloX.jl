@@ -19,8 +19,8 @@ allreduce!(values, op, ::AbstractMessageBackend) =
     throw(ArgumentError("allreduce! is not implemented for this message backend"))
 reduce(values, op, root::Int, ::AbstractMessageBackend) =
     throw(ArgumentError("reduce is not implemented for this message backend"))
-broadcast!(values, root::Int, ::AbstractMessageBackend) =
-    throw(ArgumentError("broadcast! is not implemented for this message backend"))
+bcast!(values, root::Int, ::AbstractMessageBackend) =
+    throw(ArgumentError("bcast! is not implemented for this message backend"))
 gather(value, ::AbstractMessageBackend; root::Int) =
     throw(ArgumentError("gather is not implemented for this message backend"))
 barrier(::AbstractMessageBackend) =
@@ -108,7 +108,7 @@ function reduce(values, op, root::Int, backend::MPIBackend)
     return MPI.Reduce(values, op, root, backend.comm)
 end
 
-function broadcast!(values, root::Int, backend::MPIBackend)
+function bcast!(values, root::Int, backend::MPIBackend)
     return MPI.Bcast!(values, root, backend.comm)
 end
 
@@ -220,7 +220,7 @@ function reduce(values, op, root::Int, backend::DistributedBackend)
     return gathered
 end
 
-function broadcast!(values, root::Int, backend::DistributedBackend)
+function bcast!(values, root::Int, backend::DistributedBackend)
     # Send values from root to all workers
     root_id = root + 1
     

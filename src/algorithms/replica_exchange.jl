@@ -98,8 +98,8 @@ allreduce!(values, op, ::ReplicaExchangeVector) = values
 reduce(values, op, root::Int, rx::ReplicaExchangeMessage) = reduce(values, op, root, rx.backend)
 reduce(values, op, root::Int, ::ReplicaExchangeVector) = copy(values)
 
-broadcast!(values, root::Int, rx::ReplicaExchangeMessage) = broadcast!(values, root, rx.backend)
-broadcast!(values, root::Int, ::ReplicaExchangeVector) = values
+bcast!(values, root::Int, rx::ReplicaExchangeMessage) = bcast!(values, root, rx.backend)
+bcast!(values, root::Int, ::ReplicaExchangeVector) = values
 
 gather(value, rx::ReplicaExchangeMessage; root::Int) = gather(value, rx.backend; root=root)
 gather(value, ::ReplicaExchangeVector; root::Int) = [value]
@@ -107,7 +107,7 @@ gather(value, ::ReplicaExchangeVector; root::Int) = [value]
 gather_at_root(value, rx::ReplicaExchangeMessage) = gather(value, rx.backend; root=rx.root)
 gather_at_root(value, ::ReplicaExchangeVector) = [value]
 
-broadcast_from_root!(values, rx::ReplicaExchangeMessage) = broadcast!(values, rx.root, rx.backend)
+broadcast_from_root!(values, rx::ReplicaExchangeMessage) = bcast!(values, rx.root, rx.backend)
 broadcast_from_root!(values, ::ReplicaExchangeVector) = values
 
 function exchange_stats_at_root(rx::ReplicaExchangeMessage)

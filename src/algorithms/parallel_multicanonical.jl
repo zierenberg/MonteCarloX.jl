@@ -70,8 +70,8 @@ allreduce!(values, op, ::ParallelMulticanonicalVector) = values
 reduce(values, op, root::Int, pmuca::ParallelMulticanonicalMessage) = reduce(values, op, root, pmuca.backend)
 reduce(values, op, root::Int, ::ParallelMulticanonicalVector) = copy(values)
 
-broadcast!(values, root::Int, pmuca::ParallelMulticanonicalMessage) = broadcast!(values, root, pmuca.backend)
-broadcast!(values, root::Int, ::ParallelMulticanonicalVector) = values
+bcast!(values, root::Int, pmuca::ParallelMulticanonicalMessage) = bcast!(values, root, pmuca.backend)
+bcast!(values, root::Int, ::ParallelMulticanonicalVector) = values
 
 gather(value, pmuca::ParallelMulticanonicalMessage; root::Int) = gather(value, pmuca.backend; root=root)
 gather(value, pmuca::ParallelMulticanonicalVector; root::Int) = [value]
@@ -97,7 +97,7 @@ end
 
 function distribute_logweight!(pmuca::ParallelMulticanonicalMessage)
     barrier(pmuca)
-    broadcast!(ensemble(pmuca.alg).logweight.values, pmuca.root, pmuca)
+    bcast!(ensemble(pmuca.alg).logweight.values, pmuca.root, pmuca)
     barrier(pmuca)
     return nothing
 end

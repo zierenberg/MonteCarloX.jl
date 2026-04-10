@@ -39,6 +39,10 @@ using Random
     include("test_parallel_ensembles.jl")
     run_parallel_ensembles_testsets()
 
+    # message backend primitives
+    include("test_message_backend.jl")
+    run_message_backend_testsets()
+
     # non-equilibrium / kinetic Monte Carlo
     include("test_kinetic_monte_carlo.jl")
     run_kinetic_monte_carlo_testsets()
