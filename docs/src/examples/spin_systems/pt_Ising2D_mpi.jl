@@ -1,22 +1,37 @@
 # # Parallel Tempering (MPI) for 2D Ising
 #
 # Run with:
-# mpiexec -n 4 julia --project docs/src/examples/spin_systems/pt_Ising2D_mpi.jl
+# mpiexec -n 4 julia --project=docs docs/src/examples/spin_systems/pt_Ising2D_mpi.jl
 #
-# One MPI rank hosts one replica. `pt` owns a temperature-label table
-# (`pt.labels`) so every rank always knows who its neighbors are without
-# a gather/broadcast. Only scalar data are exchanged per swap; no system
-# state is transferred. The swap observable here is the energy `E`, passed
-# as `update!(pt, alg, E)`.
+# One MPI rank hosts one replica. The replica exchange protocol coordinates
+# neighbor swaps via MPI, with energy swap observables passed to the PT
+# coordinator. Only scalar data is exchanged; no full system state is transferred.
 
 # %% #src
-import Pkg
-Pkg.activate(joinpath(@__FILE__, "../../../../"))
-Pkg.instantiate()
-include(joinpath(@__DIR__, "..", "defaults.jl"))
+import Pkg                                          #src
+Pkg.activate(joinpath(@__FILE__, "../../../../"))   #src
+Pkg.instantiate()                                   #src
+include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 
-using Random, Statistics, StatsBase
+using Random, Statistics, StatsBase, Plots
+using MonteCarloX: update!
 using MonteCarloX, SpinSystems, MPI
+
+MPI.Initialized() || MPI.Init()
+
+# Parameters
+
+L                     = 8
+nreplicas             = 4
+nmeasurements         = 20_000
+ntherm_init           = 2_000
+sweeps_between_exchange = 200
+
+Tmin = 1.5
+Tmax = 3.0
+seed = 42
+
+# Sweep helper
 
 function sweep_replica!(sys, alg, L)
     for _ in 1:(L * L)
@@ -25,109 +40,78 @@ function sweep_replica!(sys, alg, L)
     return nothing
 end
 
-function main()
-    did_init = false
-    if !MPI.Initialized()
-        required = MPI.THREAD_FUNNELED
-        provided = MPI.Init_thread(required)
-        provided < required && error("MPI thread support insufficient: required THREAD_FUNNELED, got $(provided)")
-        did_init = true
-    end
+# Setup
 
-    L = 8
-    nmeasurements = 20_000
-    ntherm_init = 2_000
-    ntherm_after_exchange = 20
-    sweeps_between_exchange = 200
-    Tmin = 1.5
-    Tmax = 3.0
-    seed = 42
+backend = init(:MPI)
+nranks = size(backend)
+nranks >= 2 || throw(ArgumentError("MPI PT requires at least 2 ranks"))
 
-    pt = ParallelTempering(MPI.COMM_WORLD, root=0)
-    pt.size >= 2 || throw(ArgumentError("MPI PT requires at least 2 ranks"))
+betas = set_betas(nranks, inv(Tmax), inv(Tmin), :uniform)
+pt = ParallelTempering(betas; seed=seed, rng=Xoshiro, backend=backend)
 
-    betas = set_betas(pt.size, inv(Tmax), inv(Tmin), :uniform)
-    beta0 = betas[pt.rank + 1]
+sys = Ising([L, L])
+init!(sys, :random; rng=pt.alg.rng)
 
-    sys = IsingLatticeOptim(L, L)
-    alg = Metropolis(MersenneTwister(seed + pt.rank); β=beta0)
-    init!(sys, :random; rng=alg.rng)
-
-    for _ in 1:ntherm_init
-        sweep_replica!(sys, alg, L)
-    end
-
-    local_samples = [Float64[] for _ in 1:pt.size]
-    m_abs_sum_local = 0.0
-
-    for meas in 1:nmeasurements
-        sweep_replica!(sys, alg, L)
-
-        e = energy(sys)
-        m_abs_sum_local += abs(magnetization(sys))
-        push!(local_samples[index(pt)], e)
-
-        if meas % sweeps_between_exchange == 0
-            update!(pt, alg, e)
-            for _ in 1:ntherm_after_exchange
-                sweep_replica!(sys, alg, L)
-            end
-        end
-    end
-
-    steps_total = MPI.Reduce(pt.steps, +, pt.root, pt.comm)
-    accepted_total = MPI.Reduce(pt.accepted, +, pt.root, pt.comm)
-    mag_abs_total = MPI.Reduce(m_abs_sum_local, +, pt.root, pt.comm)
-    all_samples = MPI.gather(local_samples, pt.comm; root=pt.root)
-
-    if is_root(pt)
-        energy_samples = [Float64[] for _ in 1:pt.size]
-        for rank_samples in all_samples
-            for i in 1:pt.size  
-                append!(energy_samples[i], rank_samples[i])
-            end
-        end
-
-        rates = zeros(Float64, length(steps_total))
-        for i in eachindex(rates)
-            rates[i] = steps_total[i] > 0 ? accepted_total[i] / steps_total[i] : 0.0
-        end
-
-        mean_abs_m = mag_abs_total / (nmeasurements * pt.size * L * L)
-
-        println("PT Ising2D MPI finished")
-        println("L = $(L), ranks = $(pt.size), measurements = $(nmeasurements)")
-        println("beta range = [$(round(minimum(betas), digits=4)), $(round(maximum(betas), digits=4))]")
-        println("mean |m| per spin = $(round(mean_abs_m, digits=4))")
-        total_steps = sum(steps_total)
-        total_acceptance = total_steps > 0 ? sum(accepted_total) / total_steps : 0.0
-        println("mean exchange acceptance = $(round(total_acceptance, digits=4))")
-
-        for (i, β) in enumerate(betas)
-            println("beta[$i] = ", round(β, digits=4),
-                " (T = ", round(inv(β), digits=4), "), samples = ", length(energy_samples[i]))
-        end
-
-        println("\nMean energy comparison (measured vs exact):")
-        for (i, β) in enumerate(betas)
-            samples = energy_samples[i]
-            dist_exact = distribution_exact_ising2D(L, β)
-            E_exact = get_centers(dist_exact)
-            mean_exact = sum(E_exact .* dist_exact.values)
-            mean_measured = isempty(samples) ? NaN : mean(samples)
-            delta_mean = mean_measured - mean_exact
-            println("  beta[$i] = $(round(β, digits=4)): ",
-                    "<E>_meas = $(round(mean_measured, digits=3)), ",
-                    "<E>_exact = $(round(mean_exact, digits=3)), ",
-                    "Δ = $(round(delta_mean, digits=3))")
-        end
-    end
-
-    MPI.Barrier(pt.comm)
-    if did_init && !MPI.Finalized()
-        MPI.Finalize()
-    end
-    return nothing
+if is_root(pt)
+    println("════════════════════════════════════════")
+    println(" PT Ising2D MPI (L = $(L))              ")
+    println(" Ranks = $(nranks), Measurements = $(nmeasurements)")
+    println("════════════════════════════════════════")
+    println("Thermalization...")
 end
 
-main()
+for _ in 1:ntherm_init
+    sweep_replica!(sys, pt.alg, L)
+end
+
+if is_root(pt)
+    println("Starting measurements...")
+end
+
+# Main measurement loop
+
+local_samples = Tuple{Int,Float64}[]
+for meas in 1:nmeasurements
+    sweep_replica!(sys, pt.alg, L)
+
+    e = energy(sys)
+    push!(local_samples, (index(pt), e))
+
+    if meas % sweeps_between_exchange == 0
+        update!(pt, e)
+    end
+end
+
+if is_root(pt)
+    println("Gathering results...")
+end
+
+all_samples = gather(local_samples, backend; root=pt.root)
+exch = exchange_stats_at_root(pt)
+
+if is_root(pt)
+    println("Simulation finished!")
+    println("\nExchange acceptance rates:")
+    for (i, acc_rate) in enumerate(exch.rates)
+        println("  (β=$(round(betas[i], digits=3)), β=$(round(betas[i+1], digits=3))): $(round(acc_rate, digits=3))")
+    end
+
+    println("\nMean energy comparison:")
+    energy_samples = [Float64[] for _ in 1:nranks]
+    for rank_samples in all_samples
+        for (i, e) in rank_samples
+            push!(energy_samples[i], e)
+        end
+    end
+    for (i, β) in enumerate(betas)
+        samples = energy_samples[i]
+        dist_exact = distribution_exact_ising2D(L, β)
+        E_exact = get_centers(dist_exact)
+        mean_exact = sum(E_exact .* dist_exact.values)
+        mean_measured = isempty(samples) ? NaN : mean(samples)
+        delta_mean = abs(mean_measured - mean_exact)
+        println("  β=$(round(β, digits=3)): <E>_meas=$(round(mean_measured, digits=1)) vs <E>_exact=$(round(mean_exact, digits=1)) Δ=$(round(delta_mean, digits=2))")
+    end
+end
+
+finalize!(backend)

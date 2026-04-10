@@ -191,7 +191,7 @@ end
     return Δpair, Δspin
 end
 
-@inline delta_field_interactions(sys::IsingGraphCouplingNoField, Δspin, i) = 0.0
+@inline delta_field_interactions(sys::IsingGraphCouplingNoField, Δspin, i) = 0
 @inline delta_field_interactions(sys::IsingGraphCouplingUniformField, Δspin, i) = sys.h * Δspin
 @inline delta_field_interactions(sys::IsingGraphCouplingVectorField, Δspin, i) = sys.h[i] * Δspin
 

@@ -12,64 +12,78 @@ end
 function test_parallel_multicanonical(; verbose=false)
     _ensure_mpi_init()
 
-    pmuca = ParallelMulticanonical(MPI.COMM_WORLD, root=0)
-
-    pass = true
-    pass &= pmuca.rank == 0
-    pass &= pmuca.size == 1
-    pass &= pmuca.root == 0
-
     bins = 0.0:1.0:4.0
     muca = Multicanonical(MersenneTwister(1234), BinnedObject(bins, 0.0))
+
+    pmuca = ParallelMulticanonical(MPIBackend(MPI.COMM_WORLD), muca, root=0)
+    @test pmuca isa ParallelMulticanonicalMessage
+    @test rank(pmuca) == 0
+    @test size(pmuca) == 1
+    @test is_root(pmuca)
+
     ensemble(muca).histogram.values .= [1.0, 2.0, 3.0, 4.0]
-    merge_histograms!(pmuca, ensemble(muca).histogram)
-    # Since only one rank, h_local should be unchanged 
-    # TODO: how can this be tested with MPI?
+    merge_histograms!(pmuca)
+    # Since only one rank, histogram should be unchanged
     @test all(ensemble(muca).histogram.values .== [1.0, 2.0, 3.0, 4.0])
 
     # Test logweight distribution (broadcast)
     ensemble(muca).logweight.values .= [10.0, 20.0, 30.0, 40.0]
-    distribute_logweight!(pmuca, ensemble(muca).logweight)
-    # Should remain unchanged in COMM_SELF
+    distribute_logweight!(pmuca)
+    # Should remain unchanged with a single-rank communicator
     @test all(ensemble(muca).logweight.values .== [10.0, 20.0, 30.0, 40.0])
-
-    if verbose
-        println("ParallelMulticanonical with Multicanonical: $(pass)")
-    end
-
-    # implement version also with general histogram of BinnedObject and test that
-    hist = Histogram((collect(bins),), zeros(Float64, length(bins) - 1))
-    hist.weights .= [1.0, 2.0, 3.0, 4.0]
-    merge_histograms!(pmuca, hist)
-    @test all(hist.weights .== [1.0, 2.0, 3.0, 4.0])
 
     lw = BinnedObject(bins, 0.0)
     lw.values .= [10.0, 20.0, 30.0, 40.0]
-    distribute_logweight!(pmuca, lw)
+    allreduce!(lw.values, +, pmuca)
     @test all(lw.values .== [10.0, 20.0, 30.0, 40.0])
+    reduced_lw = reduce(lw.values, +, pmuca.root, pmuca)
+    @test reduced_lw == lw.values
+    gathered_rank = gather(rank(pmuca), pmuca; root=pmuca.root)
+    @test gathered_rank == [0]
+
+    # Test vector mode
+    alg1 = Multicanonical(MersenneTwister(1), BinnedObject(bins, 0.0))
+    alg2 = Multicanonical(MersenneTwister(2), BinnedObject(bins, 0.0))
+    ensemble(alg1).histogram.values .= [1.0, 2.0, 3.0, 4.0]
+    ensemble(alg2).histogram.values .= [4.0, 3.0, 2.0, 1.0]
+    pmucav = ParallelMulticanonical([alg1, alg2])
+    @test pmucav isa ParallelMulticanonicalVector
+    @test rank(pmucav) == 0
+    @test size(pmucav) == 2
+    @test is_root(pmucav)
+    merge_histograms!(pmucav)
+    @test all(ensemble(alg1).histogram.values .== [5.0, 5.0, 5.0, 5.0])
+    @test all(ensemble(alg2).histogram.values .== [5.0, 5.0, 5.0, 5.0])
+    ensemble(alg1).logweight.values .= [1.0, 2.0, 3.0, 4.0]
+    distribute_logweight!(pmucav)
+    @test all(ensemble(alg2).logweight.values .== [1.0, 2.0, 3.0, 4.0])
 
     if verbose
-        println("ParallelMulticanonical with BinnedObject: $(pass)")
+        println("ParallelMulticanonical tests completed")
     end
 
-    return pass
+    return true
 end
 
 function test_parallel_tempering(; verbose=false)
     _ensure_mpi_init()
 
-    pt = ParallelTempering(MPI.COMM_WORLD, root=0)
-    @test pt.rank == 0
-    @test pt.size == 1
+    backend = MPIBackend(MPI.COMM_WORLD)
+    alg = Metropolis(MersenneTwister(10); β=0.8)
+    pt = ParallelTempering(alg, backend; root=0)
+    @test rank(pt) == 0
+    @test size(pt) == 1
     @test is_root(pt)
+    @test pt isa ParallelTemperingMessage
+    @test pt.backend === backend
+    @test pt.alg === alg
     @test index(pt) == 1
     @test isempty(pt.steps)
     @test isempty(pt.accepted)
     @test isempty(acceptance_rates(pt))
     @test acceptance_rate(pt) == 0.0
 
-    alg = Metropolis(MersenneTwister(10); β=0.8)
-    update!(pt, alg, -10.0)
+    update!(pt, -10.0)
     @test index(pt) == 1
     @test ensemble(alg).beta == 0.8
     @test pt.stage == 1
@@ -99,6 +113,21 @@ function test_parallel_tempering(; verbose=false)
     b4 = set_betas(4, 0.5, 1.0, :geometric)
     @test b4[1] ≈ 1.0
     @test b4[end] ≈ 0.5
+
+    # local-vector mode
+    v_algs = [Metropolis(MersenneTwister(11); β=1.0), Metropolis(MersenneTwister(12); β=0.5)]
+    v_pt = ParallelTempering(v_algs)
+    @test v_pt isa ParallelTemperingVector
+    @test index(v_pt, 1) == 1
+    update!(v_pt, [-10.0, -8.0])
+    @test v_pt.stage == 1
+    @test sum(v_pt.steps) >= 0
+
+    v_pt2 = ParallelTempering([1.0, 0.5]; seed=123, rng=MersenneTwister)
+    @test v_pt2 isa ParallelTemperingVector
+    @test length(v_pt2.alg) == 2
+    @test ensemble(v_pt2.alg[1]).beta == 1.0
+    @test ensemble(v_pt2.alg[2]).beta == 0.5
 
     if verbose
         println("ParallelTempering tests completed")

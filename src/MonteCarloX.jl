@@ -45,11 +45,15 @@ export  MutableRandomNumbers,
 
 # Measurement framework
 include("measurements/measurements.jl")
+include("measurements/autocorrelations.jl")
 export  Measurement,
         Measurements,
         MeasurementSchedule,
         IntervalSchedule,
         PreallocatedSchedule,
+        integrated_autocorrelation_time,
+        integrated_autocorrelation_times, #TODO:L this needs to be solved in PT
+        tau_int,
         times,
         data,
         measure!,
@@ -108,17 +112,45 @@ export  HeatBath
 include("algorithms/multicanonical.jl")
 export  Multicanonical
 
+include("algorithms/message_backend.jl")
+export  AbstractMessageBackend,
+        MPIBackend,
+        DistributedBackend,
+    init,
+    finalize!,
+        rank,
+        size,
+        exchange_packet,
+        allreduce!,
+    reduce,
+        allgather,
+        broadcast!,
+        gather,
+    barrier
+
 include("algorithms/parallel_multicanonical.jl")
 export  ParallelMulticanonical,
+        ParallelMulticanonicalMessage,
+        ParallelMulticanonicalVector,
         is_root,
         merge_histograms!,
         distribute_logweight!
 
+include("algorithms/replica_exchange.jl")
+export  ReplicaExchange,
+        ReplicaExchangeMessage,
+        ReplicaExchangeVector
+
 include("algorithms/parallel_tempering.jl")
 export  ParallelTempering,
+        ParallelTemperingMessage,
+        ParallelTemperingVector,
         index,
         acceptance_rates,
         acceptance_rate,
+        exchange_stats_at_root,
+        exchange_log_ratio,
+        attempt_exchange_pair!,
         set_betas,
         set_betas!,
         retune_betas!
