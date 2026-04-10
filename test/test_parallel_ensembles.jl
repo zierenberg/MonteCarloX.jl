@@ -4,6 +4,14 @@ using StatsBase
 using Test
 using MPI
 
+struct DummyBackend <: AbstractMessageBackend
+    myrank::Int
+    nranks::Int
+end
+
+MonteCarloX.rank(backend::DummyBackend) = backend.myrank
+MonteCarloX.size(backend::DummyBackend) = backend.nranks
+
 function _ensure_mpi_init()
     MPI.Initialized() || MPI.Init()
     return nothing
@@ -20,6 +28,9 @@ function test_parallel_multicanonical(; verbose=false)
     @test rank(pmuca) == 0
     @test size(pmuca) == 1
     @test is_root(pmuca)
+
+    pmuca_nonroot = ParallelMulticanonical(DummyBackend(1, 2), muca; root=0)
+    @test !is_root(pmuca_nonroot)
 
     ensemble(muca).histogram.values .= [1.0, 2.0, 3.0, 4.0]
     merge_histograms!(pmuca)
@@ -128,6 +139,52 @@ function test_parallel_tempering(; verbose=false)
     @test length(v_pt2.alg) == 2
     @test ensemble(v_pt2.alg[1]).beta == 1.0
     @test ensemble(v_pt2.alg[2]).beta == 0.5
+
+    @test MonteCarloX.acceptance_rates([4, 0, 3], [1, 0, 3]) == [0.25, 0.0, 1.0]
+    @test MonteCarloX.acceptance_rate([4, 0, 3], [1, 0, 3]) == 4 / 7
+
+    @test MonteCarloX._resolve_pair(1, 0, 4) == (active=true, pair_id=1, partner_index=2)
+    @test MonteCarloX._resolve_pair(2, 0, 4) == (active=true, pair_id=1, partner_index=1)
+    @test MonteCarloX._resolve_pair(1, 1, 4) == (active=false, pair_id=0, partner_index=0)
+    @test MonteCarloX._resolve_pair(3, 1, 4) == (active=true, pair_id=2, partner_index=2)
+
+    alg_i = Metropolis(MersenneTwister(21); β=1.0)
+    alg_j = Metropolis(MersenneTwister(22); β=0.5)
+    x_i, x_j = 0.0, -5.0
+    log_ratio = exchange_log_ratio(ensemble(alg_i), ensemble(alg_j), x_i, x_j)
+    @test isapprox(log_ratio, 2.5; atol=1e-12)
+
+    accepted = attempt_exchange_pair!(alg_i, alg_j, x_i, x_j, 0.0)
+    @test accepted
+    @test ensemble(alg_i).beta == 0.5
+    @test ensemble(alg_j).beta == 1.0
+
+    alg_i_reject = Metropolis(MersenneTwister(23); β=1.0)
+    alg_j_reject = Metropolis(MersenneTwister(24); β=0.5)
+    rejected = attempt_exchange_pair!(alg_i_reject, alg_j_reject, x_j, x_i, 1.0)
+    @test !rejected
+    @test ensemble(alg_i_reject).beta == 1.0
+    @test ensemble(alg_j_reject).beta == 0.5
+
+    v_pt3 = ParallelTempering([1.0, 0.5]; seed=77, rng=MersenneTwister)
+    tuple_samples = Tuple{Int,Float64}[
+        (1, 0.0), (1, 0.2), (1, -0.1), (1, 0.1), (1, -0.2),
+        (2, 0.0), (2, 2.0), (2, -2.0), (2, 2.0), (2, -2.0),
+    ]
+    sweeps = fill(10, 2)
+    interval = optimize_exchange_interval!(
+        v_pt3,
+        tuple_samples,
+        sweeps;
+        base_sweeps=10,
+        min_sweeps=2,
+        max_sweeps=50,
+        min_points=2,
+        max_lag=2,
+    )
+    @test interval == sweeps[index(v_pt3)]
+    @test all(2 .<= sweeps .<= 50)
+    @test sweeps[2] >= sweeps[1]
 
     if verbose
         println("ParallelTempering tests completed")
