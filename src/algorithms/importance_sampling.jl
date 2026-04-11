@@ -108,5 +108,3 @@ function _reset!(alg::AbstractImportanceSampling)
     alg.steps = 0
     alg.accepted = 0
 end
-
-

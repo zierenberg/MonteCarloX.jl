@@ -244,16 +244,25 @@ Observe system `sys` at time `t` before `modify!`. Default is a no-op.
 measure!(sys, event, t) = nothing
 
 """
-    advance!(alg::AbstractKineticMonteCarlo, sys, total_time; t0=0, measure!=measure!, modify!=modify!)
+    advance!(alg::AbstractKineticMonteCarlo, sys, total_time; t0=0, measure!=measure!, modify!=modify!, ckpt=nothing, checkpoint_interval=nothing)
 
 Advance system `sys` using `alg` until `total_time`.
 
 Loop order per step:
-1. `step!`    — draw next event from `event_source(sys)`
-2. `measure!` — observe before modification: `measure!(sys, event, t)`
-3. `modify!`  — apply event to state:        `modify!(sys, event, t)`
+1. `step!`         — draw next event from `event_source(sys)`
+2. `measure!`      — observe before modification: `measure!(sys, event, t)`
+3. `modify!`       — apply event to state:        `modify!(sys, event, t)`
+4. `checkpoint!`   — optional: if `ckpt::CheckpointSession` and
+                     `checkpoint_interval` are provided, write a checkpoint
+                     every `checkpoint_interval` steps.
 
 Stops early if the event source is exhausted or total time is reached.
+
+# Checkpoint usage
+```julia
+ckpt = init_checkpoint("sim/ckpt.mcx", (alg=alg, sys=sys); step=0)
+advance!(alg, sys, 1e6; ckpt=ckpt, checkpoint_interval=1000)
+```
 """
 function advance!(
     alg::AbstractKineticMonteCarlo,
@@ -262,6 +271,8 @@ function advance!(
     t0 = 0.0,
     measure! = measure!,
     modify! = modify!,
+    ckpt = nothing,
+    checkpoint_interval = nothing,
 )
     alg.time = float(t0)
     src = event_source(sys)
@@ -272,6 +283,9 @@ function advance!(
         isnothing(event) && return alg.time
         measure!(sys, event, t_new)
         modify!(sys, event, t_new)
+        if !isnothing(ckpt) && !isnothing(checkpoint_interval) && alg.steps % checkpoint_interval == 0
+            checkpoint!(ckpt; step=alg.steps)
+        end
     end
     return alg.time
 end

@@ -15,7 +15,7 @@ MonteCarloX = {path = ".."}
 [compat]
 DelimitedFiles = "1.9.1"
 Graphs = "1"
-MonteCarloX = "0.1"
+MonteCarloX = "≥ 0.2"
 julia = "1"
 
 [extras]
