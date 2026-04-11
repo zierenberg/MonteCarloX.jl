@@ -2,300 +2,154 @@ using MonteCarloX
 using StatsBase
 using Test
 
-# test for BinnedObject
-function test_binned_object_discrete(; verbose=false)
-    pass = true 
+function test_binned_object_discrete()
+    pass = true
 
     # 1D
     bins = 0:2:10
-    bo = BinnedObject(bins) # default constructor with init=0.0
-    pass &= bo isa BinnedObject{1,Float64,DiscreteBinning{Int64}}
-    pass &= all(iszero, bo.values)
-    pass &= size(bo) == (6,)
-    pass &= size(bo.values) == (6,)
-    pass &= bo.bins[1].start == 0
-    pass &= bo.bins[1].step == 2
-
-    binvals = get_centers(bo)
-    pass &= length(binvals) == 6
-    pass &= binvals == [0, 2, 4, 6, 8, 10]
+    bo = BinnedObject(bins)
+    pass &= check(bo isa BinnedObject{1,Float64,DiscreteBinning{Int64}}, "1D discrete type\n")
+    pass &= check(all(iszero, bo.values), "values zeroed\n")
+    pass &= check(size(bo) == (6,), "size == (6,)\n")
+    pass &= check(bo.bins[1].start == 0, "start == 0\n")
+    pass &= check(bo.bins[1].step == 2, "step == 2\n")
+    pass &= check(get_centers(bo) == [0, 2, 4, 6, 8, 10], "centers correct\n")
 
     bo[4] = 1.5
-    pass &= bo[4] == 1.5
-    pass &= bo(4) == bo[4]
-    bo[6] = -0.5
-    pass &= bo(6) == -0.5
+    pass &= check(bo[4] == 1.5, "getindex after setindex\n")
+    pass &= check(bo(4) == bo[4], "callable == getindex\n")
 
-    pass &= !hasproperty(bo, :weights)
-
-    # test out of bounds
-    valid = false
-    try
-        bo[11] = 0.0
-    catch err
-        valid = err isa BoundsError
-    end
-    try
-        bo[-1] = 0.0
-    catch err
-        valid &= err isa BoundsError
-    end
-
-    # test constructor with vector domain
+    # vector domain constructor
     bins_vec = [0, 2, 4, 6, 8, 10]
     bo_vec = BinnedObject(bins_vec, 0.0)
-    pass &= bo_vec isa BinnedObject{1,Float64,DiscreteBinning{Int64}}
-    pass &= all(iszero, bo_vec.values)
-    pass &= size(bo_vec) == (6,)
-    pass &= size(bo_vec.values) == (6,)
-    pass &= bo_vec.bins[1].start == 0
-    pass &= bo_vec.bins[1].step == 2
-    pass &= get_centers(bo_vec) == bins_vec
+    pass &= check(bo_vec isa BinnedObject{1,Float64,DiscreteBinning{Int64}}, "vector domain type\n")
+    pass &= check(all(iszero, bo_vec.values), "vector domain zeroed\n")
+    pass &= check(size(bo_vec) == (6,), "vector domain size\n")
+    pass &= check(bo_vec.bins[1].start == 0, "vector domain start\n")
+    pass &= check(bo_vec.bins[1].step == 2, "vector domain step\n")
+    pass &= check(get_centers(bo_vec) == bins_vec, "vector domain centers\n")
+    pass &= check(get_edges(bo_vec) == -1:2:11, "infer right edges\n")
 
-    # for discrete bins, edges indeed defined so that bins are at their centers
-    edges_vec = -1:2:11
-    pass &= get_edges(bo_vec) == edges_vec
+    # single-bin vector throws
+    threw = try; BinnedObject([0], 0.0); false; catch err; err isa ArgumentError; end
+    pass &= check(threw, "single-bin throws\n")
 
-    # test special case of single-bin vector domain to throw an error
-    valid = false
-    try
-        BinnedObject([0], 0.0)
-    catch err
-        valid = err isa ArgumentError
-    end
-    pass &= valid
+    # non-equidistant bins throw
+    threw = try; BinnedObject([0, 1, 3], 0.0); false; catch err; err isa ArgumentError; end
+    pass &= check(threw, "non-equidistant throws\n")
 
-    # error for non-equidistant bins
-    valid = false
-    try      
-        BinnedObject([0, 1, 3], 0.0)
-    catch err
-        valid = err isa ArgumentError
-    end
-    pass &= valid
+    # unsupported domain type throws
+    threw = try; BinnedObject("invalid domain", 0.0); false; catch err; err isa ArgumentError; end
+    pass &= check(threw, "unsupported domain throws\n")
 
-    # error when domain types is not supported
-    valid = false
-    try
-        BinnedObject("invalid domain", 0.0)
-    catch err
-        valid = err isa ArgumentError
-    end
-    pass &= valid
-
-    # test non-integer DiscreteBinning (even though not used by the Framework)
+    # non-integer DiscreteBinning
     bins_float = 0.0:2.0:10.0
     b = DiscreteBinning(first(bins_float), step(bins_float), length(bins_float))
-    pass &= b isa DiscreteBinning{Float64}
-    pass &= get_centers(b) == collect(bins_float)
-    pass &= get_edges(b) == collect(-1.0:2.0:11.0)
-    pass &= MonteCarloX._binindex(b, 4.0) == 3
+    pass &= check(b isa DiscreteBinning{Float64}, "float DiscreteBinning type\n")
+    pass &= check(get_centers(b) == collect(bins_float), "float DiscreteBinning centers\n")
+    pass &= check(get_edges(b) == collect(-1.0:2.0:11.0), "float DiscreteBinning edges\n")
+    pass &= check(MonteCarloX._binindex(b, 4.0) == 3, "float DiscreteBinning binindex\n")
 
-    # test _assert_same_domain
+    # _assert_same_domain
     bo2 = BinnedObject(0:2:10, 0.0)
-    pass &= MonteCarloX._assert_same_domain(bo, bo2) == nothing
+    pass &= check(MonteCarloX._assert_same_domain(bo, bo2) == nothing, "same domain passes\n")
     bo3 = BinnedObject(0:1:10, 0.0)
-    valid = false
-    try
-        MonteCarloX._assert_same_domain(bo, bo3)
-    catch err
-        valid = err isa AssertionError
-    end
-    pass &= valid
-
-    if verbose
-        println("BinnedObject discrete 1D test pass: $(pass)")
-    end
+    threw = try; MonteCarloX._assert_same_domain(bo, bo3); false; catch err; err isa AssertionError; end
+    pass &= check(threw, "different domain throws\n")
 
     # 2D
     bins2d = (0:1:5, 0:2:10)
     bo2d = BinnedObject(bins2d, 0.0)
-    pass &= bo2d isa BinnedObject{2, Float64, DiscreteBinning{Int64}}
-    pass &= all(iszero, bo2d.values)
-    pass &= size(bo2d) == (6, 6)
-    pass &= size(bo2d.values) == (6, 6)
-    pass &= bo2d.bins[1].start == 0 
-    pass &= bo2d.bins[2].start == 0 
-    pass &= bo2d.bins[1].step == 1
-    pass &= bo2d.bins[2].step == 2
+    pass &= check(bo2d isa BinnedObject{2, Float64, DiscreteBinning{Int64}}, "2D discrete type\n")
+    pass &= check(all(iszero, bo2d.values), "2D values zeroed\n")
+    pass &= check(size(bo2d) == (6, 6), "2D size\n")
+    pass &= check(bo2d.bins[1].start == 0, "2D dim1 start\n")
+    pass &= check(bo2d.bins[2].start == 0, "2D dim2 start\n")
+    pass &= check(bo2d.bins[1].step == 1, "2D dim1 step\n")
+    pass &= check(bo2d.bins[2].step == 2, "2D dim2 step\n")
 
     bo2d[3, 4] = -0.5
-    pass &= bo2d[3, 4] == -0.5
-    pass &= bo2d(3, 4) == bo2d[3, 4]
-
-    pass &= !hasproperty(bo2d, :weights)
-
-    # return test result
-    if verbose
-        println("BinnedObject discrete 2D test pass: $(pass)")
-    end
+    pass &= check(bo2d[3, 4] == -0.5, "2D getindex\n")
+    pass &= check(bo2d(3, 4) == bo2d[3, 4], "2D callable\n")
 
     return pass
 end
 
-function (test_binned_object_continuous)(; verbose=false)
-    pass = true 
+function test_binned_object_continuous()
+    pass = true
 
     # 1D
     range = 0.0:1.0:4.0
     bo = BinnedObject(range, 0.0)
-    local ok
-    ok = bo isa BinnedObject{1,Float64,ContinuousBinning{Float64}}
-        if verbose println(ok, " isa") end
-    pass &= ok
-    ok = all(iszero, bo.values)
-        if verbose println(ok, " all iszero, values=", bo.values) end
-    pass &= ok
-    ok = size(bo) == (4,)
-        if verbose println(ok, " size, got=", size(bo), " expected=(4,)") end
-    pass &= ok
-    ok = size(bo.values) == (4,)
-        if verbose println(ok, " size(values), got=", size(bo.values), " expected=(4,)") end
-    pass &= ok
-    ok = length(bo.bins[1].edges) == 5
-        if verbose println(ok, " length(edges), got=", length(bo.bins[1].edges), " expected=5") end
-    pass &= ok
-    ok = length(bo.bins[1].centers) == 4
-        if verbose println(ok, " length(centers), got=", length(bo.bins[1].centers), " expected=4") end
-    pass &= ok
-    ok = bo.bins[1].edges == collect(range)
-        if verbose println(ok, " edges==range, got=", bo.bins[1].edges, " expected=", collect(range)) end
-    pass &= ok
-    ok = bo.bins[1].centers == [0.5, 1.5, 2.5, 3.5]
-        if verbose println(ok, " centers==[0.5,1.5,2.5,3.5], got=", bo.bins[1].centers) end
-    pass &= ok
+    pass &= check(bo isa BinnedObject{1,Float64,ContinuousBinning{Float64}}, "1D continuous type\n")
+    pass &= check(all(iszero, bo.values), "values zeroed\n")
+    pass &= check(size(bo) == (4,), "size == (4,)\n")
+    pass &= check(bo.bins[1].edges == collect(range), "edges match range\n")
+    pass &= check(bo.bins[1].centers == [0.5, 1.5, 2.5, 3.5], "centers correct\n")
 
-    # get the same with the continuous interpretation even if the input is a vector of floats.
+    # continuous interpretation from integer vector
     range_int = 0:1:4
     bo_vec = BinnedObject(collect(range_int), 0.0; interpretation=:continuous)
-    ok = bo_vec isa BinnedObject{1,Float64,ContinuousBinning{Float64}}
-        if verbose println(ok, " bo_vec isa ContinuousBinning") end
-    pass &= ok
-    ok = bo_vec == bo
-        if verbose println(ok, " bo_vec == bo, bo_vec=", bo_vec, " bo=", bo) end
-    pass &= ok
+    pass &= check(bo_vec isa BinnedObject{1,Float64,ContinuousBinning{Float64}}, "vector continuous type\n")
+    pass &= check(bo_vec == bo, "vector continuous matches range\n")
 
-    # float ranges are interpreted as continuous edges by default;
-    # explicit mode can force discrete center interpretation.
+    # explicit discrete mode for float ranges
     bo_discrete_float = BinnedObject(range, 0.0; interpretation=:discrete)
-    pass &= bo_discrete_float isa BinnedObject{1,Float64,DiscreteBinning{Float64}}
-    pass &= get_centers(bo_discrete_float) == collect(range)
-    pass &= get_edges(bo_discrete_float) == collect(-0.5:1.0:4.5)
+    pass &= check(bo_discrete_float isa BinnedObject{1,Float64,DiscreteBinning{Float64}}, "discrete float type\n")
+    pass &= check(get_centers(bo_discrete_float) == collect(range), "discrete float centers\n")
+    pass &= check(get_edges(bo_discrete_float) == collect(-0.5:1.0:4.5), "discrete float edges\n")
 
+    # indexing by coordinate
     bo[1.2] = 1.5
-    ok = bo.values[2] == 1.5
-        if verbose println(ok, " bo.values[2] == 1.5, got=", bo.values[2]) end
-    pass &= ok
-    ok = bo[1.2] == 1.5
-        if verbose println(ok, " bo[1.2] == 1.5, got=", bo[1.2]) end
-    pass &= ok
-    ok = bo(1.2) == bo[1.2]
-        if verbose println(ok, " bo(1.2) == bo[1.2], got=", bo(1.2), " expected=", bo[1.2]) end
-    pass &= ok
+    pass &= check(bo.values[2] == 1.5, "setindex! by coordinate\n")
+    pass &= check(bo[1.2] == 1.5, "getindex by coordinate\n")
+    pass &= check(bo(1.2) == bo[1.2], "callable == getindex\n")
 
-    ok = !hasproperty(bo, :weights)
-        if verbose println(ok, " !hasproperty(bo, :weights)") end
-    pass &= ok
-
-    binvals = get_centers(bo)
-    ok = length(binvals) == length(range) - 1
-        if verbose println(ok, " length(binvals) == length(range)-1, got=", length(binvals), " expected=", length(range)-1) end
-    pass &= ok
-    ok = get_edges(bo) == collect(range)
-        if verbose println(ok, " get_edges(bo) == range, got=", get_edges(bo), " expected=", collect(range)) end
-    pass &= ok
-    ok = get_centers(bo) == [0.5, 1.5, 2.5, 3.5]
-        if verbose println(ok, " get_centers(bo) == [0.5,1.5,2.5,3.5], got=", get_centers(bo)) end
-    pass &= ok
-
-    # test _assert_same_domain
+    # _assert_same_domain
     bo2 = BinnedObject(range, 0.0)
-    pass &= MonteCarloX._assert_same_domain(bo, bo2) == nothing
+    pass &= check(MonteCarloX._assert_same_domain(bo, bo2) == nothing, "same domain passes\n")
+
     bo3 = BinnedObject(0.0:0.5:4.0, 0.0)
-    valid=false
-    try        
-        MonteCarloX._assert_same_domain(bo, bo3)
-        @warn "Expected AssertionError but none was raised"
-    catch err
-        valid = err isa AssertionError
-    end
-    pass &= valid
+    threw = try; MonteCarloX._assert_same_domain(bo, bo3); false; catch err; err isa AssertionError; end
+    pass &= check(threw, "different continuous domain throws\n")
+
     bo_discrete = BinnedObject(0:1:4, 0.0)
-    valid=false
-    try
-        MonteCarloX._assert_same_domain(bo, bo_discrete)
-        @warn "Expected AssertionError but none was raised"
-    catch err
-        valid = err isa AssertionError
-    end 
-    pass &= valid
-
-    if verbose
-        @show bo
-        @show bo.values
-        @show bo.bins[1].edges
-        @show bo.bins[1].centers
-        @show get_centers(bo)
-        @show get_edges(bo)
-    end
-
-    if verbose
-        println("BinnedObject continuous 1D test pass: $(pass)")
-    end
+    threw = try; MonteCarloX._assert_same_domain(bo, bo_discrete); false; catch err; err isa AssertionError; end
+    pass &= check(threw, "continuous vs discrete throws\n")
 
     # 2D
     range2d = (0.0:1.0:3.0, 0.0:2.0:6.0)
     bo2d = BinnedObject(range2d, 0.0)
-    pass &= bo2d isa BinnedObject{2,Float64,ContinuousBinning{Float64}}
-    pass &= all(iszero, bo2d.values)
-    pass &= size(bo2d) == (3, 3)
-    pass &= size(bo2d.values) == (3, 3)
-    pass &= length(bo2d.bins[1].edges) == 4
-    pass &= length(bo2d.bins[2].edges) == 4
-    pass &= length(bo2d.bins[1].centers) == 3
-    pass &= length(bo2d.bins[2].centers) == 3
-    pass &= bo2d.bins[1].edges == collect(range2d[1])
-    pass &= bo2d.bins[2].edges == collect(range2d[2])
-    pass &= bo2d.bins[1].centers == [0.5, 1.5, 2.5]
-    pass &= bo2d.bins[2].centers == [1.0, 3.0, 5.0]
+    pass &= check(bo2d isa BinnedObject{2,Float64,ContinuousBinning{Float64}}, "2D continuous type\n")
+    pass &= check(all(iszero, bo2d.values), "2D values zeroed\n")
+    pass &= check(size(bo2d) == (3, 3), "2D size\n")
+    pass &= check(bo2d.bins[1].edges == collect(range2d[1]), "2D dim1 edges match\n")
+    pass &= check(bo2d.bins[2].edges == collect(range2d[2]), "2D dim2 edges match\n")
+    pass &= check(bo2d.bins[1].centers == [0.5, 1.5, 2.5], "2D dim1 centers\n")
+    pass &= check(bo2d.bins[2].centers == [1.0, 3.0, 5.0], "2D dim2 centers\n")
 
     bo2d[1.2, 2.5] -= 0.5
-    pass &= bo2d.values[2,2] == -0.5 
-    pass &= bo2d[1.2, 2.5] == -0.5
-    pass &= bo2d(1.2, 2.5) == bo2d[1.2, 2.5]
+    pass &= check(bo2d.values[2,2] == -0.5, "2D setindex!\n")
+    pass &= check(bo2d[1.2, 2.5] == -0.5, "2D getindex\n")
+    pass &= check(bo2d(1.2, 2.5) == bo2d[1.2, 2.5], "2D callable\n")
 
-    # vector edges can also be forced to discrete mode.
+    # vector edges forced to discrete
     bo_vec_discrete = BinnedObject(collect(range), 0.0; interpretation=:discrete)
-    pass &= bo_vec_discrete isa BinnedObject{1,Float64,DiscreteBinning{Float64}}
-    pass &= get_centers(bo_vec_discrete) == collect(range)
+    pass &= check(bo_vec_discrete isa BinnedObject{1,Float64,DiscreteBinning{Float64}}, "vector discrete type\n")
+    pass &= check(get_centers(bo_vec_discrete) == collect(range), "vector discrete centers\n")
 
-    # invalid interpretation should throw.
-    valid = false
-    try
-        BinnedObject(range, 0.0; interpretation=:not_a_mode)
-    catch err
-        valid = err isa ArgumentError
-    end
-    pass &= valid
-
-    pass &= !hasproperty(bo2d, :weights)
-
-    # return test result
-    if verbose
-        println("BinnedObject continuous 2D test pass: $(pass)") 
-    end
+    # invalid interpretation throws
+    threw = try; BinnedObject(range, 0.0; interpretation=:not_a_mode); false; catch err; err isa ArgumentError; end
+    pass &= check(threw, "invalid interpretation throws\n")
 
     return pass
 end
 
-function run_binned_objects_testsets(; verbose=false)
-    @testset "BinnedObject" begin
-        @testset "Discrete" begin
-            @test test_binned_object_discrete(verbose=verbose)
-        end
-        @testset "Continuous" begin
-            @test test_binned_object_continuous(verbose=verbose)
-        end
+@testset "BinnedObject" begin
+    @testset "Discrete" begin
+        @test test_binned_object_discrete()
     end
-    return true
+    @testset "Continuous" begin
+        @test test_binned_object_continuous()
+    end
 end

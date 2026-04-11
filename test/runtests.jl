@@ -2,53 +2,31 @@ using MonteCarloX
 using Test
 using Random
 
+test_verbose = false
+
+function check(cond::Bool, message::String)
+    if test_verbose
+        if cond
+            printstyled(message; color = :green)
+        else
+            printstyled(message; color = :red)
+        end
+    end
+    return cond
+end
+
 @testset "MonteCarloX.jl" begin
-    # utilities
-    include("test_utils.jl")
-    run_utils_testsets()
-
-    # random number generators
-    include("test_rng.jl")
-    run_rng_testsets()
-
-    # event handlers
-    include("test_event_handler.jl")
-    run_event_handler_testsets()
-
-    # measurements
-    include("test_measurements.jl")
-    run_measurements_testsets()
-
-    # ensemble constructors
-    include("test_ensembles.jl")
-    run_ensemble_testsets()
-
-    # equilibrium / Metropolis
-    include("test_metropolis.jl")
-    run_metropolis_testsets()
-
-    # weights
     include("test_binned_objects.jl")
-    run_binned_objects_testsets()
-
-    # generalized ensembles
-    include("test_multicanonical.jl")
-    run_multicanonical_testsets()
-    include("test_wang_landau.jl")
-    run_wang_landau_testsets()
-    include("test_parallel_ensembles.jl")
-    run_parallel_ensembles_testsets()
-
-    # message backend primitives
-    include("test_message_backend.jl")
-    run_message_backend_testsets()
-
-    # non-equilibrium / kinetic Monte Carlo
-    include("test_kinetic_monte_carlo.jl")
-    run_kinetic_monte_carlo_testsets()
-
-    # checkpointing
     include("test_checkpointing.jl")
-    run_checkpointing_testsets()
-
+    include("test_ensembles.jl")
+    include("test_event_handler.jl")
+    include("test_kinetic_monte_carlo.jl")
+    include("test_measurements.jl")
+    include("test_message_backend.jl")
+    include("test_metropolis.jl")
+    include("test_multicanonical.jl")
+    include("test_parallel_ensembles.jl")
+    include("test_rng.jl")
+    include("test_utils.jl")
+    include("test_wang_landau.jl")
 end

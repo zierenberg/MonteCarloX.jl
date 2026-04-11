@@ -17,178 +17,189 @@ function _ensure_mpi_init()
     return nothing
 end
 
-function test_parallel_multicanonical(; verbose=false)
+function test_parallel_multicanonical()
     _ensure_mpi_init()
+    pass = true
 
     bins = 0.0:1.0:4.0
     muca = Multicanonical(MersenneTwister(1234), BinnedObject(bins, 0.0))
 
+    # MPI message backend
     pmuca = ParallelMulticanonical(MPIBackend(MPI.COMM_WORLD), muca, root=0)
-    @test pmuca isa ParallelMulticanonicalMessage
-    @test rank(pmuca) == 0
-    @test size(pmuca) == 1
-    @test is_root(pmuca)
+    pass &= check(pmuca isa ParallelMulticanonicalMessage, "MPI backend type\n")
+    pass &= check(rank(pmuca) == 0, "rank == 0\n")
+    pass &= check(size(pmuca) == 1, "size == 1\n")
+    pass &= check(is_root(pmuca), "is root\n")
 
+    # alternative constructor orderings
     pmuca_algfirst = ParallelMulticanonical(muca, MPIBackend(MPI.COMM_WORLD), root=0)
-    @test pmuca_algfirst isa ParallelMulticanonicalMessage
+    pass &= check(pmuca_algfirst isa ParallelMulticanonicalMessage, "alg-first constructor\n")
 
     pmuca_mode = ParallelMulticanonical(muca, :MPI, root=0)
-    @test pmuca_mode isa ParallelMulticanonicalMessage
+    pass &= check(pmuca_mode isa ParallelMulticanonicalMessage, "mode constructor\n")
 
     pmuca_nonroot = ParallelMulticanonical(DummyBackend(1, 2), muca; root=0)
-    @test !is_root(pmuca_nonroot)
+    pass &= check(!is_root(pmuca_nonroot), "non-root rank\n")
 
+    # merge histograms (single rank: unchanged)
     ensemble(muca).histogram.values .= [1.0, 2.0, 3.0, 4.0]
     merge_histograms!(pmuca)
-    # Since only one rank, histogram should be unchanged
-    @test all(ensemble(muca).histogram.values .== [1.0, 2.0, 3.0, 4.0])
+    pass &= check(all(ensemble(muca).histogram.values .== [1.0, 2.0, 3.0, 4.0]), "merge histograms unchanged\n")
 
-    # Test logweight distribution (broadcast)
+    # distribute logweight (single rank: unchanged)
     ensemble(muca).logweight.values .= [10.0, 20.0, 30.0, 40.0]
     distribute_logweight!(pmuca)
-    # Should remain unchanged with a single-rank communicator
-    @test all(ensemble(muca).logweight.values .== [10.0, 20.0, 30.0, 40.0])
+    pass &= check(all(ensemble(muca).logweight.values .== [10.0, 20.0, 30.0, 40.0]), "distribute logweight unchanged\n")
 
+    # collective operations
     lw = BinnedObject(bins, 0.0)
     lw.values .= [10.0, 20.0, 30.0, 40.0]
     allreduce!(lw.values, +, pmuca)
-    @test all(lw.values .== [10.0, 20.0, 30.0, 40.0])
+    pass &= check(all(lw.values .== [10.0, 20.0, 30.0, 40.0]), "allreduce unchanged\n")
     reduced_lw = reduce(lw.values, +, pmuca.root, pmuca)
-    @test reduced_lw == lw.values
+    pass &= check(reduced_lw == lw.values, "reduce unchanged\n")
     gathered_rank = gather(rank(pmuca), pmuca; root=pmuca.root)
-    @test gathered_rank == [0]
+    pass &= check(gathered_rank == [0], "gather rank\n")
 
-    # Test vector mode
+    # vector mode
     alg1 = Multicanonical(MersenneTwister(1), BinnedObject(bins, 0.0))
     alg2 = Multicanonical(MersenneTwister(2), BinnedObject(bins, 0.0))
     ensemble(alg1).histogram.values .= [1.0, 2.0, 3.0, 4.0]
     ensemble(alg2).histogram.values .= [4.0, 3.0, 2.0, 1.0]
     pmucav = ParallelMulticanonical([alg1, alg2])
-    @test pmucav isa ParallelMulticanonicalVector
-    @test rank(pmucav) == 0
-    @test size(pmucav) == 2
-    @test is_root(pmucav)
+    pass &= check(pmucav isa ParallelMulticanonicalVector, "vector mode type\n")
+    pass &= check(rank(pmucav) == 0, "vector rank == 0\n")
+    pass &= check(size(pmucav) == 2, "vector size == 2\n")
+    pass &= check(is_root(pmucav), "vector is root\n")
+
     merge_histograms!(pmucav)
-    @test all(ensemble(alg1).histogram.values .== [5.0, 5.0, 5.0, 5.0])
-    @test all(ensemble(alg2).histogram.values .== [5.0, 5.0, 5.0, 5.0])
+    pass &= check(all(ensemble(alg1).histogram.values .== [5.0, 5.0, 5.0, 5.0]), "vector merge alg1\n")
+    pass &= check(all(ensemble(alg2).histogram.values .== [5.0, 5.0, 5.0, 5.0]), "vector merge alg2\n")
+
     ensemble(alg1).logweight.values .= [1.0, 2.0, 3.0, 4.0]
     distribute_logweight!(pmucav)
-    @test all(ensemble(alg2).logweight.values .== [1.0, 2.0, 3.0, 4.0])
+    pass &= check(all(ensemble(alg2).logweight.values .== [1.0, 2.0, 3.0, 4.0]), "vector distribute logweight\n")
 
-    @test barrier(pmucav) === nothing
-    @test allgather(7, pmucav) == [7]
+    pass &= check(barrier(pmucav) === nothing, "barrier returns nothing\n")
+    pass &= check(allgather(7, pmucav) == [7], "allgather scalar\n")
     v = [3.0, 4.0]
-    @test allreduce!(v, +, pmucav) === v
-    @test reduce(v, +, 0, pmucav) == [3.0, 4.0]
-    @test MonteCarloX.bcast!(v, 0, pmucav) === v
-    @test gather(9, pmucav; root=0) == [9]
+    pass &= check(allreduce!(v, +, pmucav) === v, "allreduce! returns v\n")
+    pass &= check(reduce(v, +, 0, pmucav) == [3.0, 4.0], "reduce vector\n")
+    pass &= check(MonteCarloX.bcast!(v, 0, pmucav) === v, "bcast! returns v\n")
+    pass &= check(gather(9, pmucav; root=0) == [9], "gather scalar\n")
 
-    if verbose
-        println("ParallelMulticanonical tests completed")
-    end
-
-    return true
+    return pass
 end
 
-function test_parallel_tempering(; verbose=false)
+function test_parallel_tempering()
     _ensure_mpi_init()
+    pass = true
 
     backend = MPIBackend(MPI.COMM_WORLD)
     alg = Metropolis(MersenneTwister(10); β=0.8)
     pt = ParallelTempering(alg, backend; root=0)
-    @test rank(pt) == 0
-    @test size(pt) == 1
-    @test is_root(pt)
-    @test pt isa ParallelTemperingMessage
-    @test pt.backend === backend
-    @test pt.alg === alg
-    @test index(pt) == 1
-    @test isempty(pt.steps)
-    @test isempty(pt.accepted)
-    @test isempty(acceptance_rates(pt))
-    @test acceptance_rate(pt) == 0.0
+    pass &= check(rank(pt) == 0, "rank == 0\n")
+    pass &= check(size(pt) == 1, "size == 1\n")
+    pass &= check(is_root(pt), "is root\n")
+    pass &= check(pt isa ParallelTemperingMessage, "MPI type\n")
+    pass &= check(pt.backend === backend, "backend stored\n")
+    pass &= check(pt.alg === alg, "alg stored\n")
+    pass &= check(index(pt) == 1, "index == 1\n")
+    pass &= check(isempty(pt.steps), "steps empty\n")
+    pass &= check(isempty(pt.accepted), "accepted empty\n")
+    pass &= check(isempty(acceptance_rates(pt)), "acceptance_rates empty\n")
+    pass &= check(acceptance_rate(pt) == 0.0, "acceptance_rate == 0.0\n")
 
     update!(pt, -10.0)
-    @test index(pt) == 1
-    @test ensemble(alg).beta == 0.8
-    @test pt.stage == 1
-    @test isempty(pt.steps)
-    @test isempty(pt.accepted)
+    pass &= check(index(pt) == 1, "index unchanged after update\n")
+    pass &= check(ensemble(alg).beta == 0.8, "beta unchanged\n")
+    pass &= check(pt.stage == 1, "stage == 1\n")
+    pass &= check(isempty(pt.steps), "steps still empty\n")
+    pass &= check(isempty(pt.accepted), "accepted still empty\n")
 
     reset!(pt)
-    @test pt.stage == 0
-    @test index(pt) == 1
+    pass &= check(pt.stage == 0, "stage reset\n")
+    pass &= check(index(pt) == 1, "index reset\n")
 
+    # alternative constructors
     rx_comm = ReplicaExchange(alg, MPI.COMM_WORLD; root=0)
-    @test rx_comm isa ReplicaExchangeMessage
+    pass &= check(rx_comm isa ReplicaExchangeMessage, "ReplicaExchange from comm\n")
 
     pt_mode = ParallelTempering(alg, :MPI; root=0)
-    @test pt_mode isa ParallelTemperingMessage
+    pass &= check(pt_mode isa ParallelTemperingMessage, "mode constructor\n")
 
+    # retune_betas!
     betas = [1.0, 0.5, 0.2]
     rates = [0.1, 0.6]
     retune_betas!(betas, rates; target=0.3, damping=0.5)
-    @test length(betas) == 3
-    @test betas[1] > betas[2] > betas[3]
+    pass &= check(length(betas) == 3, "betas length unchanged\n")
+    pass &= check(betas[1] > betas[2] > betas[3], "betas sorted descending\n")
 
+    # set_betas
     b1 = set_betas(4, 0.4, 1.0, :uniform)
-    @test b1 == [1.0, 0.8, 0.6, 0.4]
+    pass &= check(b1 == [1.0, 0.8, 0.6, 0.4], "uniform betas\n")
 
     b2 = [1.0, 5/6, 2/3, 0.5]
     set_betas!(b2, [1.0, 0.85, 0.7, 0.5])
-    @test b2 == [1.0, 0.85, 0.7, 0.5]
+    pass &= check(b2 == [1.0, 0.85, 0.7, 0.5], "set_betas! in-place\n")
 
     b3 = set_betas(4, [1.0, 0.9, 0.7, 0.5])
-    @test b3 == [1.0, 0.9, 0.7, 0.5]
+    pass &= check(b3 == [1.0, 0.9, 0.7, 0.5], "set_betas from vector\n")
 
     b4 = set_betas(4, 0.5, 1.0, :geometric)
-    @test b4[1] ≈ 1.0
-    @test b4[end] ≈ 0.5
+    pass &= check(b4[1] ≈ 1.0, "geometric betas first\n")
+    pass &= check(b4[end] ≈ 0.5, "geometric betas last\n")
 
     # local-vector mode
     v_algs = [Metropolis(MersenneTwister(11); β=1.0), Metropolis(MersenneTwister(12); β=0.5)]
     v_pt = ParallelTempering(v_algs)
-    @test v_pt isa ParallelTemperingVector
-    @test index(v_pt, 1) == 1
+    pass &= check(v_pt isa ParallelTemperingVector, "vector type\n")
+    pass &= check(index(v_pt, 1) == 1, "vector index\n")
+
     update!(v_pt, [-10.0, -8.0])
-    @test v_pt.stage == 1
-    @test sum(v_pt.steps) >= 0
-    @test gather_at_root(5, v_pt) == [5]
+    pass &= check(v_pt.stage == 1, "vector stage == 1\n")
+    pass &= check(sum(v_pt.steps) >= 0, "vector steps >= 0\n")
+    pass &= check(gather_at_root(5, v_pt) == [5], "gather_at_root\n")
     arr = [1, 2]
-    @test broadcast_from_root!(arr, v_pt) === arr
+    pass &= check(broadcast_from_root!(arr, v_pt) === arr, "broadcast_from_root!\n")
 
+    # convenience constructor from betas
     v_pt2 = ParallelTempering([1.0, 0.5]; seed=123, rng=MersenneTwister)
-    @test v_pt2 isa ParallelTemperingVector
-    @test length(v_pt2.alg) == 2
-    @test ensemble(v_pt2.alg[1]).beta == 1.0
-    @test ensemble(v_pt2.alg[2]).beta == 0.5
+    pass &= check(v_pt2 isa ParallelTemperingVector, "betas constructor type\n")
+    pass &= check(length(v_pt2.alg) == 2, "betas constructor length\n")
+    pass &= check(ensemble(v_pt2.alg[1]).beta == 1.0, "betas constructor beta[1]\n")
+    pass &= check(ensemble(v_pt2.alg[2]).beta == 0.5, "betas constructor beta[2]\n")
 
-    @test MonteCarloX.acceptance_rates([4, 0, 3], [1, 0, 3]) == [0.25, 0.0, 1.0]
-    @test MonteCarloX.acceptance_rate([4, 0, 3], [1, 0, 3]) == 4 / 7
+    # acceptance rate helpers
+    pass &= check(MonteCarloX.acceptance_rates([4, 0, 3], [1, 0, 3]) == [0.25, 0.0, 1.0], "acceptance_rates vector\n")
+    pass &= check(MonteCarloX.acceptance_rate([4, 0, 3], [1, 0, 3]) == 4 / 7, "acceptance_rate scalar\n")
 
-    @test MonteCarloX._resolve_pair(1, 0, 4) == (active=true, pair_id=1, partner_index=2)
-    @test MonteCarloX._resolve_pair(2, 0, 4) == (active=true, pair_id=1, partner_index=1)
-    @test MonteCarloX._resolve_pair(1, 1, 4) == (active=false, pair_id=0, partner_index=0)
-    @test MonteCarloX._resolve_pair(3, 1, 4) == (active=true, pair_id=2, partner_index=2)
+    # _resolve_pair
+    pass &= check(MonteCarloX._resolve_pair(1, 0, 4) == (active=true, pair_id=1, partner_index=2), "resolve_pair (1,0,4)\n")
+    pass &= check(MonteCarloX._resolve_pair(2, 0, 4) == (active=true, pair_id=1, partner_index=1), "resolve_pair (2,0,4)\n")
+    pass &= check(MonteCarloX._resolve_pair(1, 1, 4) == (active=false, pair_id=0, partner_index=0), "resolve_pair (1,1,4)\n")
+    pass &= check(MonteCarloX._resolve_pair(3, 1, 4) == (active=true, pair_id=2, partner_index=2), "resolve_pair (3,1,4)\n")
 
+    # exchange_log_ratio and attempt_exchange_pair!
     alg_i = Metropolis(MersenneTwister(21); β=1.0)
     alg_j = Metropolis(MersenneTwister(22); β=0.5)
     x_i, x_j = 0.0, -5.0
     log_ratio = exchange_log_ratio(ensemble(alg_i), ensemble(alg_j), x_i, x_j)
-    @test isapprox(log_ratio, 2.5; atol=1e-12)
+    pass &= check(isapprox(log_ratio, 2.5; atol=1e-12), "exchange log ratio\n")
 
     accepted = attempt_exchange_pair!(alg_i, alg_j, x_i, x_j, 0.0)
-    @test accepted
-    @test ensemble(alg_i).beta == 0.5
-    @test ensemble(alg_j).beta == 1.0
+    pass &= check(accepted, "exchange accepted\n")
+    pass &= check(ensemble(alg_i).beta == 0.5, "betas swapped (i)\n")
+    pass &= check(ensemble(alg_j).beta == 1.0, "betas swapped (j)\n")
 
     alg_i_reject = Metropolis(MersenneTwister(23); β=1.0)
     alg_j_reject = Metropolis(MersenneTwister(24); β=0.5)
     rejected = attempt_exchange_pair!(alg_i_reject, alg_j_reject, x_j, x_i, 1.0)
-    @test !rejected
-    @test ensemble(alg_i_reject).beta == 1.0
-    @test ensemble(alg_j_reject).beta == 0.5
+    pass &= check(!rejected, "exchange rejected\n")
+    pass &= check(ensemble(alg_i_reject).beta == 1.0, "betas unchanged (i)\n")
+    pass &= check(ensemble(alg_j_reject).beta == 0.5, "betas unchanged (j)\n")
 
+    # optimize_exchange_interval!
     v_pt3 = ParallelTempering([1.0, 0.5]; seed=77, rng=MersenneTwister)
     tuple_samples = Tuple{Int,Float64}[
         (1, 0.0), (1, 0.2), (1, -0.1), (1, 0.1), (1, -0.2),
@@ -205,27 +216,19 @@ function test_parallel_tempering(; verbose=false)
         min_points=2,
         max_lag=2,
     )
-    @test interval == sweeps[index(v_pt3)]
-    @test all(2 .<= sweeps .<= 50)
-    @test sweeps[2] >= sweeps[1]
+    pass &= check(interval == sweeps[index(v_pt3)], "optimize interval consistent\n")
+    pass &= check(all(2 .<= sweeps .<= 50), "sweeps in bounds\n")
+    pass &= check(sweeps[2] >= sweeps[1], "higher temp needs more sweeps\n")
 
-    if verbose
-        println("ParallelTempering tests completed")
-    end
-
-    return true
+    return pass
 end
 
-function run_parallel_ensembles_testsets(; verbose=false)
-    @testset "Parallel ensembles" begin
-        @testset "Parallel multicanonical" begin
-            @test test_parallel_multicanonical(verbose=verbose)
-        end
-
-        @testset "Parallel tempering" begin
-            @test test_parallel_tempering(verbose=verbose)
-        end
-
+@testset "Parallel ensembles" begin
+    @testset "Parallel multicanonical" begin
+        @test test_parallel_multicanonical()
     end
-    return true
+
+    @testset "Parallel tempering" begin
+        @test test_parallel_tempering()
+    end
 end

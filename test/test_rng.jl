@@ -2,213 +2,150 @@ using MonteCarloX
 using Random
 using Test
 
-function test_rng_mutable_static_sequence(; verbose=false)
+function test_rng_mutable_static_sequence()
     pass = true
     seed = 1000
 
-    if verbose
-        println("\nRNG mutable (static mode)")
-    end
-    rng = MutableRandomNumbers(MersenneTwister(seed),10)
+    rng = MutableRandomNumbers(MersenneTwister(seed), 10)
     rng_MT = MersenneTwister(seed)
 
-    if verbose
-        println("  checking uniform draws")
-    end
-    for (r1, r2) in zip(rand(rng, 10), rand(rng_MT,10))
+    for (r1, r2) in zip(rand(rng, 10), rand(rng_MT, 10))
         pass &= r1 == r2
     end
-    valid = true
-    try
-        rand(rng)
-        valid = false
-    catch
-        valid = true
-    end
-    pass &= valid
+    pass = check(pass, "static sequence matches MersenneTwister\n")
+
+    threw = try; rand(rng); false; catch; true; end
+    pass &= check(threw, "static mode throws after exhaustion\n")
 
     return pass
 end
 
-function test_rng_mutable_dynamic_sequence_and_reset(; verbose=false)
+function test_rng_mutable_dynamic_sequence_and_reset()
     pass = true
     seed = 1000
 
+    rng = MutableRandomNumbers(MersenneTwister(seed), 10, mode=:dynamic)
+    pass &= check(length(rng) == 10, "initial length == 10\n")
 
-    if verbose
-        println("\nRNG mutable (dynamic mode)")
-    end
-    rng = MutableRandomNumbers(MersenneTwister(seed),10, mode=:dynamic)
-    pass &= length(rng) == 10
     rng_MT = MersenneTwister(seed)
-    for (r1, r2) in zip(rand(rng, 20), rand(rng_MT,20))
+    for (r1, r2) in zip(rand(rng, 20), rand(rng_MT, 20))
         pass &= r1 == r2
     end
-    length_final = length(rng)
-    pass &= length_final == 20
+    pass = check(pass, "dynamic sequence matches MersenneTwister\n")
+
+    pass &= check(length(rng) == 20, "length grew to 20\n")
+
     reset!(rng)
-    pass &= rng.index_current == 0
+    pass &= check(rng.index_current == 0, "reset! zeroes index\n")
 
     rand_number = rand(rng)
-    pass &= rand_number == rng[1]
+    pass &= check(rand_number == rng[1], "first draw after reset matches rng[1]\n")
 
     return pass
 end
 
-function test_rng_mutable_randexp_sequence(; verbose=false)
+function test_rng_mutable_randexp_sequence()
     pass = true
     seed = 1000
 
-
-    # randexp requires to redraw random number in 1.1% of tries ... requires mode=:dynamic
-    rng = MutableRandomNumbers(MersenneTwister(seed),10, mode=:dynamic)
+    rng = MutableRandomNumbers(MersenneTwister(seed), 10, mode=:dynamic)
     rng_MT = MersenneTwister(seed)
-    if verbose
-        println("  checking randexp sequence")
-    end
-    for (r1, r2) in zip(randexp(rng, 10), randexp(rng_MT,10))
+
+    for (r1, r2) in zip(randexp(rng, 10), randexp(rng_MT, 10))
         pass &= r1 == r2
     end
+    pass = check(pass, "randexp sequence matches MersenneTwister\n")
 
     return pass
 end
 
-function test_rng_mutable_default_initialization_modes(; verbose=false)
+function test_rng_mutable_default_initialization_modes()
     pass = true
 
-
-    if verbose
-        println("\nRNG default initialization modes")
-    end
     rng = MutableRandomNumbers(100)
-    pass &= rng.mode == :static
+    pass &= check(rng.mode == :static, "MutableRandomNumbers(N) defaults to static\n")
+
     rng = MutableRandomNumbers()
-    pass &= rng.mode == :dynamic
+    pass &= check(rng.mode == :dynamic, "MutableRandomNumbers() defaults to dynamic\n")
 
     return pass
 end
 
-function test_rng_mutable_dynamic_constructor(; verbose=false)
+function test_rng_mutable_dynamic_constructor()
     pass = true
     seed = 1000
 
-    if verbose
-        println("\nRNG dynamic constructor with rng argument")
-    end
     rng_base = MersenneTwister(seed)
     rng = MutableRandomNumbers(rng_base; mode=:dynamic)
-    pass &= rng.mode == :dynamic
-    pass &= length(rng) == 0
+    pass &= check(rng.mode == :dynamic, "constructor with rng arg is dynamic\n")
+    pass &= check(length(rng) == 0, "initial length == 0\n")
+
     rng_MT = MersenneTwister(seed)
-    r1 = rand(rng)
-    r2 = rand(rng_MT)
-    pass &= r1 == r2
+    pass &= check(rand(rng) == rand(rng_MT), "first draw matches MersenneTwister\n")
 
     return pass
 end
 
-function test_rng_rand_inbounds_closeopen01_mapping(; verbose=false)
+function test_rng_rand_inbounds_closeopen01_mapping()
     pass = true
     seed = 1000
 
-    if verbose
-        println("\nRNG rand_inbounds mapping")
-    end
     rng = MutableRandomNumbers(MersenneTwister(seed), 2)
     reset!(rng)
     r01 = MonteCarloX.rand_inbounds(rng, Random.CloseOpen01())
-    pass &= r01 == rng[1]
+    pass &= check(r01 == rng[1], "CloseOpen01 draw == rng[1]\n")
+
     reset!(rng)
     r12 = MonteCarloX.rand_inbounds(rng, Random.CloseOpen12())
-    pass &= r01 == r12 - 1.0
+    pass &= check(r01 == r12 - 1.0, "CloseOpen01 == CloseOpen12 - 1.0\n")
 
     return pass
 end
 
-function test_rng_mutable_access_and_manipulation(; verbose=false)
+function test_rng_mutable_access_and_manipulation()
     pass = true
     seed = 1000
 
-
-
-
-    if verbose
-        println("\nRNG access and manipulation")
-    end
-    rng = MutableRandomNumbers(MersenneTwister(seed),100)
+    rng = MutableRandomNumbers(MersenneTwister(seed), 100)
     idx = 10
     backup = rng[idx]
-    pass &= rng[idx] == backup
+    pass &= check(rng[idx] == backup, "getindex consistent\n")
+
     new = 0.23
     rng[idx] = new
-    pass &= rng[idx] == new
+    pass &= check(rng[idx] == new, "setindex! works\n")
+
     rng[idx] = 0
-    pass &= rng[idx] == 0.0
-    valid = true
-    try
-        rng[1] = 1.1
-        valid = false
-    catch
-        valid = true
+    pass &= check(rng[idx] == 0.0, "setindex! to 0 works\n")
+
+    for bad_val in [1.1, 1.0, -0.1]
+        threw = try; rng[1] = bad_val; false; catch; true; end
+        pass &= check(threw, "setindex! rejects $bad_val\n")
     end
-    pass &= valid
-    valid = true
-    try
-        rng[1] = 1.0
-        valid = false
-    catch
-        valid = true
-    end
-    pass &= valid
-    valid = true
-    try
-        rng[1] = -0.1
-        valid = false
-    catch
-        valid = true
-    end
-    pass &= valid
 
     return pass
 end
 
-function test_rng_mutable(; verbose=false)
-    pass = true
-    pass &= test_rng_mutable_static_sequence(verbose=verbose)
-    pass &= test_rng_mutable_dynamic_sequence_and_reset(verbose=verbose)
-    pass &= test_rng_mutable_randexp_sequence(verbose=verbose)
-    pass &= test_rng_mutable_default_initialization_modes(verbose=verbose)
-    pass &= test_rng_mutable_dynamic_constructor(verbose=verbose)
-    pass &= test_rng_rand_inbounds_closeopen01_mapping(verbose=verbose)
-    pass &= test_rng_mutable_access_and_manipulation(verbose=verbose)
-    return pass
-end
-
-function run_rng_testsets(; verbose=false)
-    @testset "RNG" begin
-        @testset "Static sequence" begin
-            @test test_rng_mutable_static_sequence(verbose=verbose)
-        end
-        @testset "Dynamic sequence and reset" begin
-            @test test_rng_mutable_dynamic_sequence_and_reset(verbose=verbose)
-        end
-        @testset "Randexp sequence" begin
-            @test test_rng_mutable_randexp_sequence(verbose=verbose)
-        end
-        @testset "Default initialization modes" begin
-            @test test_rng_mutable_default_initialization_modes(verbose=verbose)
-        end
-        @testset "Dynamic constructor" begin
-            @test test_rng_mutable_dynamic_constructor(verbose=verbose)
-        end
-        @testset "rand_inbounds CloseOpen01 mapping" begin
-            @test test_rng_rand_inbounds_closeopen01_mapping(verbose=verbose)
-        end
-        @testset "Access and manipulation" begin
-            @test test_rng_mutable_access_and_manipulation(verbose=verbose)
-        end
+@testset "RNG" begin
+    @testset "Static sequence" begin
+        @test test_rng_mutable_static_sequence()
     end
-    return true
+    @testset "Dynamic sequence and reset" begin
+        @test test_rng_mutable_dynamic_sequence_and_reset()
+    end
+    @testset "Randexp sequence" begin
+        @test test_rng_mutable_randexp_sequence()
+    end
+    @testset "Default initialization modes" begin
+        @test test_rng_mutable_default_initialization_modes()
+    end
+    @testset "Dynamic constructor" begin
+        @test test_rng_mutable_dynamic_constructor()
+    end
+    @testset "rand_inbounds CloseOpen01 mapping" begin
+        @test test_rng_rand_inbounds_closeopen01_mapping()
+    end
+    @testset "Access and manipulation" begin
+        @test test_rng_mutable_access_and_manipulation()
+    end
 end
-
-

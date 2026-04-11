@@ -1,50 +1,33 @@
-# tests for src/event_handler.jl
 using MonteCarloX
 using Random
 using Test
 
-function test_event_handler_rate(event_handler_type::String; verbose = false)
+function test_event_handler_rate(event_handler_type::String)
     pass = true
 
-    # test construction
     N = 1000
     rate0 = 0.1
     list_rate    = ones(N) * rate0
     list_event = [i for i = 1:N]
     if event_handler_type == "ListEventRateSimple"
-        event_handler =    ListEventRateSimple{Int}(list_event, list_rate, 0.0, 0)
+        event_handler = ListEventRateSimple{Int}(list_event, list_rate, 0.0, 0)
     elseif event_handler_type == "ListEventRateActiveMask"
         event_handler = ListEventRateActiveMask{Int}(list_event, list_rate, 0.0, 0)
     else
         throw(UndefVarError(:event_handler_type))
     end
-    if verbose
-        println("... construction")
-        println("... ... rate[1]: $(event_handler.list_rate[1]) == $(rate0)")
-        println("... ... rate[N]: $(event_handler.list_rate[N]) == $(rate0)")
-    end
-    pass &= event_handler.list_rate[1] == rate0
-    pass &= event_handler.list_rate[N] == rate0
-     
-    # test length
-    if verbose
-        println("... length: $(length(event_handler)) = $(N)")
-    end
-    pass &= length(event_handler) == N
-     
-    # test setindex! - e.g. sum_rates remains correct (random changes and keep sum of changes)
+    pass &= check(event_handler.list_rate[1] == rate0, "rate[1] == rate0\n")
+    pass &= check(event_handler.list_rate[N] == rate0, "rate[N] == rate0\n")
+    pass &= check(length(event_handler) == N, "length == N\n")
+
+    # set all rates to zero
     for i = 1:N
         event_handler[i] = 0.0
     end
-    if verbose
-        println("... set all rates to 0.0")
-        println("... ... sum(rates): $(sum(event_handler.list_rate)) !> 1e-10")
-        println("... ... length: $(length(event_handler)) == 0")
-    end
-    pass &= !(sum(event_handler.list_rate) > 1e-10)
-    pass &= length(event_handler) == 0
+    pass &= check(!(sum(event_handler.list_rate) > 1e-10), "all rates zeroed\n")
+    pass &= check(length(event_handler) == 0, "length == 0 after zeroing\n")
 
-    # test setindex! and getindex
+    # set random rates and check sum tracking
     rng = MersenneTwister(1000)
     sum_before = sum(event_handler.list_rate)
     sum_changes = 0.0
@@ -54,45 +37,21 @@ function test_event_handler_rate(event_handler_type::String; verbose = false)
         event_handler[i] = value
     end
     sum_expected = sum_before + sum_changes
-    if verbose
-        println("... set all rates random")
-        println("... ... expected sum(rates): $(sum(event_handler.list_rate)) == $(sum_expected)")
-        println("... ... diff: $(abs(sum(event_handler.list_rate) - sum_expected))  < 1e-10")
-    end
-    pass &= abs(sum(event_handler.list_rate) - sum_expected) < 1e-10
+    pass &= check(abs(sum(event_handler.list_rate) - sum_expected) < 1e-10, "sum tracking after random set\n")
 
-    # test changes in rate effecting the automatic update of sum(rates)
-    if verbose
-        println("... automatic update of sum(rates)")
-    end
-    for i = 1:10
-        valid_sum = true
-        for j = 1:1e7
+    # stress test: many random updates, check sum remains consistent
+    for round = 1:10
+        for _ = 1:1e7
             event_handler[rand(rng, 1:N)] = rand(rng)
         end
-        sum_rates = 0.0
-        for n=1:N
-            sum_rates += event_handler[n]
-        end
-        if abs(sum(event_handler.list_rate) - sum_rates) < 1e-11
-            valid_sum = true
-        else
-            valid_sum = false
-        end
-        if verbose
-            if valid_sum 
-                println("... ... correct sum(rates): $(sum(event_handler.list_rate)) == $(sum_rates)")
-            else
-                println("... ... incorrect sum(rates): $(sum(event_handler.list_rate)) == $(sum_rates)")
-            end
-        end
-        pass &= valid_sum
+        sum_rates = sum(event_handler[n] for n in 1:N)
+        pass &= check(abs(sum(event_handler.list_rate) - sum_rates) < 1e-11, "sum consistent after stress round $round\n")
     end
 
     return pass
 end
 
-function test_event_queue(; verbose = false)
+function test_event_queue()
     pass = true
 
     event_1 = (1.0, 1)
@@ -104,46 +63,39 @@ function test_event_queue(; verbose = false)
     add!(queue, event_3)
     add!(queue, event_2)
 
-    pass &= length(queue) == 3
-    pass &= queue[1] == event_1
-    pass &= popfirst!(queue) == event_1
-    pass &= popfirst!(queue) == event_2
-    pass &= popfirst!(queue) == event_3
+    pass &= check(length(queue) == 3, "queue length == 3\n")
+    pass &= check(queue[1] == event_1, "queue[1] is earliest\n")
+    pass &= check(popfirst!(queue) == event_1, "popfirst! returns event_1\n")
+    pass &= check(popfirst!(queue) == event_2, "popfirst! returns event_2\n")
+    pass &= check(popfirst!(queue) == event_3, "popfirst! returns event_3\n")
 
     queue = EventQueue{Int}(nextfloat(1.0))
-    pass &= get_time(queue) == nextfloat(1.0)
+    pass &= check(get_time(queue) == nextfloat(1.0), "initial time set\n")
     add!(queue, event_3)
     add!(queue, event_2)
     @test_throws ErrorException add!(queue, event_1)
-    pass &= popfirst!(queue) == event_2
-    pass &= popfirst!(queue) == event_3
+    pass &= check(popfirst!(queue) == event_2, "popfirst! skips past events\n")
+    pass &= check(popfirst!(queue) == event_3, "popfirst! returns event_3\n")
 
     queue = EventQueue{Int}(0.5)
     add!(queue, (1.2, 7))
     alg = Gillespie(MersenneTwister(1))
     dt, ev = next(alg, queue)
-    pass &= dt == 0.7
-    pass &= ev == 7
-    pass &= get_time(queue) == 1.2
-
-    if verbose
-        println("EventQueue test pass: $(pass)")
-    end
+    pass &= check(dt == 0.7, "dt from queue event\n")
+    pass &= check(ev == 7, "event from queue\n")
+    pass &= check(get_time(queue) == 1.2, "queue time advanced\n")
 
     return pass
 end
 
-function run_event_handler_testsets(; verbose=false)
-    @testset "Event Handler" begin
-        @testset "ListEventRateSimple" begin
-            @test test_event_handler_rate("ListEventRateSimple", verbose=verbose)
-        end
-        @testset "ListEventRateActiveMask" begin
-            @test test_event_handler_rate("ListEventRateActiveMask", verbose=verbose)
-        end
-        @testset "EventQueue" begin
-            @test test_event_queue(verbose=verbose)
-        end
+@testset "Event Handler" begin
+    @testset "ListEventRateSimple" begin
+        @test test_event_handler_rate("ListEventRateSimple")
     end
-    return true
+    @testset "ListEventRateActiveMask" begin
+        @test test_event_handler_rate("ListEventRateActiveMask")
+    end
+    @testset "EventQueue" begin
+        @test test_event_queue()
+    end
 end

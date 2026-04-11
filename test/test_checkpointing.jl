@@ -4,17 +4,11 @@ using StatsBase
 using Test
 using Serialization
 
-include("includes.jl")
-
-# ── helpers ─────────────────────────────────────────────────────────────────
-
 function _tmp_checkpoint_file(prefix="mcx_ckpt")
     joinpath(tempdir(), "$(prefix)_$(abs(rand(Int))).mcx")
 end
 
-# ── Basic checkpoint / restore round-trip with ImportanceSampling ──────────
-
-function test_checkpoint_restore_importance_sampling(; verbose=false)
+function test_checkpoint_restore_importance_sampling()
     rng = MersenneTwister(1)
     alg = Metropolis(rng, x -> -0.5x^2)
 
@@ -43,9 +37,7 @@ function test_checkpoint_restore_importance_sampling(; verbose=false)
     return pass
 end
 
-# ── Multicanonical ensemble round-trip ──────────────────────────────────────
-
-function test_checkpoint_restore_multicanonical(; verbose=false)
+function test_checkpoint_restore_multicanonical()
     bins = 0:10
     alg  = Multicanonical(MersenneTwister(2), bins)
     ens  = ensemble(alg)
@@ -69,9 +61,7 @@ function test_checkpoint_restore_multicanonical(; verbose=false)
     return pass
 end
 
-# ── WangLandau ensemble round-trip ──────────────────────────────────────────
-
-function test_checkpoint_restore_wang_landau(; verbose=false)
+function test_checkpoint_restore_wang_landau()
     alg = WangLandau(MersenneTwister(3), 0:5; logf=2.0)
     ens = ensemble(alg)
     ens.logweight.values .= [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
@@ -91,9 +81,7 @@ function test_checkpoint_restore_wang_landau(; verbose=false)
     return pass
 end
 
-# ── KMC round-trip ──────────────────────────────────────────────────────────
-
-function test_checkpoint_restore_kmc(; verbose=false)
+function test_checkpoint_restore_kmc()
     alg = Gillespie(MersenneTwister(5))
     alg.steps = 42
     alg.time  = 3.14
@@ -111,9 +99,7 @@ function test_checkpoint_restore_kmc(; verbose=false)
     return pass
 end
 
-# ── relink! swaps linked objects ────────────────────────────────────────────
-
-function test_relink(; verbose=false)
+function test_relink()
     rng = MersenneTwister(7)
     alg = Metropolis(rng, x -> -x^2)
 
@@ -133,9 +119,7 @@ function test_relink(; verbose=false)
     return pass
 end
 
-# ── Deterministic restart with ImportanceSampling ───────────────────────────
-
-function test_deterministic_restart(; verbose=false)
+function test_deterministic_restart()
     # Reference: single uninterrupted run of 2000 steps
     rng_ref = MersenneTwister(42)
     alg_ref = Metropolis(rng_ref, x -> -0.5x^2)
@@ -184,9 +168,7 @@ function test_deterministic_restart(; verbose=false)
     return pass
 end
 
-# ── Metadata key conflict detection ─────────────────────────────────────────
-
-function test_metadata_conflict(; verbose=false)
+function test_metadata_conflict()
     alg = Metropolis(MersenneTwister(1), x -> -x^2)
     file = _tmp_checkpoint_file("conflict")
     ckpt = init_checkpoint(file, (alg=alg,); sweep=0)
@@ -203,16 +185,12 @@ function test_metadata_conflict(; verbose=false)
     return pass
 end
 
-# ── Top-level test-set runner ────────────────────────────────────────────────
-
-function run_checkpointing_testsets(; verbose=false)
-    @testset "Checkpointing: checkpoint / restore" begin
-        @test test_checkpoint_restore_importance_sampling(verbose=verbose)
-        @test test_checkpoint_restore_multicanonical(verbose=verbose)
-        @test test_checkpoint_restore_wang_landau(verbose=verbose)
-        @test test_checkpoint_restore_kmc(verbose=verbose)
-        @test test_relink(verbose=verbose)
-        @test test_deterministic_restart(verbose=verbose)
-        @test test_metadata_conflict(verbose=verbose)
-    end
+@testset "Checkpointing: checkpoint / restore" begin
+    @test test_checkpoint_restore_importance_sampling()
+    @test test_checkpoint_restore_multicanonical()
+    @test test_checkpoint_restore_wang_landau()
+    @test test_checkpoint_restore_kmc()
+    @test test_relink()
+    @test test_deterministic_restart()
+    @test test_metadata_conflict()
 end
