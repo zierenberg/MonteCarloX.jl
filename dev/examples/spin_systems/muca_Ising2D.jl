@@ -12,10 +12,8 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 # [Beale (1996)](https://doi.org/10.1103/PhysRevLett.76.78).
 
 using Random, StatsBase, Plots
-using MonteCarloX, SpinSystems, MPI
-
-MPI.Initialized() || MPI.Init()
-
+using MonteCarloX, SpinSystems
+using MPI, Distributed
 
 # ## Parameters
 const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
@@ -24,6 +22,7 @@ L             = 8;
 n_iter        = CI_MODE ? 3 : 10;
 sweeps_therm  = CI_MODE ? 100 : 1_000;
 sweeps_record = CI_MODE ? 1_000 : 100_000;
+target_replicas = CI_MODE ? 2 : 4;
 
 # ## Validation and visualization
 #
@@ -73,18 +72,21 @@ end
 
 # ## Serial MUCA
 #
-# A single Markov chain accumulates the energy histogram. After each iteration
-# weights are updated via the Wang-Landau rule until the histogram flattens.
+# A single Markov chain accumulates the energy histogram.
 
-sys = IsingLatticeOptim(L, L)
+sys = Ising([L, L])
 init!(sys, :random, rng=Xoshiro(1000))
 alg = Multicanonical(Xoshiro(1000), get_centers(exact_logdos))
 
 serial_hists, serial_lws = BinnedObject[], BinnedObject[]
 for _ in 1:n_iter
-    for _ in 1:(sweeps_therm  * length(sys.spins)); spin_flip!(sys, alg); end
+    for _ in 1:(sweeps_therm  * length(sys.spins))
+        spin_flip!(sys, alg)
+    end
     reset!(alg)
-    for _ in 1:(sweeps_record * length(sys.spins)); spin_flip!(sys, alg); end
+    for _ in 1:(sweeps_record * length(sys.spins))
+        ;spin_flip!(sys, alg)
+    end
     update!(ensemble(alg); mode=:simple)
     push!(serial_hists, deepcopy(alg.ensemble.histogram))
     push!(serial_lws,   deepcopy(alg.ensemble.logweight))
@@ -92,40 +94,86 @@ end
 
 plt, rmse = plot_muca(serial_hists, serial_lws; title="Serial")
 println("Serial RMSE = ", round(last(rmse), digits=4))
-plt
+display(plt)
 
+# %% #src
 # ## Parallel MUCA with MPI
 #
 # Each rank runs an independent chain over `1/nranks` of the sweeps. After
-# each iteration histograms are merged onto rank 0, weights updated and
-# broadcast back. With a single rank (VS Code/REPL) the result is identical
-# to the serial version above.
+# each iteration histograms are merged, weights updated on the root rank, and
+# broadcast back.
 
-pmuca = ParallelMulticanonical(MPI.COMM_WORLD, root=0)
-sys   = IsingLatticeOptim(L, L)
-init!(sys, :random, rng=Xoshiro(1000 + pmuca.rank))
-alg   = Multicanonical(Xoshiro(1000 + pmuca.rank), get_centers(exact_logdos))
+mpi_backend = init(:MPI)
+mpi_alg   = Multicanonical(Xoshiro(1000 + rank(mpi_backend)), get_centers(exact_logdos))
+mpi_pmuca = ParallelMulticanonical(mpi_backend, mpi_alg, root=0)
+
+mpi_sys   = Ising([L, L])
+init!(mpi_sys, :random, rng=mpi_alg.rng)
 
 mpi_hists, mpi_lws = BinnedObject[], BinnedObject[]
 for _ in 1:n_iter
-    for _ in 1:(sweeps_therm  * length(sys.spins));              spin_flip!(sys, alg); end
-    reset!(alg)
-    for _ in 1:(sweeps_record * length(sys.spins) / pmuca.size); spin_flip!(sys, alg); end
-    merge_histograms!(pmuca, alg.ensemble.histogram)
-    if is_root(pmuca)
-        update!(ensemble(alg); mode=:simple)
-        push!(mpi_hists, deepcopy(alg.ensemble.histogram))
-        push!(mpi_lws,   deepcopy(alg.ensemble.logweight))
+    for _ in 1:(sweeps_therm  * length(mpi_sys.spins))
+        spin_flip!(mpi_sys, mpi_alg)
     end
-    distribute_logweight!(pmuca, alg.ensemble.logweight)
+    reset!(mpi_alg)
+    for _ in 1:(sweeps_record * length(mpi_sys.spins) / size(mpi_pmuca))
+        spin_flip!(mpi_sys, mpi_alg)
+    end
+    merge_histograms!(mpi_pmuca)
+    if is_root(mpi_pmuca)
+        update!(ensemble(mpi_alg); mode=:simple)
+        push!(mpi_hists, deepcopy(mpi_alg.ensemble.histogram))
+        push!(mpi_lws,   deepcopy(mpi_alg.ensemble.logweight))
+    end
+    distribute_logweight!(mpi_pmuca)
 end
 
-if is_root(pmuca)
+if is_root(mpi_pmuca)
     plt, rmse = plot_muca(mpi_hists, mpi_lws; title="MPI")
     println("MPI RMSE = ", round(last(rmse), digits=4))
-    plt
+    display(plt)
+end
+finalize!(mpi_backend)
+
+# %% #src
+# ## Parallel MUCA with Distributed
+#
+# This uses the same coordinator API as MPI, but initializes a
+# `DistributedBackend` with local worker processes.
+
+# dist_addprocs = CI_MODE ? 0 : max(1, min(target_replicas - 1, Sys.CPU_THREADS - 1))
+dist_addprocs = 0
+dist_backend = init(:Distributed; addprocs=dist_addprocs)
+dist_alg   = Multicanonical(Xoshiro(2000 + rank(dist_backend)), get_centers(exact_logdos))
+dist_pmuca = ParallelMulticanonical(dist_backend, dist_alg, root=0)
+
+dist_sys   = Ising([L, L])
+init!(dist_sys, :random, rng=dist_alg.rng)
+
+dist_hists, dist_lws = BinnedObject[], BinnedObject[]
+for _ in 1:n_iter
+    for _ in 1:(sweeps_therm  * length(dist_sys.spins))
+        spin_flip!(dist_sys, dist_alg)
+    end
+    reset!(dist_alg)
+    for _ in 1:(sweeps_record * length(dist_sys.spins) / size(dist_pmuca))
+        spin_flip!(dist_sys, dist_alg)
+    end
+    merge_histograms!(dist_pmuca)
+    if is_root(dist_pmuca)
+        update!(ensemble(dist_alg); mode=:simple)
+        push!(dist_hists, deepcopy(dist_alg.ensemble.histogram))
+        push!(dist_lws,   deepcopy(dist_alg.ensemble.logweight))
+    end
+    distribute_logweight!(dist_pmuca)
 end
 
+if is_root(dist_pmuca)
+    plt, rmse = plot_muca(dist_hists, dist_lws; title="Distributed")
+    println("Distributed RMSE = ", round(last(rmse), digits=4))
+    display(plt)
+end
+finalize!(dist_backend)
 # ## Production runs
 #
 # For true parallelism, run the standalone MPI script in the same folder:
