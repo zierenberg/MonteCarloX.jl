@@ -136,7 +136,8 @@ end
 
 distributed_result = nothing
 
-dist_addprocs = haskey(ENV, "CI") ? 0 : max(1, min(nreplicas - 1, Sys.CPU_THREADS - 1))
+# dist_addprocs = haskey(ENV, "CI") ? 0 : max(1, min(nreplicas - 1, Sys.CPU_THREADS - 1))
+dist_addprocs = 0
 dist_backend = init(:Distributed; addprocs=dist_addprocs)
 
 systems_d = [Ising([L, L]) for _ in 1:nreplicas]

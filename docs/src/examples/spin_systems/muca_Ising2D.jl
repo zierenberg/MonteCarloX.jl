@@ -141,7 +141,8 @@ finalize!(mpi_backend)
 # This uses the same coordinator API as MPI, but initializes a
 # `DistributedBackend` with local worker processes.
 
-dist_addprocs = CI_MODE ? 0 : max(1, min(target_replicas - 1, Sys.CPU_THREADS - 1))
+# dist_addprocs = CI_MODE ? 0 : max(1, min(target_replicas - 1, Sys.CPU_THREADS - 1))
+dist_addprocs = 0
 dist_backend = init(:Distributed; addprocs=dist_addprocs)
 dist_alg   = Multicanonical(Xoshiro(2000 + rank(dist_backend)), get_centers(exact_logdos))
 dist_pmuca = ParallelMulticanonical(dist_backend, dist_alg, root=0)
