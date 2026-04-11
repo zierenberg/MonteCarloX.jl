@@ -136,20 +136,9 @@ end
 
 distributed_result = nothing
 
-if Distributed.nworkers() == 0
-    addprocs_n = max(1, min(nreplicas - 1, Sys.CPU_THREADS - 1))
-    Distributed.addprocs(addprocs_n; exeflags="--project=$(Base.active_project())")
-end
-
-if Distributed.nworkers() == 0
-    error("Distributed example requires at least one worker process")
-end
-
-for pid in Distributed.workers()
-    Distributed.remotecall_eval(Main, pid, :(using Random))
-    Distributed.remotecall_eval(Main, pid, :(using MonteCarloX))
-    Distributed.remotecall_eval(Main, pid, :(using SpinSystems))
-end
+# dist_addprocs = haskey(ENV, "CI") ? 0 : max(1, min(nreplicas - 1, Sys.CPU_THREADS - 1))
+dist_addprocs = 0
+dist_backend = init(:Distributed; addprocs=dist_addprocs)
 
 systems_d = [Ising([L, L]) for _ in 1:nreplicas]
 algs_d = [Metropolis(MersenneTwister(seed + r); β=betas[r]) for r in 1:nreplicas]
@@ -236,6 +225,7 @@ distributed_result = (
 
 println("PT Ising2D distributed finished")
 println("workers = $(Distributed.nworkers()), mean exchange acceptance = $(round(mean(rates_d), digits=4))")
+finalize!(dist_backend)
 
 # %%
 # ## Plot threaded vs distributed vs exact

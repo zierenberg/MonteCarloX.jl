@@ -139,7 +139,7 @@ end
     return DistributedBackend(Distributed.myid(), Distributed.nprocs())
 end
 
-function DistributedBackend(; addprocs::Union{Nothing,Integer}=nothing, exeflags=nothing)
+function DistributedBackend(; addprocs::Union{Nothing,Integer}=nothing, exeflags=nothing, timeout::Real=30)
     if !isdefined(@__MODULE__, :Distributed)
         @warn "Distributed backend unavailable in this session; skipping DistributedBackend initialization"
         error("DistributedBackend requires Distributed module")
@@ -154,15 +154,32 @@ function DistributedBackend(; addprocs::Union{Nothing,Integer}=nothing, exeflags
     end
 
     if addprocs_n > 0
-        if launch_flags === nothing
-            Distributed.addprocs(addprocs_n)
-        else
-            Distributed.addprocs(addprocs_n; exeflags=launch_flags)
+        task = @async begin
+            if launch_flags === nothing
+                Distributed.addprocs(addprocs_n)
+            else
+                Distributed.addprocs(addprocs_n; exeflags=launch_flags)
+            end
+        end
+        deadline = time() + timeout
+        while !istaskdone(task) && time() < deadline
+            sleep(0.5)
+        end
+        if !istaskdone(task)
+            error("DistributedBackend: timed out after $(timeout)s trying to add $addprocs_n workers. The environment may not support spawning worker processes.")
+        end
+        if istaskfailed(task)
+            err = task.result
+            error("DistributedBackend: failed to add $addprocs_n worker processes. Original error: $err")
+        end
+        n_workers = Distributed.nworkers()
+        if n_workers < addprocs_n
+            error("DistributedBackend: requested $addprocs_n workers but only $n_workers are available")
         end
     end
 
     workers = Distributed.workers()
-    if !isempty(workers)
+    if length(workers) > 1 || (length(workers) == 1 && workers[1] != 1)
         try
             Distributed.remotecall_eval(Main, workers, :(using MonteCarloX))
         catch err
