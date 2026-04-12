@@ -31,7 +31,7 @@ In canonical form,
 
 up to additive constants in log space.
 
-- canonical ensemble: `BoltzmannEnsemble(β)`
+- canonical ensemble: `BoltzmannEnsemble(β=β)`
 - generalized ensemble: tabulated `BinnedObject` wrapped by ensemble types
 
 Algorithms use local log-weight differences, so they remain model-agnostic.
@@ -66,7 +66,7 @@ function local_update(x::Float64, alg::Metropolis)
 end
 
 rng = MersenneTwister(42)
-alg = Metropolis(rng; β=1.0)  # uses BoltzmannEnsemble(β)
+alg = Metropolis(rng; β=1.0)  # uses BoltzmannEnsemble(β=β)
 x = 0.0
 for _ in 1:10_000
     x = local_update(x, alg)

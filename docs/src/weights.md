@@ -31,7 +31,7 @@ using Random
 using MonteCarloX
 
 rng = MersenneTwister(1)
-alg = Metropolis(rng; β=0.5)  # internally uses BoltzmannEnsemble(0.5)
+alg = Metropolis(rng; β=0.5)  # internally uses BoltzmannEnsemble(β=0.5)
 ```
 
 Use this for standard fixed-temperature sampling.

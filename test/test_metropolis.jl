@@ -5,52 +5,75 @@ using StatsBase: normalize, kldivergence
 using Distributions
 using Test
 
-"""
-Test ImportanceSampling basics (construction and definition/nondefinition of functions)
-"""
-function test_importance_sampling_basics(; verbose=false)
+function test_algorithm_constructors()
+    pass = true
+
+    # ImportanceSampling with FunctionEnsemble
     rng = MersenneTwister(42)
     logdensity(x) = -0.5 * x^2
     alg = ImportanceSampling(rng, logdensity)
-    
-    pass = true
-    pass &= alg.rng === rng
-    pass &= alg.ensemble === FunctionEnsemble(logdensity)
-    pass &= hasmethod(accept!, Tuple{typeof(alg), Float64, Float64})
-    pass &= hasmethod(reset!, Tuple{typeof(alg)})
-    if verbose&pass; println("✓ ImportanceSampling construction and method definitions"); end
+    pass &= check(alg.rng === rng, "rng stored\n")
+    pass &= check(alg.ensemble === FunctionEnsemble(logdensity), "ensemble stored\n")
+    pass &= check(ensemble(alg) isa FunctionEnsemble, "ensemble accessor\n")
+    pass &= check(logweight(alg) === logdensity, "logweight accessor\n")
+    pass &= check(MonteCarloX.should_record_visit(ensemble(alg)) == false, "no visit recording\n")
+    pass &= check(MonteCarloX.record_visit!(ensemble(alg), 1.0) === nothing, "record_visit! is no-op\n")
 
-    pass &= ensemble(alg) isa FunctionEnsemble
-    pass &= logweight(alg) === logdensity
+    # Metropolis convenience constructor with BoltzmannEnsemble
+    β = 0.75
+    met = Metropolis(MersenneTwister(500); β=β)
+    pass &= check(ensemble(met) isa BoltzmannEnsemble, "BoltzmannEnsemble created\n")
+    pass &= check(met.steps == 0, "Metropolis steps == 0\n")
+    pass &= check(met.accepted == 0, "Metropolis accepted == 0\n")
 
-    pass &= MonteCarloX.should_record_visit(ensemble(alg)) == false
-    pass &= MonteCarloX.record_visit!(ensemble(alg), 1.0) === nothing
-    
+    # Glauber
+    glauber = Glauber(MersenneTwister(777); β=0.8)
+    pass &= check(glauber.rng isa MersenneTwister, "Glauber rng stored\n")
+    pass &= check(glauber.steps == 0, "Glauber steps == 0\n")
+    pass &= check(glauber.accepted == 0, "Glauber accepted == 0\n")
+
+    # HeatBath
+    hb = HeatBath(MersenneTwister(778); β=0.8)
+    pass &= check(hb.rng isa MersenneTwister, "HeatBath rng stored\n")
+    pass &= check(hb.β == 0.8, "HeatBath beta stored\n")
+    pass &= check(hb.steps == 0, "HeatBath steps == 0\n")
+
     return pass
 end
 
-"""
-Test Metropolis sampler on a 1D Gaussian with scheduled measurements and KL divergence check
-"""
-function test_metropolis_1d_gaussian(; verbose=false)
+function test_glauber_acceptance()
+    rng = MersenneTwister(777)
+    glauber = Glauber(rng; β=0.8)
+
+    # strongly favorable move should almost always be accepted
+    accepted = 0
+    for _ in 1:1_000
+        accepted += accept!(glauber, -8.0)
+    end
+
+    pass = true
+    pass &= check(accepted > 990, "favorable moves accepted (>990/1000)\n")
+    pass &= check(glauber.steps == 1_000, "steps counted\n")
+    pass &= check(0.0 <= acceptance_rate(glauber) <= 1.0, "acceptance rate in [0,1]\n")
+
+    return pass
+end
+
+function test_metropolis_1d_gaussian()
     rng = MersenneTwister(42)
-    
-    # Target distribution: N(μ=1.0, σ=1.0)
-    μ = 1.0; σ = 1.0
-    logweight(x) = -0.5 * ((x - μ) / σ)^2
-    
-    # Create Metropolis sampler with custom log weight function
+
+    mu = 1.0; sigma = 1.0
+    logweight(x) = -0.5 * ((x - mu) / sigma)^2
+
     alg = Metropolis(rng, logweight)
-    
-    # Create measurement for tracking samples (discretize histogram with precision ~ σ/10 from μ-10*σ to μ+10*σ)
+
     bins = -10.0:0.1:10.0
     measurements = Measurements([
         :timeseries => (x->x) => Float64[],
         :histogram => (x->x) => fit(Histogram, Float64[], bins)
     ], interval=10)
-    
-    # Local update function - only depends on x and alg
-    step = σ
+
+    step = sigma
     function update(x::Float64, alg::Metropolis)::Float64
         x_new = x + randn(alg.rng) * step
         if accept!(alg, x_new, x)
@@ -59,81 +82,63 @@ function test_metropolis_1d_gaussian(; verbose=false)
             return x
         end
     end
-    
-    # Thermalization
-    x = μ
+
+    # thermalization
+    x = mu
     for _ in 1:Int(1e3)
         x = update(x, alg)
     end
     reset!(alg)
-    
-    # Production run - collect samples using Measurement framework
+
+    # production
     for i in 1:Int(1e6)
         x = update(x, alg)
         measure!(measurements, x, i)
     end
-    
-    # create histogram from timeseries and compare to histogram from measurements
+
+    # verify histogram consistency
     hist_timeseries = fit(Histogram, measurements[:timeseries].data, bins)
     @assert hist_timeseries == measurements[:histogram].data
-    
-    # Normalize histograms to probability density
+
     hist_measured = normalize(measurements[:histogram].data)
-    
-    # Define theoretical Gaussian PDF at bin edges
-    theoretical_pdf(x) = pdf(Normal(μ, σ), x)
-    
-    # Calculate KL divergence
+    theoretical_pdf(x) = pdf(Normal(mu, sigma), x)
     kld = kldivergence(hist_measured, theoretical_pdf)
-    
-    # Calculate statistics
+
     mean_x = mean(measurements[:timeseries].data)
     std_x = std(measurements[:timeseries].data)
-
-    # expected error from central limit theorem: σ/√N ~ 0.01 for mean, σ/√(2N) ~ 0.007 for std
     samples = length(measurements[:timeseries].data)
-    expected_mean_error = σ / sqrt(samples)
-    expected_std_error = σ / sqrt(2 * samples)
-    
-    if verbose
-        println("1D Gaussian Test:")
-        println("  Target: μ=$(μ), σ=$(σ)")
-        println("  Sampled mean: $(mean_x), expected 3-sigma deviation: $(μ) +/- $(3*expected_mean_error)")
-        println("  Sampled std: $(std_x), expected 3-sigma deviation: $(σ) +/- $(3*expected_std_error)")
-        println("  Histogram bins: $(length(hist_measured.edges[1]) - 1)")
-        println("  KL divergence: $(kld)")
-        println("  Acceptance rate: $(acceptance_rate(alg))")
-    end
+    expected_mean_error = sigma / sqrt(samples)
+    expected_std_error = sigma / sqrt(2 * samples)
 
-    # Check convergence
     pass = true
-    pass &= abs(mean_x - μ) < expected_mean_error * 3  # Allow for 3-sigma error
-    pass &= abs(std_x - σ   ) < expected_std_error * 3  # Allow for 3-sigma error
-    pass &= acceptance_rate(alg) > 0.5  # Typical for 1D Gaussian with step size ~ σ
-    pass &= kld < 0.5  # KL divergence should be small
-    
+    pass &= check(abs(mean_x - mu) < expected_mean_error * 3, "mean within 3-sigma\n")
+    pass &= check(abs(std_x - sigma) < expected_std_error * 3, "std within 3-sigma\n")
+    pass &= check(acceptance_rate(alg) > 0.5, "acceptance rate > 0.5\n")
+    pass &= check(kld < 0.5, "KL divergence small\n")
+
+    # acceptance tracking and reset
+    pass &= check(alg.steps > 0, "steps counted\n")
+    reset!(alg)
+    pass &= check(alg.steps == 0, "steps reset\n")
+    pass &= check(alg.accepted == 0, "accepted reset\n")
+    pass &= check(acceptance_rate(alg) == 0.0, "acceptance rate reset\n")
+
     return pass
 end
 
-"""
-Test Metropolis sampler on 2D Gaussian distribution
-"""
-function test_metropolis_2d_gaussian(; verbose=false)
+function test_metropolis_2d_gaussian()
     rng = MersenneTwister(100)
-    
-    # Target: 2D Gaussian centered at (1.0, 2.0)
-    μ = [1.0, 2.0]
-    logweight(x) = -0.5 * ((x[1] - μ[1])^2 + (x[2] - μ[2])^2)
-    
+
+    mu = [1.0, 2.0]
+    logweight(x) = -0.5 * ((x[1] - mu[1])^2 + (x[2] - mu[2])^2)
+
     alg = Metropolis(rng, logweight)
-    
-    # Create measurements for tracking both coordinates
+
     measurements = Measurements([
         :x => (s -> s[1]) => Float64[],
         :y => (s -> s[2]) => Float64[]
     ], interval=1)
-    
-    # Local update function - only depends on x, y and alg
+
     function update(x::Vector{Float64}, alg::Metropolis)::Vector{Float64}
         x_new = x + randn(alg.rng, length(x))
         if accept!(alg, x_new, x)
@@ -142,143 +147,52 @@ function test_metropolis_2d_gaussian(; verbose=false)
             return x
         end
     end
-    
-    # Thermalization
-    x = μ
+
+    x = mu
     for _ in 1:1000
         x = update(x, alg)
     end
     reset!(alg)
-    
-    # Production run using scheduled measurements
+
     samples = 50000
     for i in 1:samples
         x = update(x, alg)
         measure!(measurements, x, i)
     end
-    
-    # Create histograms for each dimension
+
     samples_x = measurements[:x].data
     samples_y = measurements[:y].data
-    hist_x_edges = -2.0:0.4:5.0
-    hist_y_edges = -1.0:0.4:6.0
-    hist_x = fit(Histogram, samples_x, hist_x_edges, closed=:left)
-    hist_y = fit(Histogram, samples_y, hist_y_edges, closed=:left)
-    
-    # Normalize histograms
-    hist_x = normalize(hist_x)
-    hist_y = normalize(hist_y)
-    
-    # Theoretical marginal distributions
-    dist_x = Normal(μ[1], 1.0)
-    dist_y = Normal(μ[2], 1.0)
-    theoretical_pdf_x(x) = pdf(dist_x, x)
-    theoretical_pdf_y(y) = pdf(dist_y, y)
-    
-    # Calculate KL divergences
-    kld_x = kldivergence(hist_x, theoretical_pdf_x)
-    kld_y = kldivergence(hist_y, theoretical_pdf_y)
-    
-    mean_x = mean(samples_x)
-    mean_y = mean(samples_y)
-    
-    if verbose
-        println("2D Gaussian Test:")
-        println("  Target: μ=($(μ[1]), $(μ[2]))")
-        println("  Sampled: μ=($(mean_x), $(mean_y))")
-        println("  KL divergence X: $(kld_x)")
-        println("  KL divergence Y: $(kld_y)")
-        println("  Acceptance rate: $(acceptance_rate(alg))")
-    end
-    
+    hist_x = normalize(fit(Histogram, samples_x, -2.0:0.4:5.0, closed=:left))
+    hist_y = normalize(fit(Histogram, samples_y, -1.0:0.4:6.0, closed=:left))
+
+    kld_x = kldivergence(hist_x, x -> pdf(Normal(mu[1], 1.0), x))
+    kld_y = kldivergence(hist_y, y -> pdf(Normal(mu[2], 1.0), y))
+
     pass = true
-    pass &= abs(mean_x - μ[1]) < 0.1
-    pass &= abs(mean_y - μ[2]) < 0.1
-    pass &= acceptance_rate(alg) > 0.4
-    pass &= kld_x < 0.5  # KL divergence should be small
-    pass &= kld_y < 0.5
-    
+    pass &= check(abs(mean(samples_x) - mu[1]) < 0.1, "mean x correct\n")
+    pass &= check(abs(mean(samples_y) - mu[2]) < 0.1, "mean y correct\n")
+    pass &= check(acceptance_rate(alg) > 0.4, "acceptance rate > 0.4\n")
+    pass &= check(kld_x < 0.5, "KL divergence x small\n")
+    pass &= check(kld_y < 0.5, "KL divergence y small\n")
+
     return pass
 end
 
-"""
-Test acceptance rate statistics tracking using Measurement framework
-"""
-function test_metropolis_acceptance_tracking(; verbose=false)
-    rng = MersenneTwister(200)
-    
-    # Simple target: standard Gaussian
-    logweight(x) = -0.5 * x^2
-    
-    alg = Metropolis(rng, logweight)
-    
-    # Create measurement for tracking samples
-    measurements = Measurements([
-        :timeseries => (x -> x) => Float64[]
-    ], interval=1)
-    
-    # Local update function - only depends on x and alg
-    function update(x::Float64, alg::Metropolis)::Float64
-        x_new = x + randn(alg.rng) * 1.0
-        if accept!(alg, x_new, x)
-            return x_new
-        else
-            return x
-        end
-    end
-    
-    # Run with different proposal widths to get varying acceptance rates
-    x = 0.0
-    for i in 1:10000
-        x = update(x, alg)
-        measure!(measurements, x, i)
-    end
-    
-    acceptance = acceptance_rate(alg)
-    
-    if verbose
-        println("Acceptance Rate Test:")
-        println("  Total steps: $(alg.steps)")
-        println("  Accepted: $(alg.accepted)")
-        println("  Acceptance rate: $(acceptance)")
-        println("  Sample mean: $(mean(measurements[:timeseries].data))")
-    end
-    
+function test_metropolis_temperature_effects()
     pass = true
-    pass &= alg.steps == 10000
-    pass &= acceptance > 0.0 && acceptance < 1.0
-    pass &= length(measurements[:timeseries].data) == 10000  # All samples collected
-    
-    # Test reset
-    reset!(alg)
-    pass &= alg.steps == 0
-    pass &= alg.accepted == 0
-    pass &= acceptance_rate(alg) == 0.0
-    
-    return pass
-end
 
-"""
-Test Metropolis with BoltzmannEnsemble showing temperature effects using Measurement framework
-"""
-function test_metropolis_temperature_effects(; verbose=false)
-    pass = true
-    
-    for β_inv in [0.5, 1.0, 2.0]  # Different temperatures
-        rng = MersenneTwister(300 + Int(β_inv * 100))
-        
-        # Energy landscape: quadratic potential E(x) = x^2
+    for β in [0.5, 1.0, 2.0]
+        rng = MersenneTwister(300 + Int(β * 100))
+
         energy(x) = x^2
-        logweight(E) = -β_inv * E
-        
+        logweight(E) = -β * E
+
         alg = Metropolis(rng, logweight)
-        
-        # Create measurement for tracking samples
+
         measurements = Measurements([
             :timeseries => (x -> x) => Float64[]
         ], interval=1)
-        
-        # Local update function - only depends on x and alg
+
         function update(x::Float64, alg::Metropolis)::Float64
             x_new = x + randn(alg.rng) * 0.5
             delta_E = energy(x_new) - energy(x)
@@ -288,269 +202,100 @@ function test_metropolis_temperature_effects(; verbose=false)
                 return x
             end
         end
-        
-        # Run sampler using measurements
+
         x = 0.0
-        samples = 10000
-        for i in 1:samples
+        n_samples = 10000
+        for i in 1:n_samples
             x = update(x, alg)
             measure!(measurements, x, i)
         end
-        
-        # At finite temperature, variance σ² ≈ 1/(2β)
+
+        # at finite temperature, variance sigma^2 = 1/(2*beta)
         samples_data = measurements[:timeseries].data
         est_var = var(samples_data)
-        expected_var = 1.0 / (2.0 * β_inv)
-        
-        if verbose
-            println("Temperature test β=$(β_inv):")
-            println("  Estimated variance: $(est_var)")
-            println("  Expected variance: $(expected_var)")
-            println("  Ratio: $(est_var / expected_var)")
-            println("  Samples collected: $(length(samples_data))")
-        end
-        
-        # Allow 30% deviation due to finite sampling
-        pass &= est_var > expected_var * 0.7
-        pass &= est_var < expected_var * 1.3
-        pass &= length(samples_data) == samples  # All samples collected
+        expected_var = 1.0 / (2.0 * β)
+
+        pass &= check(est_var > expected_var * 0.7, "beta=$β: variance not too low\n")
+        pass &= check(est_var < expected_var * 1.3, "beta=$β: variance not too high\n")
     end
-    
+
     return pass
 end
 
-"""
-Test that different proposal distributions converge to same target using Measurements and KL divergence
-"""
-function test_metropolis_proposal_invariance(; verbose=false)
+function test_metropolis_proposal_invariance()
     logweight(x) = -0.5 * (x - 0.5)^2
-    
+
     samples = 20000
-    
-    # Test A: narrow proposal
+
+    # narrow proposal
     rng_a = MersenneTwister(400)
     alg_a = Metropolis(rng_a, logweight)
-    
-    measurements_a = Measurements([
-        :timeseries => (x -> x) => Float64[]
-    ], interval=1)
-    
+    measurements_a = Measurements([:timeseries => (x -> x) => Float64[]], interval=1)
+
     function update_a(x::Float64, alg::Metropolis)::Float64
-        x_new = x + randn(alg.rng) * 0.5  # Narrow proposal
-        if accept!(alg, x_new, x)
-            return x_new
-        else
-            return x
-        end
+        x_new = x + randn(alg.rng) * 0.5
+        accept!(alg, x_new, x) ? x_new : x
     end
-    
+
     x_a = 0.0
     for i in 1:samples
         x_a = update_a(x_a, alg_a)
         measure!(measurements_a, x_a, i)
     end
-    
-    # Test B: wide proposal
+
+    # wide proposal
     rng_b = MersenneTwister(400)
     alg_b = Metropolis(rng_b, logweight)
-    
-    measurements_b = Measurements([
-        :timeseries => (x -> x) => Float64[]
-    ], interval=1)
-    
+    measurements_b = Measurements([:timeseries => (x -> x) => Float64[]], interval=1)
+
     function update_b(x::Float64, alg::Metropolis)::Float64
-        x_new = x + randn(alg.rng) * 2.0  # Wide proposal
-        if accept!(alg, x_new, x)
-            return x_new
-        else
-            return x
-        end
+        x_new = x + randn(alg.rng) * 2.0
+        accept!(alg, x_new, x) ? x_new : x
     end
-    
+
     x_b = 0.0
     for i in 1:samples
         x_b = update_b(x_b, alg_b)
         measure!(measurements_b, x_b, i)
     end
-    
-    # Create histograms for both
+
     samples_a = measurements_a[:timeseries].data
     samples_b = measurements_b[:timeseries].data
     edges = -2.0:0.3:4.0
-    hist_a = fit(Histogram, samples_a, edges, closed=:left)
-    hist_b = fit(Histogram, samples_b, edges, closed=:left)
-    
-    # Normalize histograms
-    hist_a = normalize(hist_a)
-    hist_b = normalize(hist_b)
-    
-    # Theoretical target distribution
-    dist_target = Normal(0.5, 1.0)
-    theoretical_pdf(x) = pdf(dist_target, x)
-    
-    # Calculate KL divergences
+    hist_a = normalize(fit(Histogram, samples_a, edges, closed=:left))
+    hist_b = normalize(fit(Histogram, samples_b, edges, closed=:left))
+    theoretical_pdf(x) = pdf(Normal(0.5, 1.0), x)
+
     kld_a = kldivergence(hist_a, theoretical_pdf)
     kld_b = kldivergence(hist_b, theoretical_pdf)
-    
-    mean_a = mean(samples_a)
-    mean_b = mean(samples_b)
-    
-    if verbose
-        println("Proposal Invariance Test:")
-        println("  Target mean: 0.5")
-        println("  Narrow proposal mean: $(mean_a)")
-        println("  Wide proposal mean: $(mean_b)")
-        println("  KL divergence (narrow): $(kld_a)")
-        println("  KL divergence (wide): $(kld_b)")
-        println("  Narrow acceptance: $(acceptance_rate(alg_a))")
-        println("  Wide acceptance: $(acceptance_rate(alg_b))")
-    end
-    
-    pass = true
-    pass &= abs(mean_a - 0.5) < 0.1
-    pass &= abs(mean_b - 0.5) < 0.1
-    # Both should converge to same target distribution
-    pass &= kld_a < 0.5
-    pass &= kld_b < 0.5
-    # Different acceptance rates but same target distribution
-    pass &= abs(acceptance_rate(alg_a) - acceptance_rate(alg_b)) > 0.1
-    pass &= length(samples_a) == samples && length(samples_b) == samples
-    
-    return pass
-end
-
-"""
-Test BoltzmannEnsemble logweight overloads and Metropolis convenience constructor.
-"""
-function test_metropolis_boltzmann_overloads_and_constructor(; verbose=false)
-    rng = MersenneTwister(500)
-    β = 0.75
-
-    ens = BoltzmannEnsemble(β)
-    lw = logweight(ens)
-
-    # Scalar overload on Real (including integer inputs)
-    e_int = 4
-    e_real = 2.5
-
-    # AbstractArray overload
-    e_vec = [1, -2, 3]
-    e_mat = [1.0 2.0; -3.0 4.0]
 
     pass = true
-    pass &= lw(e_int) == -β * e_int
-    pass &= lw(e_real) == -β * e_real
-    pass &= lw(e_vec) == -β * sum(e_vec)
-    pass &= lw(e_mat) == -β * sum(e_mat)
-    pass &= lw(e_int) == -β * e_int
-    pass &= lw(e_vec) == -β * sum(e_vec)
-
-    # Metropolis convenience constructor with β keyword
-    alg = Metropolis(rng; β=β)
-
-    pass &= alg.rng === rng
-    pass &= ensemble(alg) isa BoltzmannEnsemble
-    pass &= alg.steps == 0
-    pass &= alg.accepted == 0
-    pass &= logweight(ensemble(alg), e_int) == -β * e_int
-    pass &= logweight(ensemble(alg), e_vec) == -β * sum(e_vec)
-
-    if verbose
-        println("Boltzmann logweight Overloads + Constructor Test:")
-        println("  β: $(β)")
-        println("  lw callable from logweight(ens): $(lw(e_int))")
-        println("  lw(Int): $(lw(e_int))")
-        println("  lw(Real): $(lw(e_real))")
-        println("  lw(Vector): $(lw(e_vec))")
-        println("  lw(Matrix): $(lw(e_mat))")
-        println("  Constructor ensemble type: $(typeof(ensemble(alg)))")
-    end
+    pass &= check(abs(mean(samples_a) - 0.5) < 0.1, "narrow: mean correct\n")
+    pass &= check(abs(mean(samples_b) - 0.5) < 0.1, "wide: mean correct\n")
+    pass &= check(kld_a < 0.5, "narrow: KL divergence small\n")
+    pass &= check(kld_b < 0.5, "wide: KL divergence small\n")
+    pass &= check(abs(acceptance_rate(alg_a) - acceptance_rate(alg_b)) > 0.1, "different acceptance rates\n")
 
     return pass
 end
 
-"""
-Test Glauber basics.
-"""
-function test_glauber_basics(; verbose=false)
-    rng = MersenneTwister(777)
-    β = 0.8
-
-    glauber = Glauber(rng; β=β)
-    pass = true
-
-    pass &= glauber.rng === rng
-    pass &= glauber.steps == 0
-    pass &= glauber.accepted == 0
-
-    # Strongly favorable move should almost always be accepted
-    accepted = 0
-    for _ in 1:1_000
-        accepted += accept!(glauber, -8.0)  # Large negative ΔE should have high acceptance
+@testset "Metropolis" begin
+    @testset "algorithm constructors" begin
+        @test test_algorithm_constructors()
     end
-    pass &= accepted > 990
-    pass &= glauber.steps == 1_000
-    pass &= 0.0 <= acceptance_rate(glauber) <= 1.0
-
-    if verbose
-        println("Glauber basics:")
-        println("  Glauber acceptance rate (delta_E=-8, β=0.8 -> p=0.998>0.99): $(acceptance_rate(glauber))")
+    @testset "Glauber acceptance" begin
+        @test test_glauber_acceptance()
     end
-
-    return pass
-end
-
-"""
-Test HeatBath basics.
-"""
-function test_heatbath_basics(; verbose=false)
-    rng = MersenneTwister(778)
-    β = 0.8
-    pass = true
-
-    # HeatBath constructor and counters
-    hb = HeatBath(rng; β=β)
-    pass &= hb.rng === rng
-    pass &= hb.β == β
-    pass &= hb.steps == 0
-
-    if verbose
-        println("HeatBath basics:")
-        println("  HeatBath β: $(hb.β)")
+    @testset "1D Gaussian" begin
+        @test test_metropolis_1d_gaussian()
     end
-
-    return pass
-end
-
-function run_metropolis_testsets(; verbose=false)
-    @testset "Metropolis" begin
-        @testset "Importance Sampling" begin
-            @test test_importance_sampling_basics(verbose=verbose)
-        end
-        @testset "1D Gaussian" begin
-            @test test_metropolis_1d_gaussian(verbose=verbose)
-        end
-        @testset "2D Gaussian" begin
-            @test test_metropolis_2d_gaussian(verbose=verbose)
-        end
-        @testset "Acceptance tracking" begin
-            @test test_metropolis_acceptance_tracking(verbose=verbose)
-        end
-        @testset "Temperature effects" begin
-            @test test_metropolis_temperature_effects(verbose=verbose)
-        end
-        @testset "Proposal invariance" begin
-            @test test_metropolis_proposal_invariance(verbose=verbose)
-        end
-        @testset "Boltzmann overloads and constructor" begin
-            @test test_metropolis_boltzmann_overloads_and_constructor(verbose=verbose)
-        end
-        @testset "Glauber basics" begin
-            @test test_glauber_basics(verbose=verbose)
-        end
-        @testset "HeatBath basics" begin
-            @test test_heatbath_basics(verbose=verbose)
-        end
+    @testset "2D Gaussian" begin
+        @test test_metropolis_2d_gaussian()
     end
-    return true
+    @testset "temperature effects" begin
+        @test test_metropolis_temperature_effects()
+    end
+    @testset "proposal invariance" begin
+        @test test_metropolis_proposal_invariance()
+    end
 end

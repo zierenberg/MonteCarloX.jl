@@ -50,7 +50,7 @@ alg = Metropolis(Random.default_rng(), logposterior)
 alg = Metropolis(Random.default_rng(), x -> -0.5 * x^2)
 
 # Create with a weight object
-ens = BoltzmannEnsemble(1.5)
+ens = BoltzmannEnsemble(β=1.5)
 alg = Metropolis(Random.default_rng(), ens)
 ```
 
@@ -92,8 +92,8 @@ This is a convenience constructor for the canonical ensemble.
 # Keyword Arguments
 - `β::Real`: Inverse temperature (β = 1/k_B T)
 """
-Metropolis(rng::AbstractRNG; β::Real) = 
-    Metropolis(rng, BoltzmannEnsemble(β))
+Metropolis(rng::AbstractRNG; β::Real) =
+    Metropolis(rng, BoltzmannEnsemble(β=β))
 
 """
     Glauber <: AbstractMetropolis
@@ -116,7 +116,7 @@ Glauber(rng::AbstractRNG, ensemble) =
     Glauber(rng, _as_ensemble(ensemble), 0, 0)
 
 Glauber(rng::AbstractRNG; β::Real) =
-    Glauber(rng, BoltzmannEnsemble(β))
+    Glauber(rng, BoltzmannEnsemble(β=β))
 
 function accept!(alg::Glauber, delta_state::Real)
     log_ratio = logweight(ensemble(alg), delta_state)

@@ -5,186 +5,61 @@ using Random
 
 struct UnsupportedContainer end
 
-function test_preallocated_schedule_constructor(; verbose=false)
-    times = [3.0, 1.0, 2.0]
-    schedule = PreallocatedSchedule(times)
-
+function test_measurement_constructors()
     pass = true
-    pass &= schedule.times == [1.0, 2.0, 3.0]
-    pass &= schedule.checkpoint_idx == 1
 
-    if verbose
-        println("PreallocatedSchedule constructor test pass: $(pass)")
-    end
-
-    return pass
-end
-
-function test_measurement_pair_constructor(; verbose=false)
+    # Measurement from pair
     m = Measurement((s -> s^2) => Float64[])
-
-    pass = true
-    pass &= m isa Measurement
+    pass &= check(m isa Measurement, "Measurement from pair\n")
     measure!(m, 3.0)
-    pass &= m.data == [9.0]
+    pass &= check(m.data == [9.0], "measure! applies observable\n")
 
-    if verbose
-        println("Measurement(pair) constructor test pass: $(pass)")
-    end
-
-    return pass
-end
-
-function test_measurements_interval_constructors(; verbose=false)
-    dict_measurements = Dict{Symbol, Measurement}(
-        :x => Measurement((s -> s), Float64[]),
-        :y => Measurement((s -> 2s), Float64[]),
+    # Measurements from pairs + interval
+    m_interval = Measurements(
+        [:x => ((s -> s) => Float64[]), :y => ((s -> 2s) => Float64[])];
+        interval = 0.5,
     )
-    m_dict = Measurements(dict_measurements; interval = 0.5)
+    pass &= check(m_interval.schedule isa IntervalSchedule, "IntervalSchedule\n")
+    pass &= check(m_interval.schedule.interval == 0.5, "interval == 0.5\n")
+    pass &= check(m_interval.schedule._checkpoint == 0.0, "checkpoint == 0.0\n")
+    pass &= check(haskey(m_interval.measurements, :x), "has :x\n")
+    pass &= check(haskey(m_interval.measurements, :y), "has :y\n")
 
-    pairs = [
-        :x => ((s -> s) => Float64[]),
-        :y => ((s -> 2s) => Float64[]),
-    ]
-    m_pairs = Measurements(pairs; interval = 0.25)
-
-    pass = true
-    pass &= m_dict.schedule isa IntervalSchedule
-    pass &= m_dict.schedule.interval == 0.5
-    pass &= m_dict.schedule._checkpoint == 0.0
-
-    pass &= m_pairs.schedule isa IntervalSchedule
-    pass &= m_pairs.schedule.interval == 0.25
-    pass &= haskey(m_pairs.measurements, :x)
-    pass &= haskey(m_pairs.measurements, :y)
-
-    if verbose
-        println("Measurements interval constructors test pass: $(pass)")
-    end
+    # Measurements from pairs + preallocated times (verifies sorting)
+    m_pre = Measurements([:x => ((s -> s) => Float64[])], [3, 1, 2])
+    pass &= check(m_pre.schedule isa PreallocatedSchedule, "PreallocatedSchedule\n")
+    pass &= check(m_pre.schedule.times == [1.0, 2.0, 3.0], "times sorted\n")
+    pass &= check(m_pre.schedule.checkpoint_idx == 1, "checkpoint_idx == 1\n")
 
     return pass
 end
 
-function test_measurements_dict_preallocated_constructor(; verbose=false)
-    measurements = Dict{Symbol, Measurement}(
-        :x => Measurement((s -> s), Float64[]),
-        :y => Measurement((s -> 2s), Float64[]),
-    )
-    times = [3, 1, 2]
-
-    m = Measurements(measurements, times)
-
-    pass = true
-    pass &= m.schedule isa PreallocatedSchedule
-    pass &= m.schedule.times == [1.0, 2.0, 3.0]
-    pass &= m.schedule.checkpoint_idx == 1
-
-    if verbose
-        println("Measurements(dict, times) constructor test pass: $(pass)")
-    end
-
-    return pass
-end
-
-function test_measurements_pairs_preallocated_constructor(; verbose=false)
-    pairs = [
-        :x => ((s -> s) => Float64[]),
-        :y => ((s -> 2s) => Float64[]),
-    ]
-    times = [2, 1, 3]
-
-    m = Measurements(pairs, times)
-
-    pass = true
-    pass &= m.schedule isa PreallocatedSchedule
-    pass &= m.schedule.times == [1.0, 2.0, 3.0]
-    pass &= haskey(m.measurements, :x)
-    pass &= haskey(m.measurements, :y)
-    pass &= m[:x] isa Measurement
-    pass &= m[:y] isa Measurement
-
-    if verbose
-        println("Measurements(pairs, times) constructor test pass: $(pass)")
-    end
-
-    return pass
-end
-
-function test_measurements_setindex(; verbose=false)
+function test_measurements_interval_behavior()
     m = Measurements(
-        Dict{Symbol, Measurement}(:x => Measurement((s -> s), Float64[])),
-        [1.0, 2.0]
-    )
-
-    replacement = Measurement((s -> 3s), Float64[])
-    m[:x] = replacement
-
-    pass = true
-    pass &= m[:x] === replacement
-    pass &= m.measurements[:x] === replacement
-
-    if verbose
-        println("Measurements setindex! test pass: $(pass)")
-    end
-
-    return pass
-end
-
-function test_measurements_accessors(; verbose=false)
-    m = Measurements(
-        [
-            :x => ((s -> s) => Float64[]),
-        ],
-        [1.0, 2.0, 3.0],
-    )
-
-    measure!(m, 7.0, 1.1)
-    measure!(m, 9.0, 3.2)
-
-    pass = true
-    pass &= times(m) == [1.0, 2.0, 3.0]
-    pass &= data(m, :x) == [7.0, 9.0, 9.0]
-
-    if verbose
-        println("Measurements accessor API test pass: $(pass)")
-    end
-
-    return pass
-end
-
-function test_measurements_interval_cadence(; verbose=false)
-    m = Measurements(
-        [
-            :x => ((s -> s) => Float64[]),
-        ],
+        [:x => ((s -> s) => Float64[])],
         interval = 1.0,
     )
 
     pass = true
 
-    # below first checkpoint (0.0) does not measure
     measure!(m, 5.0, -0.1)
-    pass &= isempty(m[:x].data)
-    pass &= m.schedule._checkpoint == 0.0
+    pass &= check(isempty(m[:x].data), "below first checkpoint: no measurement\n")
+    pass &= check(m.schedule._checkpoint == 0.0, "checkpoint unchanged\n")
 
-    # exactly at checkpoint measures once
     measure!(m, 7.0, 0.0)
-    pass &= m[:x].data == [7.0]
-    pass &= m.schedule._checkpoint == 1.0
+    pass &= check(m[:x].data == [7.0], "at checkpoint: one measurement\n")
+    pass &= check(m.schedule._checkpoint == 1.0, "checkpoint advanced\n")
 
-    # if t jumps, interval schedule still measures at most once per call
     measure!(m, 9.0, 3.5)
-    pass &= m[:x].data == [7.0, 9.0]
-    pass &= m.schedule._checkpoint == 2.0
+    pass &= check(m[:x].data == [7.0, 9.0], "jump: still one measurement per call\n")
+    pass &= check(m.schedule._checkpoint == 2.0, "checkpoint advanced after jump\n")
 
-    if verbose
-        println("Measurements interval cadence test pass: $(pass)")
-    end
+    pass &= check(is_complete(m) == false, "interval schedule never complete\n")
 
     return pass
 end
 
-function test_measurements_preallocated_measure_event_skipping(; verbose=false)
+function test_measurements_preallocated_behavior()
     m = Measurements(
         [
             :x => ((s -> s) => Float64[]),
@@ -193,129 +68,54 @@ function test_measurements_preallocated_measure_event_skipping(; verbose=false)
         [1.0, 2.0, 3.0]
     )
 
-    # Skip over first two checkpoints in one call
+    pass = true
+
+    # accessors
+    pass &= check(times(m) == [1.0, 2.0, 3.0], "times accessor\n")
+    pass &= check(is_complete(m) == false, "not complete initially\n")
+
+    # event skipping: t=2.5 covers checkpoints 1 and 2
     measure!(m, 7.0, 2.5)
+    pass &= check(m.schedule.checkpoint_idx == 3, "skipped to checkpoint 3\n")
+    pass &= check(m[:x].data == [7.0, 7.0], "x: two measurements from skip\n")
+    pass &= check(m[:y].data == [14.0, 14.0], "y: two measurements from skip\n")
+    pass &= check(data(m, :x) == [7.0, 7.0], "data accessor\n")
 
-    pass = true
-    pass &= m.schedule.checkpoint_idx == 3
-    pass &= m[:x].data == [7.0, 7.0]
-    pass &= m[:y].data == [14.0, 14.0]
-
-    # Process final checkpoint
+    # final checkpoint
     measure!(m, 9.0, 10.0)
-    pass &= m.schedule.checkpoint_idx == 4
-    pass &= m[:x].data == [7.0, 7.0, 9.0]
-    pass &= m[:y].data == [14.0, 14.0, 18.0]
+    pass &= check(m[:x].data == [7.0, 7.0, 9.0], "x: three measurements\n")
+    pass &= check(is_complete(m) == true, "complete after all checkpoints\n")
 
-    # Further calls after completion should not append data
+    # no append after completion
     measure!(m, 11.0, 20.0)
-    pass &= m[:x].data == [7.0, 7.0, 9.0]
-    pass &= m[:y].data == [14.0, 14.0, 18.0]
+    pass &= check(m[:x].data == [7.0, 7.0, 9.0], "no append after completion\n")
 
-    if verbose
-        println("Measurements preallocated event-skipping test pass: $(pass)")
-    end
+    # setindex!
+    replacement = Measurement((s -> 3s), Float64[])
+    m[:x] = replacement
+    pass &= check(m[:x] === replacement, "setindex! replaces measurement\n")
 
     return pass
 end
 
-function test_measurements_is_complete(; verbose=false)
+function test_measurements_reset()
     pass = true
 
-    # Interval schedule is indefinite by definition
-    m_interval = Measurements(
-        [
-            :x => ((s -> s) => Float64[]),
-        ],
-        interval=1.0
-    )
-    pass &= is_complete(m_interval) == false
-    measure!(m_interval, 1.0, 100.0)
-    pass &= is_complete(m_interval) == false
-
-    # Preallocated schedule is complete once checkpoint index passes times length
-    m_preallocated = Measurements(
-        [
-            :x => ((s -> s) => Float64[]),
-        ],
-        [1.0, 2.0]
-    )
-    pass &= is_complete(m_preallocated) == false
-    measure!(m_preallocated, 5.0, 1.5)
-    pass &= is_complete(m_preallocated) == false
-    measure!(m_preallocated, 6.0, 2.5)
-    pass &= is_complete(m_preallocated) == true
-
-    if verbose
-        println("Measurements is_complete test pass: $(pass)")
-    end
-
-    return pass
-end
-
-function test_measurement_reset_single(; verbose=false)
+    # single Measurement: vector
     m_vec = Measurement((s -> s), Float64[])
     measure!(m_vec, 1.0)
     measure!(m_vec, 2.0)
     reset!(m_vec)
+    pass &= check(isempty(m_vec.data), "vector data cleared\n")
 
+    # single Measurement: histogram
     bins = 0.0:1.0:4.0
     hist = fit(Histogram, [0.2, 1.4, 2.6], bins)
     m_hist = Measurement((s -> s), hist)
     reset!(m_hist)
+    pass &= check(all(iszero, m_hist.data.weights), "histogram weights zeroed\n")
 
-    pass = true
-    pass &= isempty(m_vec.data)
-    pass &= all(iszero, m_hist.data.weights)
-
-    if verbose
-        println("Measurement reset! (single) test pass: $(pass)")
-    end
-
-    return pass
-end
-
-function test_measurement_reset_special_cases(; verbose=false)
-    # schedule reset! returns schedule and restores initial state
-    interval_schedule = IntervalSchedule(0.3)
-    interval_schedule._checkpoint = 1.2
-    preallocated_schedule = PreallocatedSchedule([1.0, 2.0])
-    preallocated_schedule.checkpoint_idx = 3
-
-    pass = true
-    pass &= reset!(interval_schedule) === interval_schedule
-    pass &= interval_schedule._checkpoint == 0.0
-
-    pass &= reset!(preallocated_schedule) === preallocated_schedule
-    pass &= preallocated_schedule.checkpoint_idx == 1
-
-    # supported but non-explicitly-handled container (e.g. empty! method exists but it is not an AbstractVector or Histogram) throws no error and empties container 
-    custom_container = [1, 2, 3]
-    m_custom = Measurement((s -> s), custom_container)
-    pass &= try
-        reset!(m_custom)
-        isempty(custom_container)
-    catch err
-        false
-    end
-
-    # unsupported container throws informative ArgumentError
-    m_bad = Measurement((s -> s), UnsupportedContainer())
-    pass &= try
-        reset!(m_bad)
-        false
-    catch err
-        err isa ArgumentError
-    end
-
-    if verbose
-        println("Measurement reset! special-cases test pass: $(pass)")
-    end
-
-    return pass
-end
-
-function test_measurements_reset_container(; verbose=false)
+    # Measurements with interval schedule
     m_interval = Measurements(
         [
             :x => ((s -> s) => Float64[]),
@@ -325,50 +125,41 @@ function test_measurements_reset_container(; verbose=false)
     )
     measure!(m_interval, 1.0, 0.0)
     measure!(m_interval, 2.0, 1.0)
-    pass = true
-    pass &= m_interval.schedule._checkpoint > 0.0
-    pass &= !isempty(m_interval[:x].data)
-
     reset!(m_interval)
-    pass &= m_interval.schedule._checkpoint == 0.0
-    pass &= isempty(m_interval[:x].data)
-    pass &= all(iszero, m_interval[:h].data.weights)
+    pass &= check(m_interval.schedule._checkpoint == 0.0, "interval checkpoint reset\n")
+    pass &= check(isempty(m_interval[:x].data), "x data cleared\n")
+    pass &= check(all(iszero, m_interval[:h].data.weights), "histogram weights zeroed\n")
 
-    m_preallocated = Measurements(
-        [
-            :x => ((s -> s) => Float64[]),
-        ],
+    # Measurements with preallocated schedule
+    m_pre = Measurements(
+        [:x => ((s -> s) => Float64[])],
         [1.0, 2.0],
     )
-    measure!(m_preallocated, 7.0, 5.0)
-    pass &= m_preallocated.schedule.checkpoint_idx == 3
+    measure!(m_pre, 7.0, 5.0)
+    reset!(m_pre)
+    pass &= check(m_pre.schedule.checkpoint_idx == 1, "preallocated checkpoint_idx reset\n")
+    pass &= check(isempty(m_pre[:x].data), "x data cleared\n")
 
-    reset!(m_preallocated)
-    pass &= m_preallocated.schedule.checkpoint_idx == 1
-    pass &= isempty(m_preallocated[:x].data)
-
-    if verbose
-        println("Measurements reset! (container) test pass: $(pass)")
-    end
+    # unsupported container type
+    m_bad = Measurement((s -> s), UnsupportedContainer())
+    threw = try; reset!(m_bad); false; catch err; err isa ArgumentError; end
+    pass &= check(threw, "unsupported container throws ArgumentError\n")
 
     return pass
 end
 
-function test_tau_int_estimator(; verbose=false)
+function test_tau_int_estimator()
     pass = true
 
-    # Zero-variance signal has no measurable decay structure.
-    pass &= integrated_autocorrelation_time(fill(1.0, 64)) == 0.5
-    pass &= tau_int(fill(1.0, 64)) == 0.5
+    pass &= check(integrated_autocorrelation_time(fill(1.0, 64)) == 0.5, "constant signal tau_int == 0.5\n")
+    pass &= check(tau_int(fill(1.0, 64)) == 0.5, "tau_int alias works\n")
 
     rng = MersenneTwister(123)
 
-    # Weakly correlated white noise should stay near the minimum.
     white = randn(rng, 4_000)
     tau_white = integrated_autocorrelation_time(white)
-    pass &= 0.5 <= tau_white <= 2.0
+    pass &= check(0.5 <= tau_white <= 2.0, "white noise tau_int near 0.5\n")
 
-    # AR(1) benchmark: tau_int = 1/2 + phi/(1-phi) in the long-chain limit.
     phi = 0.8
     n = 6_000
     ar = Vector{Float64}(undef, n)
@@ -379,77 +170,37 @@ function test_tau_int_estimator(; verbose=false)
     end
 
     tau_ar = integrated_autocorrelation_time(ar)
-    pass &= 2.5 <= tau_ar <= 7.0
+    pass &= check(2.5 <= tau_ar <= 7.0, "AR(1) tau_int in expected range\n")
 
-    # Explicit lag cap is accepted and finite.
     tau_capped = integrated_autocorrelation_time(ar; max_lag=50)
-    pass &= isfinite(tau_capped)
-    pass &= tau_capped >= 0.5
+    pass &= check(isfinite(tau_capped), "capped tau_int is finite\n")
+    pass &= check(tau_capped >= 0.5, "capped tau_int >= 0.5\n")
 
-    # max_lag must not exceed floor(n/2).
-    pass &= try
-        integrated_autocorrelation_time(randn(rng, 20); max_lag=11)
-        false
-    catch err
-        err isa ArgumentError
-    end
+    threw = try; integrated_autocorrelation_time(randn(rng, 20); max_lag=11); false
+    catch err; err isa ArgumentError; end
+    pass &= check(threw, "excessive max_lag throws ArgumentError\n")
 
-    # For batch mode, local lag caps < 1 are skipped and reported as NaN.
     tau_batch = integrated_autocorrelation_times([randn(rng, 20)]; min_points=2, max_lag=0)
-    pass &= length(tau_batch) == 1
-    pass &= isnan(tau_batch[1])
-
-    if verbose
-        println("tau_int estimator test pass: $(pass)")
-    end
+    pass &= check(length(tau_batch) == 1, "batch returns one element\n")
+    pass &= check(isnan(tau_batch[1]), "skipped batch entry is NaN\n")
 
     return pass
 end
 
-function run_measurements_testsets(; verbose=false)
-    @testset "Measurements" begin
-        @testset "PreallocatedSchedule constructor" begin
-            @test test_preallocated_schedule_constructor(verbose=verbose)
-        end
-        @testset "Measurement(pair) constructor" begin
-            @test test_measurement_pair_constructor(verbose=verbose)
-        end
-        @testset "Measurements interval constructors" begin
-            @test test_measurements_interval_constructors(verbose=verbose)
-        end
-        @testset "Measurements(dict, times)" begin
-            @test test_measurements_dict_preallocated_constructor(verbose=verbose)
-        end
-        @testset "Measurements(pairs, times)" begin
-            @test test_measurements_pairs_preallocated_constructor(verbose=verbose)
-        end
-        @testset "Measurements setindex!" begin
-            @test test_measurements_setindex(verbose=verbose)
-        end
-        @testset "accessor API" begin
-            @test test_measurements_accessors(verbose=verbose)
-        end
-        @testset "interval cadence" begin
-            @test test_measurements_interval_cadence(verbose=verbose)
-        end
-        @testset "measure! event skipping" begin
-            @test test_measurements_preallocated_measure_event_skipping(verbose=verbose)
-        end
-        @testset "is_complete" begin
-            @test test_measurements_is_complete(verbose=verbose)
-        end
-        @testset "reset! single measurement" begin
-            @test test_measurement_reset_single(verbose=verbose)
-        end
-        @testset "reset! special cases" begin
-            @test test_measurement_reset_special_cases(verbose=verbose)
-        end
-        @testset "reset! measurements container" begin
-            @test test_measurements_reset_container(verbose=verbose)
-        end
-        @testset "tau_int estimator" begin
-            @test test_tau_int_estimator(verbose=verbose)
-        end
+@testset "Measurements" begin
+    @testset "constructors" begin
+        @test test_measurement_constructors()
     end
-    return true
+    @testset "interval behavior" begin
+        @test test_measurements_interval_behavior()
+    end
+    @testset "preallocated behavior" begin
+        @test test_measurements_preallocated_behavior()
+    end
+    @testset "reset!" begin
+        @test test_measurements_reset()
+    end
+    @testset "tau_int estimator" begin
+        @test test_tau_int_estimator()
+    end
 end

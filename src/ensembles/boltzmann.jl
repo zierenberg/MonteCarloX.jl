@@ -6,21 +6,22 @@ Canonical-ensemble score with
 """
 struct BoltzmannEnsemble{T<:Real} <: AbstractEnsemble
     beta::T
-end
 
-function BoltzmannEnsemble(; beta=nothing, β=nothing, T=nothing)
-    if beta !== nothing && β !== nothing
-        throw(ArgumentError("Specify only one of `beta` or `β`"))
-    end
+    function BoltzmannEnsemble(; beta=nothing, β=nothing, T=nothing)
+        if beta !== nothing && β !== nothing
+            throw(ArgumentError("Specify only one of `beta` or `β`"))
+        end
 
-    b = beta === nothing ? β : beta
+        b = beta === nothing ? β : beta
 
-    if (b === nothing) == (T === nothing)
-        throw(ArgumentError("Specify exactly one of `beta`/`β` or `T`"))
-    elseif b !== nothing
-        return BoltzmannEnsemble(b)
-    else
-        return BoltzmannEnsemble(inv(T))
+        if (b === nothing) == (T === nothing)
+            throw(ArgumentError("Specify exactly one of `beta`/`β` or `T`"))
+        elseif b !== nothing
+            return new{typeof(b)}(b)
+        else
+            val = inv(T)
+            return new{typeof(val)}(val)
+        end
     end
 end
 

@@ -25,3 +25,7 @@ abstract type AbstractHeatBath <: AbstractAlgorithm end
 Base type for continuous-time kinetic Monte Carlo algorithms.
 """
 abstract type AbstractKineticMonteCarlo <: AbstractAlgorithm end
+
+function Base.:(==)(a::T, b::T) where {T<:AbstractAlgorithm}
+    all(getfield(a, f) == getfield(b, f) for f in fieldnames(T))
+end

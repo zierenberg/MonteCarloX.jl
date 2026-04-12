@@ -5,6 +5,10 @@ Base type for all ensemble objects.
 """
 abstract type AbstractEnsemble end
 
+function Base.:(==)(a::T, b::T) where {T<:AbstractEnsemble}
+    all(getfield(a, f) == getfield(b, f) for f in fieldnames(T))
+end
+
 @inline _as_ensemble(e::AbstractEnsemble) = e
 @inline _as_ensemble(e) = FunctionEnsemble(e)
 

@@ -3,13 +3,18 @@ using Random
 using StatsBase
 using Test
 
-
-function test_wang_landau_accept(; verbose=false)
-    rng = MersenneTwister(42)
+function test_wang_landau_accept_and_reset()
     pass = true
 
     bins = 0.0:1.0:4.0
     lw = BinnedObject(bins, 0.0)
+
+    # default RNG constructor
+    wl_default = WangLandau(lw; logf=log(2.0))
+    pass &= check(wl_default.rng === Random.GLOBAL_RNG, "default RNG is GLOBAL_RNG\n")
+
+    # accept/reject loop with flat weights
+    rng = MersenneTwister(42)
     alg = WangLandau(rng, lw)
 
     step = 0.1
@@ -22,91 +27,46 @@ function test_wang_landau_accept(; verbose=false)
         end
     end
 
-    # updates
-    x = 2.0  # start in bin 2
+    x = 2.0
     for _ in 1:10
         x = update!(x, alg)
     end
-    
-    # test num_accepts
-    pass &= alg.accepted >= 0 && alg.accepted <= 10
-    # test acceptance rate (between 0 and 1 since log_weight is zero, so acceptance should be 1)
-    pass &= acceptance_rate(alg) >= 0.0 && acceptance_rate(alg) <= 1.0
 
-    # reset
+    pass &= check(alg.accepted >= 0 && alg.accepted <= 10, "accepted in [0, 10]\n")
+    pass &= check(acceptance_rate(alg) >= 0.0 && acceptance_rate(alg) <= 1.0, "acceptance rate in [0, 1]\n")
+
     reset!(alg)
-    pass &= alg.accepted == 0
-    
+    pass &= check(alg.accepted == 0, "accepted reset\n")
+
     return pass
 end
 
-function test_wang_landau_local_update(; verbose=false)
-    rng = MersenneTwister(780)
+function test_wang_landau_update_mechanics()
     pass = true
 
     bins = 0.0:1.0:4.0
     lw = BinnedObject(bins, 0.0)
-    wl = WangLandau(rng, lw; logf=log(2.0))
+    wl = WangLandau(MersenneTwister(780), lw; logf=log(2.0))
 
+    # accept! decrements logweight by logf
     x = 1.2
     w0 = lw[x]
-    pass &= accept!(wl, x, x) == true
+    pass &= check(accept!(wl, x, x) == true, "self-move accepted\n")
+    pass &= check(lw[x] == w0 - ensemble(wl).logf, "weight updated by logf\n")
 
-    pass &= lw[x] == w0 - ensemble(wl).logf
-
-    if verbose
-        println("Wang-Landau local update:")
-        println("  weight before: $(w0), after: $(lw[x])")
-    end
-
-    return pass
-end
-
-function test_wang_landau_update_f(; verbose=false)
-    rng = MersenneTwister(781)
-
-    bins = 0.0:1.0:4.0
-    lw = BinnedObject(bins, 0.0)
-    wl = WangLandau(rng, lw; logf=1.0)
-
+    # update! halves logf
     logf0 = ensemble(wl).logf
-    pass = update!(ensemble(wl)) === nothing && ensemble(wl).logf == 0.5 * logf0
-
-    if verbose
-        println("Wang-Landau schedule update!: logf0=$(logf0), logf1=$(ensemble(wl).logf)")
-    end
+    pass &= check(update!(ensemble(wl)) === nothing, "update! returns nothing\n")
+    pass &= check(ensemble(wl).logf == 0.5 * logf0, "logf halved\n")
 
     return pass
 end
 
-function test_wang_landau_default_rng(; verbose=false)
-    bins = 0.0:1.0:4.0
-    lw = BinnedObject(bins, 0.0)
-    wl = WangLandau(lw; logf=log(2.0))
-
-    pass = wl.rng === Random.GLOBAL_RNG
-
-    if verbose
-        println("Wang-Landau default RNG: $(pass)")
+@testset "Wang-Landau" begin
+    @testset "accept and reset" begin
+        @test test_wang_landau_accept_and_reset()
     end
-
-    return pass
-end
-
-function run_wang_landau_testsets(; verbose=false)
-    @testset "Wang-Landau" begin
-        @testset "Accept/reject" begin
-            @test test_wang_landau_accept(verbose=verbose)
-        end
-        @testset "Local update" begin
-            @test test_wang_landau_local_update(verbose=verbose)
-        end
-        @testset "Update f" begin
-            @test test_wang_landau_update_f(verbose=verbose)
-        end
-        @testset "Default RNG" begin
-            @test test_wang_landau_default_rng(verbose=verbose)
-        end
+    @testset "update mechanics" begin
+        @test test_wang_landau_update_mechanics()
     end
-    return true
 end
