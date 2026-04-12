@@ -3,12 +3,18 @@ using Random
 using StatsBase
 using Test
 
-function test_wang_landau_accept()
-    rng = MersenneTwister(42)
+function test_wang_landau_accept_and_reset()
     pass = true
 
     bins = 0.0:1.0:4.0
     lw = BinnedObject(bins, 0.0)
+
+    # default RNG constructor
+    wl_default = WangLandau(lw; logf=log(2.0))
+    pass &= check(wl_default.rng === Random.GLOBAL_RNG, "default RNG is GLOBAL_RNG\n")
+
+    # accept/reject loop with flat weights
+    rng = MersenneTwister(42)
     alg = WangLandau(rng, lw)
 
     step = 0.1
@@ -35,58 +41,32 @@ function test_wang_landau_accept()
     return pass
 end
 
-function test_wang_landau_local_update()
-    rng = MersenneTwister(780)
+function test_wang_landau_update_mechanics()
     pass = true
 
     bins = 0.0:1.0:4.0
     lw = BinnedObject(bins, 0.0)
-    wl = WangLandau(rng, lw; logf=log(2.0))
+    wl = WangLandau(MersenneTwister(780), lw; logf=log(2.0))
 
+    # accept! decrements logweight by logf
     x = 1.2
     w0 = lw[x]
     pass &= check(accept!(wl, x, x) == true, "self-move accepted\n")
     pass &= check(lw[x] == w0 - ensemble(wl).logf, "weight updated by logf\n")
 
-    return pass
-end
-
-function test_wang_landau_update_f()
-    rng = MersenneTwister(781)
-
-    bins = 0.0:1.0:4.0
-    lw = BinnedObject(bins, 0.0)
-    wl = WangLandau(rng, lw; logf=1.0)
-
+    # update! halves logf
     logf0 = ensemble(wl).logf
-    pass = true
     pass &= check(update!(ensemble(wl)) === nothing, "update! returns nothing\n")
     pass &= check(ensemble(wl).logf == 0.5 * logf0, "logf halved\n")
 
     return pass
 end
 
-function test_wang_landau_default_rng()
-    bins = 0.0:1.0:4.0
-    lw = BinnedObject(bins, 0.0)
-    wl = WangLandau(lw; logf=log(2.0))
-
-    pass = check(wl.rng === Random.GLOBAL_RNG, "default RNG is GLOBAL_RNG\n")
-
-    return pass
-end
-
 @testset "Wang-Landau" begin
-    @testset "Accept/reject" begin
-        @test test_wang_landau_accept()
+    @testset "accept and reset" begin
+        @test test_wang_landau_accept_and_reset()
     end
-    @testset "Local update" begin
-        @test test_wang_landau_local_update()
-    end
-    @testset "Update f" begin
-        @test test_wang_landau_update_f()
-    end
-    @testset "Default RNG" begin
-        @test test_wang_landau_default_rng()
+    @testset "update mechanics" begin
+        @test test_wang_landau_update_mechanics()
     end
 end

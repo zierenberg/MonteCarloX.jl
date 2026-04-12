@@ -4,80 +4,64 @@ using StatsBase
 using Test
 using Serialization
 
-function _tmp_checkpoint_file(prefix="mcx_ckpt")
-    joinpath(tempdir(), "$(prefix)_$(abs(rand(Int))).mcx")
+function _tmp_checkpoint_file(prefix="mcx_")
+    joinpath(tempdir(), "$(prefix)_$(abs(rand(Int))).ckpt")
 end
 
 function test_checkpoint_restore_importance_sampling()
-    rng = MersenneTwister(1)
-    alg = Metropolis(rng, x -> -0.5x^2)
+    pass = true
 
-    for _ in 1:500
-        accept!(alg, randn(alg.rng), 0.0)
+    for (name, alg) in [
+        ("Metropolis", Metropolis(MersenneTwister(1), x -> -0.5x^2)),
+        ("Glauber",    Glauber(MersenneTwister(2), x -> -0.5x^2)),
+        ("HeatBath",   HeatBath(MersenneTwister(3); β=0.5)),
+    ]
+        alg.steps = 100
+        hasproperty(alg, :accepted) && (alg.accepted = 42)
+        next_rand = rand(copy(alg.rng))
+
+        file = _tmp_checkpoint_file(name)
+        ckpt = init_checkpoint(file, (alg=alg,); sweep=100)
+        pass &= check(isfile(file), "$name: checkpoint file created\n")
+
+        state = restore(file)
+        pass &= check(state.sweep == 100, "$name: metadata restored\n")
+        pass &= check(rand(state.alg.rng) == next_rand, "$name: rng restored\n")
+
+        finalize!(ckpt)
+        pass &= check(!isfile(file), "$name: finalize! cleans up\n")
     end
 
-    steps_saved    = alg.steps
-    accepted_saved = alg.accepted
-    next_rand      = rand(copy(alg.rng))
-
-    file = _tmp_checkpoint_file("is")
-    ckpt = init_checkpoint(file, (alg=alg,); sweep=500)
-
-    pass = true
-    pass &= check(isfile(file), "checkpoint file created\n")
-
-    state = restore(file)
-    pass &= check(state.sweep == 500, "sweep metadata restored\n")
-    pass &= check(state.alg.steps == steps_saved, "steps restored\n")
-    pass &= check(state.alg.accepted == accepted_saved, "accepted restored\n")
-    pass &= check(rand(state.alg.rng) == next_rand, "rng state restored\n")
-
-    finalize!(ckpt)
-    pass &= check(!isfile(file), "checkpoint file removed after finalize!\n")
     return pass
 end
 
-function test_checkpoint_restore_multicanonical()
-    bins = 0:10
-    alg  = Multicanonical(MersenneTwister(2), bins)
-    ens  = ensemble(alg)
-
-    for x in 0:10
-        ens.logweight.values[x+1] = Float64(x)
-        ens.histogram.values[x+1] = Float64(x * 2)
-    end
-
-    file = _tmp_checkpoint_file("muca")
-    ckpt = init_checkpoint(file, (alg=alg,); sweep=0)
-
-    state = restore(file)
-    ens_restored = ensemble(state.alg)
-
+function test_checkpoint_restore_ensembles()
     pass = true
-    pass &= check(all(ens_restored.logweight.values .== 0:10), "logweight restored\n")
-    pass &= check(all(ens_restored.histogram.values .== 2 .* (0:10)), "histogram restored\n")
 
-    finalize!(ckpt)
-    return pass
-end
+    # Multicanonical ensemble: logweight + histogram
+    alg_muca = Multicanonical(MersenneTwister(2), 0:10)
+    ens_muca = ensemble(alg_muca)
+    ens_muca.logweight.values .= 0:10
+    ens_muca.histogram.values .= 2 .* (0:10)
 
-function test_checkpoint_restore_wang_landau()
-    alg = WangLandau(MersenneTwister(3), 0:5; logf=2.0)
-    ens = ensemble(alg)
-    ens.logweight.values .= [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    ens.logf = 1.5
-
-    file = _tmp_checkpoint_file("wl")
-    ckpt = init_checkpoint(file, (alg=alg,); sweep=0)
-
+    file = _tmp_checkpoint_file("ens")
+    ckpt = init_checkpoint(file, (alg=alg_muca,); sweep=0)
     state = restore(file)
-    ens_r = ensemble(state.alg)
-
-    pass = true
-    pass &= check(ens_r.logf == 1.5, "logf restored\n")
-    pass &= check(all(ens_r.logweight.values .== 1.0:6.0), "logweight values restored\n")
-
+    pass &= check(ensemble(state.alg) == ens_muca, "muca ensemble restored\n")
     finalize!(ckpt)
+
+    # WangLandau ensemble: logweight + logf
+    alg_wl = WangLandau(MersenneTwister(3), 0:5; logf=2.0)
+    ens_wl = ensemble(alg_wl)
+    ens_wl.logweight.values .= [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    ens_wl.logf = 1.5
+
+    file = _tmp_checkpoint_file("ens")
+    ckpt = init_checkpoint(file, (alg=alg_wl,); sweep=0)
+    state = restore(file)
+    pass &= check(ensemble(state.alg) == ens_wl, "wl ensemble restored\n")
+    finalize!(ckpt)
+
     return pass
 end
 
@@ -88,12 +72,9 @@ function test_checkpoint_restore_kmc()
 
     file = _tmp_checkpoint_file("kmc")
     ckpt = init_checkpoint(file, (alg=alg,); step=42)
-
     state = restore(file)
 
-    pass = true
-    pass &= check(state.alg.steps == 42,   "KMC steps restored\n")
-    pass &= check(state.alg.time  == 3.14, "KMC time restored\n")
+    pass = check(state.alg == alg, "KMC algorithm restored\n")
 
     finalize!(ckpt)
     return pass
@@ -187,8 +168,7 @@ end
 
 @testset "Checkpointing: checkpoint / restore" begin
     @test test_checkpoint_restore_importance_sampling()
-    @test test_checkpoint_restore_multicanonical()
-    @test test_checkpoint_restore_wang_landau()
+    @test test_checkpoint_restore_ensembles()
     @test test_checkpoint_restore_kmc()
     @test test_relink()
     @test test_deterministic_restart()

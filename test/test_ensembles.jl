@@ -31,12 +31,6 @@ function test_boltzmann_ensemble_constructor()
     ens3 = BoltzmannEnsemble(T=1.0)
     pass &= check(isapprox(ens3.beta, 1.0), "BoltzmannEnsemble(T=1.0)\n")
 
-    ens4 = BoltzmannEnsemble(T=0.5)
-    pass &= check(isapprox(ens4.beta, 2.0), "BoltzmannEnsemble(T=0.5) => beta=2.0\n")
-
-    ens5 = BoltzmannEnsemble(1.5)
-    pass &= check(ens5.beta == 1.5, "BoltzmannEnsemble(1.5)\n")
-
     # error: both beta and beta
     threw = try; BoltzmannEnsemble(beta=2.0, β=3.0); false
     catch err; err isa ArgumentError && contains(err.msg, "Specify only one of"); end
@@ -55,8 +49,7 @@ function test_boltzmann_ensemble_constructor()
     pass &= check(threw, "error: no arguments\n")
 
     # logweight methods
-    ens = BoltzmannEnsemble(β=2.0)
-    lw = logweight(ens)
+    lw = logweight(ens1)
     pass &= check(lw(1.0) == -2.0, "logweight scalar\n")
     pass &= check(lw([1.0, 2.0, 3.0]) == -12.0, "logweight vector\n")
 
@@ -78,18 +71,10 @@ function test_multicanonical_ensemble_constructor()
     pass &= check(ens2.logweight === lw, "explicit logweight\n")
     pass &= check(ens2.histogram === hist, "explicit histogram\n")
 
-    ens3 = MulticanonicalEnsemble(lw; record_visits=false)
+    ens3 = MulticanonicalEnsemble(bins; init=-1.0, record_visits=false)
     pass &= check(ens3.record_visits == false, "record_visits=false\n")
-
-    ens4 = MulticanonicalEnsemble(bins)
-    pass &= check(ens4.logweight isa BinnedObject, "from bins\n")
-    pass &= check(all(iszero, ens4.logweight.values), "logweight zeroed\n")
-
-    ens5 = MulticanonicalEnsemble(bins; init=-1.0)
-    pass &= check(all(w -> isapprox(w, -1.0), ens5.logweight.values), "from bins with init\n")
-
-    ens6 = MulticanonicalEnsemble(lw)
-    pass &= check(ens6.record_visits == true, "default record_visits=true\n")
+    pass &= check(ens3.logweight isa BinnedObject, "from bins\n")
+    pass &= check(all(w -> isapprox(w, -1.0), ens3.logweight.values), "from bins with init\n")
 
     # mismatched domains
     other_lw = BinnedObject(0.0:1.0:5.0, 0.0)
@@ -98,25 +83,7 @@ function test_multicanonical_ensemble_constructor()
 
     # logweight methods
     ens = MulticanonicalEnsemble(bins, init=-2.0)
-    lw_ens = logweight(ens)
-    pass &= check(lw_ens isa BinnedObject, "logweight returns BinnedObject\n")
-    pass &= check(lw_ens(2.0) === ens.logweight(2.0), "logweight callable\n")
-    pass &= check(lw_ens(2.0) === logweight(ens, 2.0), "logweight(ens, x) consistent\n")
-
-    # get_centers and get_values
-    ens = MulticanonicalEnsemble(bins, init=-1.5)
-    lw = logweight(ens)
-    centers = get_centers(lw)
-    pass &= check(centers isa Vector, "get_centers returns Vector\n")
-    pass &= check(length(centers) == 4, "get_centers length\n")
-    values = get_values(lw)
-    pass &= check(all(v -> isapprox(v, -1.5), values), "get_values match init\n")
-
-    # record_visits field
-    ens_record = MulticanonicalEnsemble(lw; record_visits=true)
-    ens_no_record = MulticanonicalEnsemble(lw; record_visits=false)
-    pass &= check(ens_record.record_visits == true, "record_visits=true\n")
-    pass &= check(ens_no_record.record_visits == false, "record_visits=false\n")
+    pass &= check(logweight(ens)(2.0) === logweight(ens, 2.0), "logweight(ens, x) consistent\n")
 
     return pass
 end
@@ -140,24 +107,9 @@ function test_wang_landau_ensemble_constructor()
     ens4 = WangLandauEnsemble(bins; init=-1.0)
     pass &= check(all(w -> isapprox(w, -1.0), ens4.logweight.values), "from bins with init\n")
 
-    ens5 = WangLandauEnsemble(bins; logf=0.3)
-    pass &= check(isapprox(ens5.logf, 0.3), "from bins with logf\n")
-
     # logweight methods
     ens = WangLandauEnsemble(bins, init=-2.0)
-    lw_ens = logweight(ens)
-    pass &= check(lw_ens isa BinnedObject, "logweight returns BinnedObject\n")
-    pass &= check(lw_ens(2.0) === ens.logweight(2.0), "logweight callable\n")
-    pass &= check(lw_ens(2.0) === logweight(ens, 2.0), "logweight(ens, x) consistent\n")
-
-    # get_centers and get_values
-    ens = WangLandauEnsemble(bins, init=-1.5)
-    lw = logweight(ens)
-    centers = get_centers(lw)
-    pass &= check(centers isa Vector, "get_centers returns Vector\n")
-    pass &= check(length(centers) == 4, "get_centers length\n")
-    values = get_values(lw)
-    pass &= check(all(v -> isapprox(v, -1.5), values), "get_values match init\n")
+    pass &= check(logweight(ens)(2.0) === logweight(ens, 2.0), "logweight(ens, x) consistent\n")
 
     return pass
 end

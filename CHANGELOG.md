@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Refactored API around ensemble-based design (Boltzmann, Multicanonical ensembles)
 - Reorganized code structure and file naming conventions
+- Reorganized and verified tests (unit and some math tests)
 
 ## [0.1.0] - Initial release
 

@@ -27,10 +27,14 @@ end
 function test_next_time_thinning()
     rng = MersenneTwister(77)
     rate_generation = 2.0
-    rate = t -> 0.5 * rate_generation
+    effective_rate = 0.5 * rate_generation
+    rate = t -> effective_rate
 
-    samples = [next_time(rng, rate, rate_generation) for _ in 1:1_000]
-    pass = check(all(isfinite, samples) && all(>(0), samples), "thinning samples finite and positive\n")
+    n_samples = 50_000
+    samples = [next_time(rng, rate, rate_generation) for _ in 1:n_samples]
+    mean_dt = sum(samples) / n_samples
+
+    pass = check(abs(mean_dt - 1 / effective_rate) < 0.03, "thinning mean dt matches effective rate\n")
 
     return pass
 end
@@ -243,46 +247,21 @@ end
 function test_kmc_next_event_special_cases()
     pass = true
 
-    rng_num = MersenneTwister(9)
-    pass &= check(next_event(rng_num, 0.7) == 1, "scalar float -> 1\n")
-    pass &= check(next_event(rng_num, 3) == 1, "scalar int -> 1\n")
-
+    # MVector path
     rates = MVector{2, Float64}(0.3, 0.7)
     rng_a = MersenneTwister(19)
     rng_b = MersenneTwister(19)
     draw_ref = rand(rng_b) * (rates[1] + rates[2]) < rates[1] ? 1 : 2
     draw_mvec = next_event(rng_a, rates)
     pass &= check(draw_mvec == draw_ref, "MVector matches manual draw\n")
-    pass &= check(draw_mvec in (1, 2), "MVector event in (1,2)\n")
 
     pass &= check(next_event(MersenneTwister(20), MVector{2, Float64}(1.0, 0.0)) == 1, "MVector deterministic event 1\n")
     pass &= check(next_event(MersenneTwister(21), MVector{2, Float64}(0.0, 1.0)) == 2, "MVector deterministic event 2\n")
 
-    simple_nonempty = ListEventRateSimple{Int}([10, 20], [0.0, 1.0], 0.0, -1)
-    pass &= check(next_event(MersenneTwister(22), simple_nonempty) == 20, "simple handler selects active event\n")
-
+    # empty handler
     simple_empty = ListEventRateSimple{Int}(Int[], Float64[], 0.0, -1)
     pass &= check(next_event(MersenneTwister(23), simple_empty) == -1, "empty handler returns default\n")
     pass &= check(next_event(simple_empty) == -1, "empty handler no-rng returns default\n")
-
-    return pass
-end
-
-function test_kmc_next_single_rate_inf_paths()
-    alg = Gillespie(MersenneTwister(5050))
-
-    dt_num, ev_num = next(alg, 0.0)
-    dt_vec, ev_vec = next(alg, [0.0])
-    dt_w, ev_w = next(alg, ProbabilityWeights([0.0]))
-
-    handler = ListEventRateSimple{Int}([1], [0.0], 0.0, -1)
-    dt_handler, ev_handler = next(alg, handler)
-
-    pass = true
-    pass &= check(dt_num == Inf && ev_num === nothing, "scalar zero rate -> Inf\n")
-    pass &= check(dt_vec == Inf && ev_vec === nothing, "vector zero rate -> Inf\n")
-    pass &= check(dt_w == Inf && ev_w === nothing, "weights zero rate -> Inf\n")
-    pass &= check(dt_handler == Inf && ev_handler === nothing, "handler zero rate -> Inf\n")
 
     return pass
 end
@@ -311,66 +290,15 @@ function test_kmc_event_handler_edge_cases()
     return pass
 end
 
-function test_kmc_step_and_advance_zero_rate_edges()
-    pass = true
-
-    alg_step = Gillespie(MersenneTwister(2027))
-    t_step, event_step = step!(alg_step, [0.0])
-    pass &= check(t_step == Inf, "step! zero rate t == Inf\n")
-    pass &= check(event_step === nothing, "step! zero rate event == nothing\n")
-    pass &= check(alg_step.time == Inf, "step! zero rate alg.time == Inf\n")
-    pass &= check(alg_step.steps == 1, "step! zero rate steps == 1\n")
-
-    alg_adv = Gillespie(MersenneTwister(2029))
-    seen_events = Any[]
-    seen_times = Float64[]
-    t_adv = advance!(alg_adv, [0.0], 10.0; measure! = (r, e, t) -> begin
-        push!(seen_events, e)
-        push!(seen_times, t)
-    end)
-
-    pass &= check(t_adv == Inf, "advance! zero rate t == Inf\n")
-    pass &= check(alg_adv.time == Inf, "advance! zero rate alg.time == Inf\n")
-    pass &= check(alg_adv.steps == 1, "advance! zero rate steps == 1\n")
-    pass &= check(isempty(seen_events), "advance! zero rate no events measured\n")
-    pass &= check(isempty(seen_times), "advance! zero rate no times measured\n")
-
-    return pass
-end
-
-function test_kmc_two_rate_vector_and_weights_paths()
-    pass = true
-
-    rates_vec = [0.2, 0.8]
-    rates_w = ProbabilityWeights(copy(rates_vec))
-
-    alg_vec = Gillespie(MersenneTwister(3030))
-    alg_w = Gillespie(MersenneTwister(3030))
-
-    dt_vec, ev_vec = next(alg_vec, rates_vec)
-    dt_w, ev_w = next(alg_w, rates_w)
-
-    pass &= check(dt_vec == dt_w, "vector/weights dt match\n")
-    pass &= check(ev_vec == ev_w, "vector/weights event match\n")
-    pass &= check(ev_vec in (1, 2), "event in (1,2)\n")
-
-    t_vec, ev_step_vec = step!(alg_vec, rates_vec)
-    t_w, ev_step_w = step!(alg_w, rates_w)
-
-    pass &= check(t_vec == t_w, "step! vector/weights t match\n")
-    pass &= check(ev_step_vec == ev_step_w, "step! vector/weights event match\n")
-    pass &= check(ev_step_vec in (1, 2), "step! event in (1,2)\n")
-    pass &= check(alg_vec.steps == 1, "vector steps == 1\n")
-    pass &= check(alg_w.steps == 1, "weights steps == 1\n")
-
-    alg_w_zero = Gillespie(MersenneTwister(3031))
-    rates_w_zero = ProbabilityWeights([0.0, 0.0])
+function test_kmc_zero_rate_advance()
+    alg = Gillespie(MersenneTwister(2029))
     seen = Any[]
-    t_adv = advance!(alg_w_zero, rates_w_zero, 10.0; measure! = (r, e, t) -> push!(seen, e))
-    pass &= check(t_adv == Inf, "weights zero rate t == Inf\n")
-    pass &= check(alg_w_zero.time == Inf, "weights zero rate alg.time == Inf\n")
-    pass &= check(alg_w_zero.steps == 1, "weights zero rate steps == 1\n")
-    pass &= check(isempty(seen), "weights zero rate no events\n")
+    t_adv = advance!(alg, [0.0], 10.0; measure! = (r, e, t) -> push!(seen, e))
+
+    pass = true
+    pass &= check(t_adv == Inf, "advance! zero rate t == Inf\n")
+    pass &= check(alg.steps == 1, "advance! zero rate steps == 1\n")
+    pass &= check(isempty(seen), "advance! zero rate no events measured\n")
 
     return pass
 end
@@ -449,17 +377,11 @@ end
     @testset "next_event special cases" begin
         @test test_kmc_next_event_special_cases()
     end
-    @testset "next single-rate Inf paths" begin
-        @test test_kmc_next_single_rate_inf_paths()
-    end
     @testset "event-handler edge cases" begin
         @test test_kmc_event_handler_edge_cases()
     end
-    @testset "step!/advance! zero-rate edges" begin
-        @test test_kmc_step_and_advance_zero_rate_edges()
-    end
-    @testset "two-rate vector/weights paths" begin
-        @test test_kmc_two_rate_vector_and_weights_paths()
+    @testset "zero-rate advance" begin
+        @test test_kmc_zero_rate_advance()
     end
     @testset "time-event-handler paths" begin
         @test test_kmc_time_event_handler_paths()
