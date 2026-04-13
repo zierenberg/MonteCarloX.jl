@@ -18,7 +18,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
 Coverage = "1.8.1"
-Distributed = "1.11.0"
+Distributed = "1.10.0"
 Distributions = "0.25"
 Graphs = "1"
 StaticArrays = "1"
