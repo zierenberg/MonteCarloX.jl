@@ -9,6 +9,7 @@ docs/src/generated/
 
 settings.json
 .vscode/
+.claude/
 
 Manifest.toml
 docs/Manifest.toml
