@@ -12,6 +12,7 @@ import Pkg                                          #src
 Pkg.activate(joinpath(@__FILE__, "../../../../"))   #src
 Pkg.instantiate()                                   #src
 include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
+
 using Random, StatsBase, Plots
 using MonteCarloX: update!
 using MonteCarloX, SpinSystems

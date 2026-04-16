@@ -1,111 +1,68 @@
 """
     ParallelMulticanonical
 
-Construct a parallel multicanonical coordinator from either a message backend
-(e.g. `MPIBackend`) or a local vector of per-replica algorithms.
+Parallel multicanonical sampling: independent chains with multicanonical
+ensembles, plus `merge_histograms!` and `distribute_logweight!` for
+iterative weight refinement.
+
+`ParallelMulticanonical` is not a separate type — it is a `ParallelChains`
+whose algorithms carry `MulticanonicalEnsemble`. The constructor and
+convenience functions dispatch on this type signature.
 """
 
-mutable struct ParallelMulticanonicalMessage <: AbstractAlgorithm
-    alg::AbstractImportanceSampling
-    backend::AbstractMessageBackend
-    root::Int
+using MPI
+
+"""
+    ParallelMulticanonical(backend, alg)
+
+Create `ParallelChains` for multicanonical algorithms.
+Validates that the algorithm(s) carry a `MulticanonicalEnsemble`.
+"""
+function ParallelMulticanonical(backend::ThreadsBackend,
+                                alg::AbstractVector{<:ImportanceSampling{<:MulticanonicalEnsemble}})
+    return ParallelChains(backend, alg)
 end
 
-mutable struct ParallelMulticanonicalVector{A<:AbstractImportanceSampling} <: AbstractAlgorithm
-    alg::Vector{A}
+function ParallelMulticanonical(backend::MPIBackend,
+                                alg::ImportanceSampling{<:MulticanonicalEnsemble})
+    return ParallelChains(backend, alg)
 end
 
-function _validate_parallel_multicanonical_alg(alg::AbstractImportanceSampling)
-    ens = ensemble(alg)
-    hasproperty(ens, :histogram) || throw(ArgumentError("parallel multicanonical requires an ensemble with `histogram`"))
-    hasproperty(ens, :logweight) || throw(ArgumentError("parallel multicanonical requires an ensemble with `logweight`"))
+"""
+    merge_histograms!(pc)
 
-    hist = getproperty(ens, :histogram)
-    lw = getproperty(ens, :logweight)
-    hasproperty(hist, :values) || throw(ArgumentError("`histogram` must provide a `values` array"))
-    hasproperty(lw, :values) || throw(ArgumentError("`logweight` must provide a `values` array"))
-    length(hist.values) == length(lw.values) || throw(ArgumentError("`histogram.values` and `logweight.values` must have matching lengths"))
-    return alg
-end
-
-function ParallelMulticanonicalMessage(backend::AbstractMessageBackend, alg::AbstractImportanceSampling; root::Int=0)
-    n = size(backend)
-    0 <= root < n || throw(ArgumentError("`root` must satisfy 0 <= root < size"))
-    return ParallelMulticanonicalMessage(_validate_parallel_multicanonical_alg(alg), backend, Int(root))
-end
-
-function ParallelMulticanonicalVector(algs::AbstractVector{<:AbstractImportanceSampling})
-    length(algs) >= 1 || throw(ArgumentError("need at least 1 algorithm"))
-    validated = map(_validate_parallel_multicanonical_alg, collect(algs))
-    return ParallelMulticanonicalVector(validated)
-end
-
-ParallelMulticanonical(backend::AbstractMessageBackend, alg::AbstractImportanceSampling; root::Int=0) =
-    ParallelMulticanonicalMessage(backend, alg; root=root)
-ParallelMulticanonical(alg::AbstractImportanceSampling, backend::AbstractMessageBackend; root::Int=0) =
-    ParallelMulticanonicalMessage(backend, alg; root=root)
-ParallelMulticanonical(alg::AbstractImportanceSampling, mode::Symbol; root::Int=0, kwargs...) =
-    ParallelMulticanonical(init(mode; kwargs...), alg; root=root)
-ParallelMulticanonical(algs::AbstractVector{<:AbstractImportanceSampling}) =
-    ParallelMulticanonicalVector(algs)
-
-@inline is_root(pmuca::ParallelMulticanonicalMessage) = rank(pmuca.backend) == pmuca.root
-@inline is_root(::ParallelMulticanonicalVector) = true
-
-@inline rank(pmuca::ParallelMulticanonicalMessage) = rank(pmuca.backend)
-@inline size(pmuca::ParallelMulticanonicalMessage) = size(pmuca.backend)
-@inline rank(::ParallelMulticanonicalVector) = 0
-@inline size(pmuca::ParallelMulticanonicalVector) = length(pmuca.alg)
-
-# Collective communication wrappers
-barrier(pmuca::ParallelMulticanonicalMessage) = barrier(pmuca.backend)
-barrier(::ParallelMulticanonicalVector) = nothing
-
-allgather(value, pmuca::ParallelMulticanonicalMessage) = allgather(value, pmuca.backend)
-allgather(value, pmuca::ParallelMulticanonicalVector) = [value]
-
-allreduce!(values, op, pmuca::ParallelMulticanonicalMessage) = allreduce!(values, op, pmuca.backend)
-allreduce!(values, op, ::ParallelMulticanonicalVector) = values
-
-reduce(values, op, root::Int, pmuca::ParallelMulticanonicalMessage) = reduce(values, op, root, pmuca.backend)
-reduce(values, op, root::Int, ::ParallelMulticanonicalVector) = copy(values)
-
-bcast!(values, root::Int, pmuca::ParallelMulticanonicalMessage) = bcast!(values, root, pmuca.backend)
-bcast!(values, root::Int, ::ParallelMulticanonicalVector) = values
-
-gather(value, pmuca::ParallelMulticanonicalMessage; root::Int) = gather(value, pmuca.backend; root=root)
-gather(value, pmuca::ParallelMulticanonicalVector; root::Int) = [value]
-
-# --- merge_histograms! ---
-
-function merge_histograms!(pmuca::ParallelMulticanonicalMessage)
-    barrier(pmuca)
-    allreduce!(ensemble(pmuca.alg).histogram.values, +, pmuca)
-    barrier(pmuca)
-    return nothing
-end
-
-function merge_histograms!(pmuca::ParallelMulticanonicalVector)
-    merged = sum(ensemble(alg).histogram.values for alg in pmuca.alg)
-    for alg in pmuca.alg
-        ensemble(alg).histogram.values .= merged
+Sum histograms across all chains. After this call every chain (or rank)
+holds the merged histogram.
+"""
+function merge_histograms!(pc::ParallelChains{ThreadsBackend, <:Vector{<:ImportanceSampling{<:MulticanonicalEnsemble}}})
+    n = size(pc)
+    merged = sum(ensemble(algorithm(pc, i)).histogram.values for i in 1:n)
+    for i in 1:n
+        ensemble(algorithm(pc, i)).histogram.values .= merged
     end
     return nothing
 end
 
-# --- distribute_logweight! ---
-
-function distribute_logweight!(pmuca::ParallelMulticanonicalMessage)
-    barrier(pmuca)
-    bcast!(ensemble(pmuca.alg).logweight.values, pmuca.root, pmuca)
-    barrier(pmuca)
+function merge_histograms!(pc::ParallelChains{<:MPIBackend, <:ImportanceSampling{<:MulticanonicalEnsemble}})
+    MPI.Reduce!(ensemble(algorithm(pc)).histogram.values, +, pc.backend.comm; root=pc.backend.root)
     return nothing
 end
 
-function distribute_logweight!(pmuca::ParallelMulticanonicalVector)
-    root_lw = ensemble(pmuca.alg[1]).logweight.values
-    for alg in pmuca.alg[2:end]
-        ensemble(alg).logweight.values .= root_lw
+"""
+    distribute_logweight!(pc)
+
+Broadcast logweights from root to all chains.
+"""
+function distribute_logweight!(pc::ParallelChains{ThreadsBackend, <:Vector{<:ImportanceSampling{<:MulticanonicalEnsemble}}})
+    root_lw = ensemble(algorithm(pc, 1)).logweight.values
+    n = size(pc)
+    for i in 2:n
+        ensemble(algorithm(pc, i)).logweight.values .= root_lw
     end
+    return nothing
+end
+
+function distribute_logweight!(pc::ParallelChains{<:MPIBackend, <:ImportanceSampling{<:MulticanonicalEnsemble}})
+    MPI.Bcast!(ensemble(algorithm(pc)).logweight.values, pc.backend.root, pc.backend.comm)
     return nothing
 end
