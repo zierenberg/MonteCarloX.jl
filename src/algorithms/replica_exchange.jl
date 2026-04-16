@@ -25,6 +25,7 @@ end
 
 # indexing
 @inline index(rx::ReplicaExchange{<:ThreadsBackend}, i::Integer) = rx.indices[i]
+@inline index(rx::ReplicaExchange{<:ThreadsBackend}) = rx.indices
 @inline index(rx::ReplicaExchange{<:MPIBackend}) = rx.indices[rank(rx) + 1]
 
 function ReplicaExchange(backend::ThreadsBackend, alg::AbstractVector{<:AbstractImportanceSampling})

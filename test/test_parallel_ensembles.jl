@@ -156,7 +156,7 @@ function test_parallel_tempering()
     v_algs = [Metropolis(MersenneTwister(11); β=1.0), Metropolis(MersenneTwister(12); β=0.5)]
     v_pt = ParallelTempering(ThreadsBackend(2), v_algs)
     pass &= check(v_pt isa ReplicaExchange{ThreadsBackend}, "Threads type\n")
-    pass &= check(index(v_pt) == v_pt.indices[1], "Threads index\n")
+    pass &= check(index(v_pt,1) == v_pt.indices[1], "Threads index\n")
 
     update!(v_pt, [-10.0, -8.0])
     pass &= check(v_pt.stage == 1, "Threads stage == 1\n")
