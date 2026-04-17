@@ -246,3 +246,4 @@ function set!(
 
     return nothing
 end
+@inline set!(bo::BinnedObject, f::Function) = set!(bo, (first(get_centers(bo, 1)), last(get_centers(bo, 1))), f)

@@ -41,21 +41,21 @@ include("infrastructure/rng.jl")
 export  MutableRandomNumbers,
         reset!
 
-include("infrastructure/message_backend.jl")
-export  AbstractMessageBackend,
+include("infrastructure/parallel_backends.jl")
+export  ThreadsBackend,
         MPIBackend,
-        DistributedBackend,
         init,
         finalize!,
         rank,
         size,
-        exchange_packet,
-        allreduce!,
-        reduce,
-        allgather,
-        bcast!,
-        gather,
-        barrier
+        is_root
+
+include("infrastructure/parallel_chains.jl")
+export  ParallelChains,
+        algorithm,
+        on_root,
+        with_parallel,
+        merge!
 
 include("infrastructure/checkpointing.jl")
 export  CheckpointSession,
@@ -139,33 +139,20 @@ export  Multicanonical
 
 include("algorithms/parallel_multicanonical.jl")
 export  ParallelMulticanonical,
-        ParallelMulticanonicalMessage,
-        ParallelMulticanonicalVector,
-        is_root,
         merge_histograms!,
         distribute_logweight!
 
 include("algorithms/replica_exchange.jl")
-export  ReplicaExchange,
-        ReplicaExchangeMessage,
-        ReplicaExchangeVector,
-        gather_at_root,
-        broadcast_from_root!
+export  ReplicaExchange
 
 include("algorithms/parallel_tempering.jl")
 export  ParallelTempering,
-        ParallelTemperingMessage,
-        ParallelTemperingVector,
         index,
         optimize_exchange_interval!,
         acceptance_rates,
-        acceptance_rate,
-        exchange_stats_at_root,
         exchange_log_ratio,
         attempt_exchange_pair!,
-        set_betas,
-        set_betas!,
-        retune_betas!
+        set_betas
 
 include("algorithms/wang_landau.jl")
 export  WangLandau

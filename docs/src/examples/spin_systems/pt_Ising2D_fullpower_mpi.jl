@@ -69,11 +69,12 @@ function main()
 
     betas = set_betas(nreplicas, inv(Tmax), inv(Tmin), :uniform)
     pt = ParallelTempering(betas; seed=seed, rng=MersenneTwister, backend=backend)
+    alg = algorithm(pt)
 
     sys = Ising([L, L])
-    init!(sys, :random; rng=pt.alg.rng)
+    init!(sys, :random; rng=alg.rng)
 
-    if is_root(pt)
+    on_root(pt) do
         println("════════════════════════════════════════")
         println(" PT Ising2D MPI full-power (L = $(L))  ")
         println(" Ranks = $(nreplicas), Measurements = $(nmeasurements)")
@@ -81,7 +82,7 @@ function main()
     end
 
     for _ in 1:ntherm_init
-        sweep_replica!(sys, pt.alg, L)
+        sweep_replica!(sys, alg, L)
     end
 
     local_samples = Tuple{Int,Float64}[]
@@ -91,13 +92,13 @@ function main()
     exchange_counter = 0
 
     for meas in 1:nmeasurements
-        sweep_replica!(sys, pt.alg, L)
+        sweep_replica!(sys, alg, L)
         e = energy(sys)
         push!(local_samples, (index(pt), e))
 
         sweeps_since_exchange += 1
         if sweeps_since_exchange >= next_exchange_interval
-            update!(pt, e)
+            MonteCarloX.update!(pt, e)
             exchange_counter += 1
             sweeps_since_exchange = 0
 
@@ -116,16 +117,16 @@ function main()
                 # Propose a rank-local interval from the current ladder index,
                 # then synchronize to one global interval via max-reduction.
                 interval_buf = [sweeps_after_exchange[index(pt)]]
-                MonteCarloX.allreduce!(interval_buf, max, pt)
+                MPI.Allreduce!(interval_buf, max, backend.comm)
                 next_exchange_interval = only(interval_buf)
             end
         end
     end
 
-    exch = exchange_stats_at_root(pt)
-    all_samples = gather(local_samples, backend; root=pt.root)
+    rates = acceptance_rates(pt)
+    all_samples = MPI.gather(local_samples, backend.comm; root=backend.root)
 
-    if is_root(pt)
+    on_root(pt) do
         energy_samples = merge_samples_by_index(all_samples, nreplicas)
         taus_final = integrated_autocorrelation_times(energy_samples;
                                                       min_points=tau_min_points,
@@ -136,9 +137,9 @@ function main()
         println("beta range = [$(round(minimum(betas), digits=4)), $(round(maximum(betas), digits=4))]")
 
         println("\nExchange acceptance by neighboring betas:")
-        for i in eachindex(exch.rates)
+        for i in eachindex(rates)
             println("  (", round(betas[i], digits=4), ", ", round(betas[i + 1], digits=4), ")",
-                " -> ", round(exch.rates[i], digits=4))
+                " -> ", round(rates[i], digits=4))
         end
 
         println("\nFinal tau_int(E) and post-exchange sweep schedule by beta index:")

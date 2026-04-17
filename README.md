@@ -5,7 +5,7 @@
 [![CI: examples](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_examples.yml/badge.svg)](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_examples.yml)
 [![codecov](https://codecov.io/gh/zierenberg/MonteCarloX.jl/branch/main/graph/badge.svg?token=FUn6qFnsSN)](https://codecov.io/gh/zierenberg/MonteCarloX.jl)
 
-<img src="assets/montecarlox_logo.png" alt="MonteCarloX logo" width="180" />
+<img src="docs/logo/logo.png" alt="MonteCarloX logo" width="180" />
 
 MonteCarloX.jl is a concise, modular Monte Carlo framework in Julia.
 It provides reusable sampling algorithms and measurement tools, while model-specific code lives in companion packages (for example, `SpinSystems`).

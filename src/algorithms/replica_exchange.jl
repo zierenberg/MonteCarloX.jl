@@ -1,56 +1,70 @@
 """
-    ReplicaExchange
+    ReplicaExchange{B, A}
 
-Generic replica-exchange coordinator from either a message backend
-(e.g. `MPIBackend`, `DistributedBackend`) or a local vector of per-replica
-algorithms.
+Generic replica-exchange coordinator. The backend type parameter `B`
+determines the parallelism strategy:
+
+- `ReplicaExchange{ThreadsBackend}`: local vector of per-replica algorithms, shared memory.
+- `ReplicaExchange{MPIBackend}`: one algorithm per MPI rank, MPI communication.
 """
 
-abstract type AbstractReplicaExchange <: AbstractAlgorithm end
+using MPI
 
-mutable struct ReplicaExchangeMessage <: AbstractReplicaExchange
-    alg::AbstractImportanceSampling
-    backend::AbstractMessageBackend
-    root::Int
+mutable struct ReplicaExchange{B, A}
+    replica::ParallelChains{B, A}
     stage::Int
     indices::Vector{Int}
     steps::Vector{Int}
     accepted::Vector{Int}
 end
 
-mutable struct ReplicaExchangeVector{A<:AbstractImportanceSampling} <: AbstractReplicaExchange
-    alg::Vector{A}
-    stage::Int
-    indices::Vector{Int}
-    steps::Vector{Int}
-    accepted::Vector{Int}
+@inline rank(rx::ReplicaExchange) = rank(rx.replica)
+@inline size(rx::ReplicaExchange) = size(rx.replica)
+@inline is_root(rx::ReplicaExchange) = is_root(rx.replica)
+@inline algorithm(rx::ReplicaExchange, args...) = algorithm(rx.replica, args...)
+@inline with_parallel(f, rx::ReplicaExchange) = with_parallel(f, rx.replica)
+
+"""
+    on_root(f, rx::ReplicaExchange)
+
+Run a block on the root chain only; no-op on non-root ranks.
+Consistent with `on_root(f, pc::ParallelChains)`.  The callback
+may take zero or one argument (root chain index).
+"""
+@inline function on_root(f, rx::ReplicaExchange{ThreadsBackend})
+    i = root_chain(rx.replica)
+    return applicable(f, i) ? f(i) : f()
 end
 
-function ReplicaExchangeMessage(alg::AbstractImportanceSampling, backend::AbstractMessageBackend; root::Int=0)
+@inline function on_root(f, rx::ReplicaExchange{<:MPIBackend})
+    if !is_root(rx)
+        return nothing
+    end
+    i = root_chain(rx.replica)
+    return applicable(f, i) ? f(i) : f()
+end
+
+# indexing
+@inline index(rx::ReplicaExchange{<:ThreadsBackend}, i::Integer) = rx.indices[i]
+@inline index(rx::ReplicaExchange{<:ThreadsBackend}) = rx.indices
+@inline index(rx::ReplicaExchange{<:MPIBackend}) = rx.indices[rank(rx) + 1]
+
+function ReplicaExchange(backend::ThreadsBackend, alg::AbstractVector{<:AbstractImportanceSampling})
+    n = length(alg)
+    n >= 2 || throw(ArgumentError("need at least 2 algorithms for replica exchange"))
+    pc = ParallelChains(backend, alg)
+    nedges = n - 1
+    return ReplicaExchange(pc, 0, collect(1:n), zeros(Int, nedges), zeros(Int, nedges))
+end
+
+function ReplicaExchange(backend::MPIBackend, alg::AbstractImportanceSampling)
+    pc = ParallelChains(backend, alg)
     n = size(backend)
-    0 <= root < n || throw(ArgumentError("`root` must satisfy 0 <= root < size"))
-    indices = collect(1:n)
     nedges = max(0, n - 1)
-    return ReplicaExchangeMessage(alg, backend, Int(root), 0, indices, zeros(Int, nedges), zeros(Int, nedges))
+    return ReplicaExchange(pc, 0, collect(1:n), zeros(Int, nedges), zeros(Int, nedges))
 end
 
-function ReplicaExchangeVector(algs::AbstractVector{<:AbstractImportanceSampling})
-    n = length(algs)
-    n >= 2 || throw(ArgumentError("need at least 2 local algorithms for replica exchange"))
-    indices = collect(1:n)
-    nedges = max(0, n - 1)
-    return ReplicaExchangeVector(collect(algs), 0, indices, zeros(Int, nedges), zeros(Int, nedges))
-end
-
-# alg-first, backend second — canonical order matching ParallelMulticanonical
-ReplicaExchange(alg::AbstractImportanceSampling, backend::AbstractMessageBackend; root::Int=0) =
-    ReplicaExchangeMessage(alg, backend; root=root)
-ReplicaExchange(alg::AbstractImportanceSampling, comm; root::Int=0) =
-    ReplicaExchangeMessage(alg, MPIBackend(comm); root=root)
-ReplicaExchange(algs::AbstractVector{<:AbstractImportanceSampling}; root::Int=0) =
-    ReplicaExchangeVector(algs)
-
-function reset!(rx::AbstractReplicaExchange)
+function reset!(rx::ReplicaExchange)
     rx.stage = 0
     rx.indices .= eachindex(rx.indices)
     fill!(rx.steps, 0)
@@ -58,88 +72,35 @@ function reset!(rx::AbstractReplicaExchange)
     return rx
 end
 
-function acceptance_rates(steps::AbstractVector{<:Real}, accepted::AbstractVector{<:Real})
-    length(steps) == length(accepted) || throw(ArgumentError("steps and accepted must have the same length"))
-    rates = zeros(Float64, length(steps))
-    @inbounds for i in eachindex(rates)
-        rates[i] = steps[i] > 0 ? accepted[i] / steps[i] : 0.0
-    end
-    return rates
+function acceptance_rates(rx::ReplicaExchange{ThreadsBackend})
+    return [s > 0 ? a / s : 0.0 for (s, a) in zip(rx.steps, rx.accepted)]
 end
 
-acceptance_rates(rx::AbstractReplicaExchange) = acceptance_rates(rx.steps, rx.accepted)
-
-function acceptance_rate(steps::AbstractVector{<:Real}, accepted::AbstractVector{<:Real})
-    length(steps) == length(accepted) || throw(ArgumentError("steps and accepted must have the same length"))
-    total_steps = sum(steps)
-    return total_steps > 0 ? sum(accepted) / total_steps : 0.0
+function acceptance_rates(rx::ReplicaExchange{<:MPIBackend})
+    comm = rx.replica.backend.comm
+    root = rx.replica.backend.root
+    steps_total = MPI.Reduce(rx.steps, +, root, comm)
+    accepted_total = MPI.Reduce(rx.accepted, +, root, comm)
+    is_root(rx) || return Float64[]
+    return [s > 0 ? a / s : 0.0 for (s, a) in zip(steps_total, accepted_total)]
 end
 
-acceptance_rate(rx::AbstractReplicaExchange) = acceptance_rate(rx.steps, rx.accepted)
-
-@inline rank(rx::ReplicaExchangeMessage) = rank(rx.backend)
-@inline size(rx::ReplicaExchangeMessage) = size(rx.backend)
-@inline rank(::ReplicaExchangeVector) = 0
-@inline size(rx::ReplicaExchangeVector) = length(rx.alg)
-
-@inline is_root(rx::ReplicaExchangeMessage) = rank(rx) == rx.root
-@inline is_root(::ReplicaExchangeVector) = true
-
-# Collective communication wrappers
-barrier(rx::ReplicaExchangeMessage) = barrier(rx.backend)
-barrier(::ReplicaExchangeVector) = nothing
-
-allgather(value, rx::ReplicaExchangeMessage) = allgather(value, rx.backend)
-allgather(value, rx::ReplicaExchangeVector) = [value]
-
-allreduce!(values, op, rx::ReplicaExchangeMessage) = allreduce!(values, op, rx.backend)
-allreduce!(values, op, ::ReplicaExchangeVector) = values
-
-reduce(values, op, root::Int, rx::ReplicaExchangeMessage) = reduce(values, op, root, rx.backend)
-reduce(values, op, root::Int, ::ReplicaExchangeVector) = copy(values)
-
-bcast!(values, root::Int, rx::ReplicaExchangeMessage) = bcast!(values, root, rx.backend)
-bcast!(values, root::Int, ::ReplicaExchangeVector) = values
-
-gather(value, rx::ReplicaExchangeMessage; root::Int) = gather(value, rx.backend; root=root)
-gather(value, ::ReplicaExchangeVector; root::Int) = [value]
-
-gather_at_root(value, rx::ReplicaExchangeMessage) = gather(value, rx.backend; root=rx.root)
-gather_at_root(value, ::ReplicaExchangeVector) = [value]
-
-broadcast_from_root!(values, rx::ReplicaExchangeMessage) = bcast!(values, rx.root, rx.backend)
-broadcast_from_root!(values, ::ReplicaExchangeVector) = values
-
-function exchange_stats_at_root(rx::ReplicaExchangeMessage)
-    steps_total = reduce(rx.steps, +, rx.root, rx)
-    accepted_total = reduce(rx.accepted, +, rx.root, rx)
-    barrier(rx)
-    is_root(rx) || return nothing
-    rates = acceptance_rates(steps_total, accepted_total)
-    return (steps=steps_total, accepted=accepted_total, rates=rates)
+function acceptance_rate(rx::ReplicaExchange{ThreadsBackend})
+    total = sum(rx.steps)
+    return total > 0 ? sum(rx.accepted) / total : 0.0
 end
 
-@inline index(rx::AbstractReplicaExchange) = rx.indices[rank(rx) + 1]
-@inline index(rx::ReplicaExchangeVector, replica::Integer) = rx.indices[Int(replica)]
-
-function _resolve_pair(my_index::Int, stage::Int, nranks::Int)
-    first = iseven(stage) ? 1 : 2
-    offset = my_index - first
-
-    if offset >= 0 && iseven(offset) && my_index < nranks
-        return (active=true, pair_id=my_index, partner_index=my_index + 1)
-    elseif offset > 0 && isodd(offset) && my_index - 1 >= first
-        return (active=true, pair_id=my_index - 1, partner_index=my_index - 1)
-    else
-        return (active=false, pair_id=0, partner_index=0)
-    end
+function acceptance_rate(rx::ReplicaExchange{<:MPIBackend})
+    comm = rx.replica.backend.comm
+    root = rx.replica.backend.root
+    steps_total = MPI.Reduce(rx.steps, +, root, comm)
+    accepted_total = MPI.Reduce(rx.accepted, +, root, comm)
+    is_root(rx) || return 0.0
+    total = sum(steps_total)
+    return total > 0 ? sum(accepted_total) / total : 0.0
 end
 
-function _partner_rank(rx::AbstractReplicaExchange, partner_index::Int)
-    partner_pos = findfirst(==(partner_index), rx.indices)
-    partner_pos === nothing && throw(ArgumentError("Replica-exchange partner index $partner_index not found in current ladder permutation"))
-    return partner_pos - 1
-end
+################ exchange logic ################
 
 """
     exchange_log_ratio(ens_i, ens_j, x_i, x_j)
@@ -174,7 +135,62 @@ function attempt_exchange_pair!(alg_i::AbstractImportanceSampling,
     return accepted
 end
 
-function _update_pair!(rx::ReplicaExchangeMessage,
+function _resolve_pair(my_index::Int, stage::Int, nranks::Int)
+    first = iseven(stage) ? 1 : 2
+    offset = my_index - first
+
+    if offset >= 0 && iseven(offset) && my_index < nranks
+        return (active=true, pair_id=my_index, partner_index=my_index + 1)
+    elseif offset > 0 && isodd(offset) && my_index - 1 >= first
+        return (active=true, pair_id=my_index - 1, partner_index=my_index - 1)
+    else
+        return (active=false, pair_id=0, partner_index=0)
+    end
+end
+
+function _partner_rank(rx::ReplicaExchange, partner_index::Int)
+    partner_pos = findfirst(==(partner_index), rx.indices)
+    partner_pos === nothing && throw(ArgumentError("Replica-exchange partner index $partner_index not found in current ladder permutation"))
+    return partner_pos - 1
+end
+
+################ exchange logic (Threads specific) ################
+function update!(rx::ReplicaExchange{ThreadsBackend}, xs::AbstractVector{<:Real})
+    length(xs) == size(rx) || throw(ArgumentError("xs must have length size(rx)"))
+
+    first = iseven(rx.stage) ? 1 : 2
+    @inbounds for pair_id in first:2:(size(rx) - 1)
+        ri = findfirst(==(pair_id), rx.indices)
+        rj = findfirst(==(pair_id + 1), rx.indices)
+        (ri === nothing || rj === nothing) && throw(ArgumentError("Replica-exchange local index permutation is inconsistent"))
+
+        rx.steps[pair_id] += 1
+        u = rand(algorithm(rx, ri).rng)
+        did_accept = attempt_exchange_pair!(algorithm(rx, ri), algorithm(rx, rj), xs[ri], xs[rj], u)
+        if did_accept
+            rx.accepted[pair_id] += 1
+            rx.indices[ri], rx.indices[rj] = rx.indices[rj], rx.indices[ri]
+        end
+    end
+
+    rx.stage = 1 - rx.stage
+    return nothing
+end
+
+
+
+################ exchange logic (MPI specific) ################
+function _exchange_packet_mpi(comm, packet, partner_rank::Int, tag::Integer, is_owner::Bool)
+    if is_owner
+        MPI.send(packet, comm; dest=partner_rank, tag=tag)
+        return MPI.recv(comm; source=partner_rank, tag=tag)
+    end
+    recv_packet = MPI.recv(comm; source=partner_rank, tag=tag)
+    MPI.send(packet, comm; dest=partner_rank, tag=tag)
+    return recv_packet
+end
+
+function _update_pair!(rx::ReplicaExchange{<:MPIBackend},
                        alg::AbstractImportanceSampling,
                        x::Real,
                        pair_id::Int,
@@ -185,7 +201,7 @@ function _update_pair!(rx::ReplicaExchangeMessage,
     ens = alg.ensemble
 
     packet = (ensemble=ens, x=x, u=float(is_owner ? rand(alg.rng) : NaN))
-    packet_p = exchange_packet(rx.backend, packet, partner_rank, rx.stage, is_owner)
+    packet_p = _exchange_packet_mpi(rx.replica.backend.comm, packet, partner_rank, rx.stage, is_owner)
 
     ens_p = packet_p.ensemble
     x_p = packet_p.x
@@ -208,46 +224,22 @@ function _update_pair!(rx::ReplicaExchangeMessage,
     return my_index
 end
 
-function update!(rx::ReplicaExchangeMessage, alg::AbstractImportanceSampling, x::Real)
-    barrier(rx)
-    
+function update!(rx::ReplicaExchange{<:MPIBackend}, x::Real)
+    comm = rx.replica.backend.comm
+    MPI.Barrier(comm)
+
     my_index = index(rx)
     pair = _resolve_pair(my_index, rx.stage, size(rx))
 
     new_index = my_index
     if pair.active
-        new_index = _update_pair!(rx, alg, x, pair.pair_id, pair.partner_index)
+        new_index = _update_pair!(rx, algorithm(rx), x, pair.pair_id, pair.partner_index)
     end
 
-    rx.indices = allgather(new_index, rx)
+    rx.indices = MPI.Allgather(new_index, comm)
     rx.stage = 1 - rx.stage
-    
-    barrier(rx)
+
+    MPI.Barrier(comm)
     return nothing
 end
 
-function update!(rx::ReplicaExchangeMessage, x::Real)
-    return update!(rx, rx.alg, x)
-end
-
-function update!(rx::ReplicaExchangeVector, xs::AbstractVector{<:Real})
-    length(xs) == size(rx) || throw(ArgumentError("xs must have length size(rx)"))
-
-    first = iseven(rx.stage) ? 1 : 2
-    @inbounds for pair_id in first:2:(size(rx) - 1)
-        ri = findfirst(==(pair_id), rx.indices)
-        rj = findfirst(==(pair_id + 1), rx.indices)
-        (ri === nothing || rj === nothing) && throw(ArgumentError("Replica-exchange local index permutation is inconsistent"))
-
-        rx.steps[pair_id] += 1
-        u = rand(rx.alg[ri].rng)
-        did_accept = attempt_exchange_pair!(rx.alg[ri], rx.alg[rj], xs[ri], xs[rj], u)
-        if did_accept
-            rx.accepted[pair_id] += 1
-            rx.indices[ri], rx.indices[rj] = rx.indices[rj], rx.indices[ri]
-        end
-    end
-
-    rx.stage = 1 - rx.stage
-    return nothing
-end

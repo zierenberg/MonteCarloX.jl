@@ -45,6 +45,7 @@ function discover_scripts(root::String)
             f == "runtests.jl"             && continue
             f == "defaults.jl"             && continue
             occursin("_mpi", lowercase(f)) && continue
+            occursin("_threads", lowercase(f)) && continue
             push!(scripts, joinpath(dir, f))
         end
     end

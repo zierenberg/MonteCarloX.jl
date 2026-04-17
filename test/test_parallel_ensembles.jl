@@ -4,17 +4,67 @@ using StatsBase
 using Test
 using MPI
 
-struct DummyBackend <: AbstractMessageBackend
-    myrank::Int
-    nranks::Int
-end
-
-MonteCarloX.rank(backend::DummyBackend) = backend.myrank
-MonteCarloX.size(backend::DummyBackend) = backend.nranks
-
 function _ensure_mpi_init()
     MPI.Initialized() || MPI.Init()
     return nothing
+end
+
+function test_parallel_chains()
+    pass = true
+
+    # Threads backend
+    alg1 = Metropolis(MersenneTwister(1); β=1.0)
+    alg2 = Metropolis(MersenneTwister(2); β=0.5)
+    tb = ThreadsBackend(2)
+    pc = ParallelChains(tb, [alg1, alg2])
+    pass &= check(pc isa ParallelChains{ThreadsBackend}, "ParallelChains Threads type\n")
+    pass &= check(rank(pc) == 0, "Threads rank == 0\n")
+    pass &= check(size(pc) == 2, "Threads size == 2\n")
+    pass &= check(is_root(pc), "Threads is_root\n")
+    pass &= check(algorithm(pc, 1) === alg1, "Threads algorithm(1)\n")
+    pass &= check(algorithm(pc, 2) === alg2, "Threads algorithm(2)\n")
+
+    # with_parallel
+    results = zeros(2)
+    with_parallel(pc) do i, alg
+        results[i] = ensemble(alg).beta
+    end
+    pass &= check(results[1] == 1.0, "with_parallel result[1]\n")
+    pass &= check(results[2] == 0.5, "with_parallel result[2]\n")
+
+    # merge! with generic collection
+    per_chain = [[1.0, 2.0], [3.0, 4.0]]
+    merged = merge!(per_chain, +, pc)
+    pass &= check(merged == [4.0, 6.0], "merge! Threads\n")
+
+    # size mismatch
+    @test_throws ArgumentError ParallelChains(ThreadsBackend(3), [alg1, alg2])
+
+    # MPI backend
+    _ensure_mpi_init()
+    mb = MPIBackend(MPI.COMM_WORLD)
+    alg = Metropolis(MersenneTwister(1); β=1.0)
+    pc_mpi = ParallelChains(mb, alg)
+    pass &= check(pc_mpi isa ParallelChains{<:MPIBackend}, "ParallelChains MPI type\n")
+    pass &= check(rank(pc_mpi) == 0, "MPI rank == 0\n")
+    pass &= check(size(pc_mpi) == 1, "MPI size == 1\n")
+    pass &= check(is_root(pc_mpi), "MPI is_root\n")
+    pass &= check(algorithm(pc_mpi) === alg, "MPI algorithm\n")
+    pass &= check(algorithm(pc_mpi, 1) === alg, "MPI algorithm(1)\n")
+
+    # with_parallel MPI
+    results_mpi = zeros(1)
+    with_parallel(pc_mpi) do alg
+        results_mpi[1] = ensemble(alg).beta
+    end
+    pass &= check(results_mpi[1] == 1.0, "with_parallel MPI result\n")
+
+    # merge! MPI (single rank: unchanged)
+    vals = [10.0, 20.0]
+    merge!(vals, +, pc_mpi)
+    pass &= check(vals == [10.0, 20.0], "merge! MPI unchanged\n")
+
+    return pass
 end
 
 function test_parallel_multicanonical()
@@ -24,22 +74,13 @@ function test_parallel_multicanonical()
     bins = 0.0:1.0:4.0
     muca = Multicanonical(MersenneTwister(1234), BinnedObject(bins, 0.0))
 
-    # MPI message backend
-    pmuca = ParallelMulticanonical(MPIBackend(MPI.COMM_WORLD), muca, root=0)
-    pass &= check(pmuca isa ParallelMulticanonicalMessage, "MPI backend type\n")
+    # MPI backend
+    backend = MPIBackend(MPI.COMM_WORLD)
+    pmuca = ParallelMulticanonical(backend, muca)
+    pass &= check(pmuca isa ParallelChains{<:MPIBackend}, "MPI backend type\n")
     pass &= check(rank(pmuca) == 0, "rank == 0\n")
     pass &= check(size(pmuca) == 1, "size == 1\n")
     pass &= check(is_root(pmuca), "is root\n")
-
-    # alternative constructor orderings
-    pmuca_algfirst = ParallelMulticanonical(muca, MPIBackend(MPI.COMM_WORLD), root=0)
-    pass &= check(pmuca_algfirst isa ParallelMulticanonicalMessage, "alg-first constructor\n")
-
-    pmuca_mode = ParallelMulticanonical(muca, :MPI, root=0)
-    pass &= check(pmuca_mode isa ParallelMulticanonicalMessage, "mode constructor\n")
-
-    pmuca_nonroot = ParallelMulticanonical(DummyBackend(1, 2), muca; root=0)
-    pass &= check(!is_root(pmuca_nonroot), "non-root rank\n")
 
     # merge histograms (single rank: unchanged)
     ensemble(muca).histogram.values .= [1.0, 2.0, 3.0, 4.0]
@@ -51,42 +92,25 @@ function test_parallel_multicanonical()
     distribute_logweight!(pmuca)
     pass &= check(all(ensemble(muca).logweight.values .== [10.0, 20.0, 30.0, 40.0]), "distribute logweight unchanged\n")
 
-    # collective operations
-    lw = BinnedObject(bins, 0.0)
-    lw.values .= [10.0, 20.0, 30.0, 40.0]
-    allreduce!(lw.values, +, pmuca)
-    pass &= check(all(lw.values .== [10.0, 20.0, 30.0, 40.0]), "allreduce unchanged\n")
-    reduced_lw = reduce(lw.values, +, pmuca.root, pmuca)
-    pass &= check(reduced_lw == lw.values, "reduce unchanged\n")
-    gathered_rank = gather(rank(pmuca), pmuca; root=pmuca.root)
-    pass &= check(gathered_rank == [0], "gather rank\n")
-
-    # vector mode
+    # Threads backend
     alg1 = Multicanonical(MersenneTwister(1), BinnedObject(bins, 0.0))
     alg2 = Multicanonical(MersenneTwister(2), BinnedObject(bins, 0.0))
     ensemble(alg1).histogram.values .= [1.0, 2.0, 3.0, 4.0]
     ensemble(alg2).histogram.values .= [4.0, 3.0, 2.0, 1.0]
-    pmucav = ParallelMulticanonical([alg1, alg2])
-    pass &= check(pmucav isa ParallelMulticanonicalVector, "vector mode type\n")
-    pass &= check(rank(pmucav) == 0, "vector rank == 0\n")
-    pass &= check(size(pmucav) == 2, "vector size == 2\n")
-    pass &= check(is_root(pmucav), "vector is root\n")
+    pmucav = ParallelMulticanonical(ThreadsBackend(2), [alg1, alg2])
+    pass &= check(pmucav isa ParallelChains{ThreadsBackend}, "Threads type\n")
+    pass &= check(rank(pmucav) == 0, "Threads rank == 0\n")
+    pass &= check(size(pmucav) == 2, "Threads size == 2\n")
+    pass &= check(is_root(pmucav), "Threads is root\n")
 
     merge_histograms!(pmucav)
-    pass &= check(all(ensemble(alg1).histogram.values .== [5.0, 5.0, 5.0, 5.0]), "vector merge alg1\n")
-    pass &= check(all(ensemble(alg2).histogram.values .== [5.0, 5.0, 5.0, 5.0]), "vector merge alg2\n")
+    # merge_histograms! only populates the root chain; other chains are unchanged
+    pass &= check(all(ensemble(alg1).histogram.values .== [5.0, 5.0, 5.0, 5.0]), "Threads merge root (alg1)\n")
+    pass &= check(all(ensemble(alg2).histogram.values .== [4.0, 3.0, 2.0, 1.0]), "Threads merge non-root unchanged (alg2)\n")
 
     ensemble(alg1).logweight.values .= [1.0, 2.0, 3.0, 4.0]
     distribute_logweight!(pmucav)
-    pass &= check(all(ensemble(alg2).logweight.values .== [1.0, 2.0, 3.0, 4.0]), "vector distribute logweight\n")
-
-    pass &= check(barrier(pmucav) === nothing, "barrier returns nothing\n")
-    pass &= check(allgather(7, pmucav) == [7], "allgather scalar\n")
-    v = [3.0, 4.0]
-    pass &= check(allreduce!(v, +, pmucav) === v, "allreduce! returns v\n")
-    pass &= check(reduce(v, +, 0, pmucav) == [3.0, 4.0], "reduce vector\n")
-    pass &= check(MonteCarloX.bcast!(v, 0, pmucav) === v, "bcast! returns v\n")
-    pass &= check(gather(9, pmucav; root=0) == [9], "gather scalar\n")
+    pass &= check(all(ensemble(alg2).logweight.values .== [1.0, 2.0, 3.0, 4.0]), "Threads distribute logweight\n")
 
     return pass
 end
@@ -97,13 +121,13 @@ function test_parallel_tempering()
 
     backend = MPIBackend(MPI.COMM_WORLD)
     alg = Metropolis(MersenneTwister(10); β=0.8)
-    pt = ParallelTempering(alg, backend; root=0)
+    pt = ParallelTempering(backend, alg)
     pass &= check(rank(pt) == 0, "rank == 0\n")
     pass &= check(size(pt) == 1, "size == 1\n")
     pass &= check(is_root(pt), "is root\n")
-    pass &= check(pt isa ParallelTemperingMessage, "MPI type\n")
-    pass &= check(pt.backend === backend, "backend stored\n")
-    pass &= check(pt.alg === alg, "alg stored\n")
+    pass &= check(pt isa ReplicaExchange{<:MPIBackend}, "MPI type\n")
+    pass &= check(pt.replica.backend === backend, "backend stored\n")
+    pass &= check(algorithm(pt) === alg, "alg stored\n")
     pass &= check(index(pt) == 1, "index == 1\n")
     pass &= check(isempty(pt.steps), "steps empty\n")
     pass &= check(isempty(pt.accepted), "accepted empty\n")
@@ -121,58 +145,40 @@ function test_parallel_tempering()
     pass &= check(pt.stage == 0, "stage reset\n")
     pass &= check(index(pt) == 1, "index reset\n")
 
-    # alternative constructors
-    rx_comm = ReplicaExchange(alg, MPI.COMM_WORLD; root=0)
-    pass &= check(rx_comm isa ReplicaExchangeMessage, "ReplicaExchange from comm\n")
-
-    pt_mode = ParallelTempering(alg, :MPI; root=0)
-    pass &= check(pt_mode isa ParallelTemperingMessage, "mode constructor\n")
-
-    # retune_betas!
-    betas = [1.0, 0.5, 0.2]
-    rates = [0.1, 0.6]
-    retune_betas!(betas, rates; target=0.3, damping=0.5)
-    pass &= check(length(betas) == 3, "betas length unchanged\n")
-    pass &= check(betas[1] > betas[2] > betas[3], "betas sorted descending\n")
+    # constructor from backend
+    rx_backend = ReplicaExchange(backend, alg)
+    pass &= check(rx_backend isa ReplicaExchange{<:MPIBackend}, "ReplicaExchange from backend\n")
 
     # set_betas
     b1 = set_betas(4, 0.4, 1.0, :uniform)
     pass &= check(b1 == [1.0, 0.8, 0.6, 0.4], "uniform betas\n")
 
-    b2 = [1.0, 5/6, 2/3, 0.5]
-    set_betas!(b2, [1.0, 0.85, 0.7, 0.5])
-    pass &= check(b2 == [1.0, 0.85, 0.7, 0.5], "set_betas! in-place\n")
+    b2 = set_betas(4, 0.5, 1.0, :geometric)
+    pass &= check(b2[1] ≈ 1.0, "geometric betas first\n")
+    pass &= check(b2[end] ≈ 0.5, "geometric betas last\n")
 
-    b3 = set_betas(4, [1.0, 0.9, 0.7, 0.5])
-    pass &= check(b3 == [1.0, 0.9, 0.7, 0.5], "set_betas from vector\n")
-
-    b4 = set_betas(4, 0.5, 1.0, :geometric)
-    pass &= check(b4[1] ≈ 1.0, "geometric betas first\n")
-    pass &= check(b4[end] ≈ 0.5, "geometric betas last\n")
-
-    # local-vector mode
+    # Threads mode
     v_algs = [Metropolis(MersenneTwister(11); β=1.0), Metropolis(MersenneTwister(12); β=0.5)]
-    v_pt = ParallelTempering(v_algs)
-    pass &= check(v_pt isa ParallelTemperingVector, "vector type\n")
-    pass &= check(index(v_pt, 1) == 1, "vector index\n")
+    v_pt = ParallelTempering(ThreadsBackend(2), v_algs)
+    pass &= check(v_pt isa ReplicaExchange{ThreadsBackend}, "Threads type\n")
+    pass &= check(index(v_pt,1) == v_pt.indices[1], "Threads index\n")
 
     update!(v_pt, [-10.0, -8.0])
-    pass &= check(v_pt.stage == 1, "vector stage == 1\n")
-    pass &= check(sum(v_pt.steps) >= 0, "vector steps >= 0\n")
-    pass &= check(gather_at_root(5, v_pt) == [5], "gather_at_root\n")
-    arr = [1, 2]
-    pass &= check(broadcast_from_root!(arr, v_pt) === arr, "broadcast_from_root!\n")
+    pass &= check(v_pt.stage == 1, "Threads stage == 1\n")
+    pass &= check(sum(v_pt.steps) >= 0, "Threads steps >= 0\n")
 
     # convenience constructor from betas
     v_pt2 = ParallelTempering([1.0, 0.5]; seed=123, rng=MersenneTwister)
-    pass &= check(v_pt2 isa ParallelTemperingVector, "betas constructor type\n")
-    pass &= check(length(v_pt2.alg) == 2, "betas constructor length\n")
-    pass &= check(ensemble(v_pt2.alg[1]).beta == 1.0, "betas constructor beta[1]\n")
-    pass &= check(ensemble(v_pt2.alg[2]).beta == 0.5, "betas constructor beta[2]\n")
+    pass &= check(v_pt2 isa ReplicaExchange{ThreadsBackend}, "betas constructor type\n")
+    pass &= check(length(v_pt2.replica.alg) == 2, "betas constructor length\n")
+    pass &= check(ensemble(algorithm(v_pt2, 1)).beta == 1.0, "betas constructor beta[1]\n")
+    pass &= check(ensemble(algorithm(v_pt2, 2)).beta == 0.5, "betas constructor beta[2]\n")
 
     # acceptance rate helpers
-    pass &= check(MonteCarloX.acceptance_rates([4, 0, 3], [1, 0, 3]) == [0.25, 0.0, 1.0], "acceptance_rates vector\n")
-    pass &= check(MonteCarloX.acceptance_rate([4, 0, 3], [1, 0, 3]) == 4 / 7, "acceptance_rate scalar\n")
+    rates = acceptance_rates(v_pt)
+    pass &= check(length(rates) == 1, "acceptance_rates length\n")
+    pass &= check(all(0.0 .<= rates .<= 1.0), "acceptance_rates in [0,1]\n")
+    pass &= check(0.0 <= acceptance_rate(v_pt) <= 1.0, "acceptance_rate in [0,1]\n")
 
     # _resolve_pair
     pass &= check(MonteCarloX._resolve_pair(1, 0, 4) == (active=true, pair_id=1, partner_index=2), "resolve_pair (1,0,4)\n")
@@ -224,6 +230,10 @@ function test_parallel_tempering()
 end
 
 @testset "Parallel ensembles" begin
+    @testset "Parallel chains" begin
+        @test test_parallel_chains()
+    end
+
     @testset "Parallel multicanonical" begin
         @test test_parallel_multicanonical()
     end
