@@ -50,6 +50,13 @@ export  ThreadsBackend,
         size,
         is_root
 
+include("infrastructure/parallel_chains.jl")
+export  ParallelChains,
+        algorithm,
+        on_root,
+        with_parallel,
+        merge!
+
 include("infrastructure/checkpointing.jl")
 export  CheckpointSession,
         init_checkpoint,
@@ -129,13 +136,6 @@ export  HeatBath
 
 include("algorithms/multicanonical.jl")
 export  Multicanonical
-
-include("algorithms/parallel_chains.jl")
-export  ParallelChains,
-        algorithm,
-        on_root,
-        with_parallel,
-        merge!
 
 include("algorithms/parallel_multicanonical.jl")
 export  ParallelMulticanonical,

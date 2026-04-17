@@ -80,32 +80,33 @@ meas = Measurements([
 index_trace = Vector{Vector{Int}}()
 
 n_exchanges = nmeasurements ÷ sweeps_between_exchange
-sample_counter = 0
-for exch in 1:n_exchanges
-    ## re-thermalize after exchange
-    for r in 1:nreplicas
-        for _ in 1:ntherm_after_exchange
-            sweep_replica!(systems[r], algorithm(pt, r), L)
-        end
-    end
-
-    ## measure
-    for _ in 1:sweeps_between_exchange
+let sample_counter = 0
+    for exch in 1:n_exchanges
+        ## re-thermalize after exchange
         for r in 1:nreplicas
-            sweep_replica!(systems[r], algorithm(pt, r), L)
-            energies[r] = energy(systems[r])
-            mags[r] = magnetization(systems[r])
+            for _ in 1:ntherm_after_exchange
+                sweep_replica!(systems[r], algorithm(pt, r), L)
+            end
         end
-        sample_counter += 1
-        n_before = length(data(meas, :energies))
-        measure!(meas, nothing, sample_counter)
-        if length(data(meas, :energies)) > n_before
-            push!(index_trace, copy(index(pt)))
+
+        ## measure
+        for _ in 1:sweeps_between_exchange
+            for r in 1:nreplicas
+                sweep_replica!(systems[r], algorithm(pt, r), L)
+                energies[r] = energy(systems[r])
+                mags[r] = magnetization(systems[r])
+            end
+            sample_counter += 1
+            n_before = length(data(meas, :energies))
+            measure!(meas, nothing, sample_counter)
+            if length(data(meas, :energies)) > n_before
+                push!(index_trace, copy(index(pt)))
+            end
         end
+        ## replica exchange
+        MonteCarloX.update!(pt, energies)
     end
-    ## replica exchange
-    MonteCarloX.update!(pt, energies)
-end
+end 
 
 energy_samples = [Float64[] for _ in 1:nreplicas]
 mag_samples = [Float64[] for _ in 1:nreplicas]
