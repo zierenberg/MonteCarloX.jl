@@ -22,6 +22,27 @@ end
 @inline size(rx::ReplicaExchange) = size(rx.replica)
 @inline is_root(rx::ReplicaExchange) = is_root(rx.replica)
 @inline algorithm(rx::ReplicaExchange, args...) = algorithm(rx.replica, args...)
+@inline with_parallel(f, rx::ReplicaExchange) = with_parallel(f, rx.replica)
+
+"""
+    on_root(f, rx::ReplicaExchange)
+
+Run a block on the root chain only; no-op on non-root ranks.
+Consistent with `on_root(f, pc::ParallelChains)`.  The callback
+may take zero or one argument (root chain index).
+"""
+@inline function on_root(f, rx::ReplicaExchange{ThreadsBackend})
+    i = root_chain(rx.replica)
+    return applicable(f, i) ? f(i) : f()
+end
+
+@inline function on_root(f, rx::ReplicaExchange{<:MPIBackend})
+    if !is_root(rx)
+        return nothing
+    end
+    i = root_chain(rx.replica)
+    return applicable(f, i) ? f(i) : f()
+end
 
 # indexing
 @inline index(rx::ReplicaExchange{<:ThreadsBackend}, i::Integer) = rx.indices[i]

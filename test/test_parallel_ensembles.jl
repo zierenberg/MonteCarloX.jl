@@ -24,11 +24,13 @@ function test_parallel_chains()
     pass &= check(algorithm(pc, 1) === alg1, "Threads algorithm(1)\n")
     pass &= check(algorithm(pc, 2) === alg2, "Threads algorithm(2)\n")
 
-    # run! with generic results
+    # with_parallel
     results = zeros(2)
-    run!((alg, res, i) -> (res[i] = ensemble(alg).beta), pc, results)
-    pass &= check(results[1] == 1.0, "run! result[1]\n")
-    pass &= check(results[2] == 0.5, "run! result[2]\n")
+    with_parallel(pc) do i, alg
+        results[i] = ensemble(alg).beta
+    end
+    pass &= check(results[1] == 1.0, "with_parallel result[1]\n")
+    pass &= check(results[2] == 0.5, "with_parallel result[2]\n")
 
     # merge! with generic collection
     per_chain = [[1.0, 2.0], [3.0, 4.0]]
@@ -50,10 +52,12 @@ function test_parallel_chains()
     pass &= check(algorithm(pc_mpi) === alg, "MPI algorithm\n")
     pass &= check(algorithm(pc_mpi, 1) === alg, "MPI algorithm(1)\n")
 
-    # run! MPI
+    # with_parallel MPI
     results_mpi = zeros(1)
-    run!((alg, res, i) -> (res[i] = ensemble(alg).beta), pc_mpi, results_mpi)
-    pass &= check(results_mpi[1] == 1.0, "run! MPI result\n")
+    with_parallel(pc_mpi) do alg
+        results_mpi[1] = ensemble(alg).beta
+    end
+    pass &= check(results_mpi[1] == 1.0, "with_parallel MPI result\n")
 
     # merge! MPI (single rank: unchanged)
     vals = [10.0, 20.0]
@@ -100,8 +104,9 @@ function test_parallel_multicanonical()
     pass &= check(is_root(pmucav), "Threads is root\n")
 
     merge_histograms!(pmucav)
-    pass &= check(all(ensemble(alg1).histogram.values .== [5.0, 5.0, 5.0, 5.0]), "Threads merge alg1\n")
-    pass &= check(all(ensemble(alg2).histogram.values .== [5.0, 5.0, 5.0, 5.0]), "Threads merge alg2\n")
+    # merge_histograms! only populates the root chain; other chains are unchanged
+    pass &= check(all(ensemble(alg1).histogram.values .== [5.0, 5.0, 5.0, 5.0]), "Threads merge root (alg1)\n")
+    pass &= check(all(ensemble(alg2).histogram.values .== [4.0, 3.0, 2.0, 1.0]), "Threads merge non-root unchanged (alg2)\n")
 
     ensemble(alg1).logweight.values .= [1.0, 2.0, 3.0, 4.0]
     distribute_logweight!(pmucav)

@@ -26,6 +26,42 @@ end
 @inline size(pc::ParallelChains) = size(pc.backend)
 @inline is_root(pc::ParallelChains) = is_root(pc.backend)
 
+# 1-based chain index of the root chain.
+# Threads: conventionally chain 1. MPI: index corresponding to backend.root.
+@inline root_chain(::ParallelChains{ThreadsBackend}) = 1
+@inline root_chain(pc::ParallelChains{<:MPIBackend}) = pc.backend.root + 1
+
+"""
+    on_root(f, pc::ParallelChains)
+
+Run a block on the root chain only; no-op on non-root ranks.
+
+The callback may take zero or one argument.  When one argument is
+accepted it receives the root chain index, useful for fetching
+the algorithm:
+
+    on_root(pmuca) do i
+        alg = algorithm(pmuca, i)
+        update!(ensemble(alg); mode=:simple)
+    end
+
+    on_root(pt) do
+        println("done")
+    end
+"""
+@inline function on_root(f, pc::ParallelChains{ThreadsBackend})
+    i = root_chain(pc)
+    return applicable(f, i) ? f(i) : f()
+end
+
+@inline function on_root(f, pc::ParallelChains{<:MPIBackend})
+    if !is_root(pc)
+        return nothing
+    end
+    i = root_chain(pc)
+    return applicable(f, i) ? f(i) : f()
+end
+
 function ParallelChains(backend::ThreadsBackend, alg::AbstractVector{<:AbstractAlgorithm})
     length(alg) == size(backend) || throw(ArgumentError(
         "number of algorithms ($(length(alg))) must match backend size ($(size(backend)))"))
@@ -39,59 +75,39 @@ end
 
 
 """
-    run!(f!, pc::ParallelChains, results)
+    with_parallel(f, pc::ParallelChains)
 
-Run `f!(alg, results, i)` for each chain, writing results in-place.
+Run `f` for each chain in parallel.
 
-- Threads: each thread calls `f!(alg, results, i)` for its chain index `i`.
-- MPI: each rank calls `f!(alg, results, i)` with `i = rank(pc) + 1`.
+- Threads: calls `f(i, alg)` for each chain via `Threads.@threads`.
+- MPI: calls `f(alg)` once on the local rank.
 
-The function `f!(alg, results, i)` receives the chain's algorithm, the result
-container, and the 1-based chain index. It must store its output in-place.
+Note the different callback signatures: threads receives `(i, alg)` because
+shared-memory code needs the chain index for storage; MPI receives `(alg)` only
+because each rank owns exactly one chain.
+
+    # Threads
+    with_parallel(pc) do i, alg
+        ...
+    end
+
+    # MPI
+    with_parallel(pc) do alg
+        ...
+    end
 """
-function run!(f!, pc::ParallelChains{ThreadsBackend}, results)
+function with_parallel(f, pc::ParallelChains{ThreadsBackend})
     n = size(pc)
     Threads.@threads for i in 1:n
-        f!(algorithm(pc, i), results, i)
+        f(i, algorithm(pc, i))
     end
-    return results
+    return nothing
 end
 
-function run!(f!, pc::ParallelChains{<:MPIBackend}, results)
-    i = rank(pc) + 1
-    f!(algorithm(pc), results, i)
-    return results
+function with_parallel(f, pc::ParallelChains{<:MPIBackend})
+    f(algorithm(pc))
+    return nothing
 end
-
-# This is used as 
-#all_results = [zeros(3) for _ in 1:size(pc)]
-
-# run!(pc, all_results) do alg, results, i
-#     x = randn(alg.rng)
-#     Δ = 1.5
-
-#     for _ in 1:burn_in
-#         x_new = x + Δ * randn(alg.rng)
-#         accept!(alg, x_new, x) && (x = x_new)
-#     end
-#     reset!(alg)
-
-#     sum_x  = 0.0
-#     sum_x2 = 0.0
-
-#     for _ in 1:n_steps
-#         x_new = x + Δ * randn(alg.rng)
-#         accept!(alg, x_new, x) && (x = x_new)
-#         sum_x  += x
-#         sum_x2 += x^2
-#     end
-
-#     @inbounds begin
-#         results[i][1] = sum_x
-#         results[i][2] = sum_x2
-#         results[i][3] = Float64(n_steps)
-#     end
-# end
 
 
 """

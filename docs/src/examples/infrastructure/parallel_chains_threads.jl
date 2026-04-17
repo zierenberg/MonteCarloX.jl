@@ -7,15 +7,22 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 # # Parallel Chains (Threads)
 #
 # Run parallel Markov chains with a thread-based backend.
-# Launch Julia with multiple threads to see the speedup:
+# Launch with:
 # ```bash
 # julia --threads=4 --project docs/src/examples/infrastructure/parallel_chains_threads.jl
 # ```
-# In single-threaded mode this would fail to run.
+#
+# With only a single chain this fails due to replica-exchange requirements nthreads>=2;
 #
 # For the MPI version (HPC clusters), see `parallel_chains_mpi.jl`.
+#
+# Key differences from the MPI version (kept visible on purpose):
+# - Operates explicitly on vector of `alg` and vector of `sys`;
+# - Data is stored in shared memory and can be accessed by threads;
+# - Parallelization needs to be actively enabled via `with_parallel` or `Threads.@threads`;
+# - MonteCarloX API on parallel chain uses vectors of objects directly in shared memory
 
-using Random, Statistics, StatsBase, Plots
+using Random, Statistics, StatsBase, Plots, ProgressMeter
 using MonteCarloX
 
 # ## Setup
@@ -45,10 +52,10 @@ Ebins = E_min:0.005:E_max
 
 # ## Parameters
 
-n_samples = CI_MODE ? 50 : 100_000
+n_samples = CI_MODE ? 50 : 50_000
 n_burn_in = CI_MODE ? 10 : 500
 n_sweep   = CI_MODE ? 10 : 100
-n_iter    = CI_MODE ? 2 : 10
+n_iter    = CI_MODE ? 2 : 6
 
 backend  = ThreadsBackend()
 beta_ref = 10.0
@@ -65,30 +72,34 @@ pc_algs = [Metropolis(Xoshiro(1000 + i); β=beta_ref) for i in 1:size(backend)]
 pc      = ParallelChains(backend, pc_algs)
 pc_sys  = [System(0.0) for i in 1:size(backend)]
 
+# shared memory storage: each thread writes to its own row, no synchronization needed.
 pc_xs = zeros(Float64, size(backend), n_samples)
 pc_Es = zeros(Float64, size(backend), n_samples)
 
-Threads.@threads for i in 1:size(backend)
-    alg = algorithm(pc, i)
-    # burn in
+time = @elapsed with_parallel(pc) do i, alg
+    sys = pc_sys[i]
     for _ in 1:n_burn_in
-        for _ in 1:n_sweep; update!(pc_sys[i], alg); end
+        for _ in 1:n_sweep; update!(sys, alg); end
     end
     reset!(alg)
-    # measurements
     for j in 1:n_samples
-        for _ in 1:n_sweep; update!(pc_sys[i], alg); end
-        pc_xs[i, j] = pc_sys[i].x
-        pc_Es[i, j] = E(pc_sys[i])
+        for _ in 1:n_sweep; update!(sys, alg); end
+        pc_xs[i, j] = sys.x
+        pc_Es[i, j] = E(sys)
     end
 end
 
-global_samples = vcat(pc_xs...)
-println("## Independent chains (beta=$beta_ref)")
-for i in 1:size(pc)
-    println("  chain $i: mean=$(round(mean(pc_xs[i,:]); digits=3)), std=$(round(std(pc_Es[i,:]); digits=3))")
+# No need to merge samples, we have shared memory
+# 
+#
+
+on_root(pc) do 
+    println("## Independent chains (beta=$beta_ref) took $(round(time; digits=2)) seconds")
+    for i in 1:size(pc)
+        println("  chain $i: mean_x=$(round(mean(pc_xs[i,:]); digits=3)), mean_E=$(round(mean(pc_Es[i,:]); digits=3))")
+    end
+    println("  merged:  mean_x=$(round(mean(pc_xs); digits=3)), mean_E=$(round(mean(pc_Es); digits=3))")
 end
-println("  merged:  mean=$(round(mean(global_samples); digits=3)), std=$(round(std(global_samples); digits=3))")
 
 # ## Parallel tempering
 #
@@ -101,15 +112,13 @@ pt_algs = [Metropolis(Xoshiro(2000 + i); β=betas_pt[i]) for i in 1:size(backend
 pt      = ParallelTempering(backend, pt_algs)
 pt_sys  = [System(0.0) for _ in 1:size(pt)]
 
+# global storage
 pt_xs = zeros(Float64, size(pt), n_samples)
 pt_Es = zeros(Float64, size(pt), n_samples)
 
 exchange_after_sample = 100
-# outer loop is over swaps
-for s in 1:Int(n_samples / exchange_after_sample)
-    # sample independently
-    Threads.@threads for i in 1:size(pt)
-        alg = algorithm(pt, i)
+time = @elapsed for s in 1:Int(n_samples / exchange_after_sample)
+    with_parallel(pt) do i, alg
         sys = pt_sys[i]
         for _ in 1:n_burn_in
             for _ in 1:n_sweep; update!(sys, alg); end
@@ -121,40 +130,54 @@ for s in 1:Int(n_samples / exchange_after_sample)
             pt_Es[index(pt, i), (s-1)*exchange_after_sample + j] = E(sys)
         end
     end
-    # replica exchange every `exchange_after_sample` samples
+    # replica exchange gets full energy array, here we are no longer parallel
     MonteCarloX.update!(pt, E.(pt_sys))
 end
 
-println("\n## Parallel Tempering (betas = $(round.(betas_pt; digits=2)))")
-println("Exchange acceptance rates: ", round.(acceptance_rates(pt); digits=3))
-for (i, b) in enumerate(betas_pt)
-    s = pt_xs[i, :]
-    println("  beta=$(round(b; digits=2)): $(length(s)) samples, mean=$(round(mean(s); digits=3)), std=$(round(std(s); digits=3))")
+# No need to gather samples, we have shared memory
+
+
+
+
+
+
+
+
+
+
+
+on_root(pt) do _
+    println("\n## Parallel Tempering (betas = $(round.(betas_pt; digits=2))) took $(round(time; digits=2)) seconds")
+    println("Exchange acceptance rates: ", round.(acceptance_rates(pt); digits=3))
+    for (i, b) in enumerate(betas_pt)
+        s = pt_xs[i, :]
+        println("  beta=$(round(b; digits=2)): $(length(s)) samples, mean=$(round(mean(s); digits=3)), std=$(round(std(s); digits=3))")
+    end
 end
 
 # ## Multicanonical sampling with parallel chains
 #
-# Same potential, but now we use multicanonical sampling to flatten the
-# energy histogram.  Each chain iteratively refines its weights by
-# merging histograms and distributing logweights across chains. 
+# Each chain runs a multicanonical sampler; after each iteration we merge
+# histograms to root, refine the logweight on root, and distribute the
+# new logweight back to all chains.
 pmuca_algs = [Multicanonical(Xoshiro(3000 + i), Ebins) for i in 1:size(backend)]
 pmuca      = ParallelMulticanonical(backend, pmuca_algs)
 pmuca_sys  = [System(0.0) for i in 1:size(backend)]
 
-# initalize logweights with low temperature to remain within the energy range of interest and get nonzero histogram counts for the first merge step
-beta_bound = beta_ref*2
-# TODO: convention here is "chain 1 acts as root"; MPI version uses is_root.
-# Both should converge to a single API (e.g. root_algorithm(pmuca)).
-alg_root = algorithm(pmuca, 1)
-set!(logweight(alg_root), E -> -beta_bound * E)
+# Initialize logweights with low temperature so chains stay in-range and
+# the first histogram merge has non-zero counts.
+beta_bound = beta_ref * 2
+on_root(pmuca) do i
+    alg = algorithm(pmuca, i)
+    set!(logweight(alg), E -> -beta_bound * E)
+end
 distribute_logweight!(pmuca)
 
-E_left = 0.0
+E_left  = 0.0
 E_right = 3.0
 
-using ProgressMeter
-@showprogress for iter in 1:n_iter
-    # sample independently
+prog = is_root(pmuca) ? Progress(n_iter; desc="pmuca iter") : nothing
+time_iter = @elapsed for iter in 1:n_iter
     Threads.@threads for i in 1:size(pmuca)
         alg = algorithm(pmuca, i)
         sys = pmuca_sys[i]
@@ -162,23 +185,25 @@ using ProgressMeter
             for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
         end
         reset!(alg)
-        for j in 1:Int(round(n_samples/n_iter*iter))
+        for j in 1:Int(round(n_samples / n_iter * iter))
             for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
         end
     end
     merge_histograms!(pmuca)
-    # TODO: "get root for threads" - needs to run via update!(pmuca) that sorts this out
-    # (alg_root is chain 1, same object every iteration)
-    MonteCarloX.update!(ensemble(alg_root); mode=:simple)
-    set!(logweight(alg_root), (E_right, E_max),
-         E -> logweight(alg_root)(E_right) - beta_bound * (E - E_right))
+    on_root(pmuca) do i
+        alg = algorithm(pmuca, i)
+        MonteCarloX.update!(ensemble(alg); mode=:simple)
+        set!(logweight(alg), (E_right, E_max),
+             E -> logweight(alg)(E_right) - beta_bound * (E - E_right))
+        next!(prog)
+    end
     distribute_logweight!(pmuca)
 end
-# production run with final weights
-pmuca_xs = zeros(Float64, size(pmuca), n_samples);
-pmuca_Es = zeros(Float64, size(pmuca), n_samples);
-Threads.@threads for i in 1:size(pmuca)
-    alg = algorithm(pmuca, i)
+
+# Production run with final weights.
+pmuca_xs = zeros(Float64, size(pmuca), n_samples)
+pmuca_Es = zeros(Float64, size(pmuca), n_samples)
+time_prod = @elapsed with_parallel(pmuca) do i, alg
     sys = pmuca_sys[i]
     for j in 1:n_samples
         for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
@@ -186,16 +211,16 @@ Threads.@threads for i in 1:size(pmuca)
         pmuca_Es[i, j] = E(sys)
     end
 end
-# merge samples with final weights
-pmuca_xs = vec(pmuca_xs);
-pmuca_Es = vec(pmuca_Es);
 
-println("\n## Parallel Multicanonical")
-# acceptance rate per chain (pmuca is a ParallelChains, not a ReplicaExchange;
-# no acceptance_rates helper exists here — compute per chain manually).
-println("Acceptance rates (per chain): ",
-        round.([acceptance_rate(algorithm(pmuca, i)) for i in 1:size(pmuca)]; digits=2))
-# TODO: print metrics like roundtrips that still need to be implemented.
+# No need to gather samples, we have shared memory.
+pmuca_xs = vec(pmuca_xs)
+pmuca_Es = vec(pmuca_Es)
+
+on_root(pmuca) do 
+    println("\n## Parallel Multicanonical took $(round(time_iter; digits=2)) seconds for iterations and $(round(time_prod; digits=2)) seconds for production runs")
+    println("Acceptance rates (per chain): ",
+            round.([acceptance_rate(algorithm(pmuca, i)) for i in 1:size(pmuca)]; digits=2))
+end
 
 
 

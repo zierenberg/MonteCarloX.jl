@@ -133,7 +133,8 @@ export  Multicanonical
 include("algorithms/parallel_chains.jl")
 export  ParallelChains,
         algorithm,
-        run!,
+        on_root,
+        with_parallel,
         merge!
 
 include("algorithms/parallel_multicanonical.jl")

@@ -12,32 +12,24 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 # mpiexec -n 4 julia --project docs/src/examples/infrastructure/parallel_chains_mpi.jl
 # ```
 #
-# This example is the MPI counterpart to `parallel_chains_threads.jl` and
-# mirrors it section-by-section so you can see where the two backends
-# share an API and where MPI's distributed memory forces asymmetries.
+# With only a single chain this fails due to replica-exchange requirements nthreads>=2;
 #
-# Key differences from the threads version (kept visible on purpose):
+# For the threads version (single node, shared memory), see `parallel_chains_threads.jl`.
 #
-# - Each rank owns exactly one `alg` and one `sys`; there is no array of
-#   replicas on a single process. `algorithm(pc)` returns *this rank's*
-#   algorithm, not a vector.
-# - Data arrays are **rank-local**. To print global statistics or draw
-#   plots we must gather/reduce explicitly (`merge!(...)`, `MPI.gather`,
-#   `MPI.Reduce!`).
-# - Anything that is "chain-1-only" in the threads example becomes a
-#   `is_root(backend)` guard here (e.g. the `update!(ensemble; ...)` step
-#   in the multicanonical refinement).
-# - `update!(pt, ...)` takes a *scalar* local energy on MPI, but a vector
-#   of energies (one per chain) on threads.
+# Key differences from threads version (kept visible on purpose):
+# - Each rank owns exactly one `alg` and one `sys`;
+# - Data needs to be stored locally and exchanged via MPI;
+# - Parallelization is implicit in the one-algorithm-per-rank design; uses on_root(), is_root() and with_parallel() to manage asymmetric steps and rank-local operations;
+# - MonteCarloX API on parallel chains uses individual objects, communication via API;
 
-using Random, Statistics, StatsBase, Plots
-using MPI
-using MonteCarloX
+using Random, Statistics, StatsBase, Plots, ProgressMeter
+using MonteCarloX, MPI
 
 # ## Setup
 #
-# Identical physics to the threads example: double-well potential with
-# minima at ``x = \pm 1``.
+# We sample a double-well potential ``E(x) = (x^2 - 1)^2`` with minima at
+# ``x = \pm 1``.  At low temperature a single chain gets trapped in one
+# well; parallel tempering enables barrier crossings.
 
 const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
 
@@ -60,10 +52,10 @@ Ebins = E_min:0.005:E_max
 
 # ## Parameters
 
-n_samples = CI_MODE ? 50 : 100_000
+n_samples = CI_MODE ? 50 : 50_000
 n_burn_in = CI_MODE ? 10 : 500
 n_sweep   = CI_MODE ? 10 : 100
-n_iter    = CI_MODE ? 2 : 10
+n_iter    = CI_MODE ? 2 : 6
 
 backend  = init(:MPI)
 beta_ref = 10.0
@@ -71,9 +63,10 @@ betas_pt = set_betas(size(backend), 0.1, beta_ref, :geometric)
 
 # ## Independent parallel chains
 #
-# Each rank samples the same target independently. At high beta each
-# chain gets trapped in whichever well it starts near — merging does NOT
-# fix this, only diagnoses it.
+# Each chain samples the same target independently. At high beta (low
+# temperature) each chain gets trapped in whichever well it starts near.
+# Merging samples from all chains does NOT fix this — you just get a
+# biased mixture of trapped chains.
 
 pc_alg = Metropolis(Xoshiro(1000 + rank(backend) + 1); β=beta_ref)
 pc     = ParallelChains(backend, pc_alg)
@@ -83,7 +76,8 @@ pc_sys = System(0.0)
 pc_xs_local = zeros(Float64, n_samples)
 pc_Es_local = zeros(Float64, n_samples)
 
-let alg = algorithm(pc), sys = pc_sys
+time = @elapsed with_parallel(pc) do alg
+    sys = pc_sys
     for _ in 1:n_burn_in
         for _ in 1:n_sweep; update!(sys, alg); end
     end
@@ -95,24 +89,16 @@ let alg = algorithm(pc), sys = pc_sys
     end
 end
 
-# Per-chain statistics: compute local mean/std on each rank, gather to
-# root for a per-chain printout. The threads example could read
-# `pc_xs[i,:]` directly from any thread; we cannot.
-pc_local_stats = [mean(pc_xs_local), std(pc_Es_local)]
-pc_all_stats   = MPI.gather(pc_local_stats, backend.comm; root=backend.root)
+# Gather all per-rank samples to root for statistics and plotting.
+pc_xs = MPI.gather(pc_xs_local, backend.comm; root=backend.root)
+pc_Es = MPI.gather(pc_Es_local, backend.comm; root=backend.root)
 
-# Global mean/std via an allreduce-style merge on (sum, sum², n).
-pc_agg_local = [sum(pc_xs_local), sum(abs2, pc_xs_local), Float64(n_samples)]
-pc_agg_total = MonteCarloX.merge!(copy(pc_agg_local), +, pc)
-pc_mean_glob = pc_agg_total[1] / pc_agg_total[3]
-pc_std_glob  = sqrt(pc_agg_total[2] / pc_agg_total[3] - pc_mean_glob^2)
-
-if is_root(pc)
-    println("## Independent chains (beta=$beta_ref)")
-    for (i, s) in enumerate(pc_all_stats)
-        println("  chain $i: mean=$(round(s[1]; digits=3)), std=$(round(s[2]; digits=3))")
+on_root(pc) do
+    println("## Independent chains (beta=$beta_ref) took $(round(time; digits=2)) seconds")
+    for i in 1:size(pc)
+        println("  chain $i: mean_x=$(round(mean(pc_xs[i]); digits=3)), mean_E=$(round(mean(pc_Es[i]); digits=3))")
     end
-    println("  merged:  mean=$(round(pc_mean_glob; digits=3)), std=$(round(pc_std_glob; digits=3))")
+    println("  merged:  mean_x=$(round(mean(vcat(pc_xs...)); digits=3)), mean_E=$(round(mean(vcat(pc_Es...)); digits=3))")
 end
 
 # ## Parallel tempering
@@ -126,71 +112,55 @@ pt_alg = Metropolis(Xoshiro(2000 + rank(backend) + 1); β=betas_pt[rank(backend)
 pt     = ParallelTempering(backend, pt_alg)
 pt_sys = System(0.0)
 
-# Ragged per-ladder storage on each rank: samples contributed by this
-# rank while it occupied each ladder position.
-pt_xs_local = [Float64[] for _ in 1:size(pt)]
-pt_Es_local = [Float64[] for _ in 1:size(pt)]
+# Each rank stores (ladder_index, x, E) tuples in a flat vector.
+pt_samples_local = Tuple{Int,Float64,Float64}[]
+
 
 exchange_after_sample = 100
-for s in 1:Int(n_samples / exchange_after_sample)
-    alg = algorithm(pt)
-    sys = pt_sys
-    for _ in 1:n_burn_in
-        for _ in 1:n_sweep; update!(sys, alg); end
-    end
-    reset!(alg)
-    for j in 1:exchange_after_sample
-        for _ in 1:n_sweep; update!(sys, alg); end
-        push!(pt_xs_local[index(pt)], sys.x)
-        push!(pt_Es_local[index(pt)], E(sys))
-    end
-    # NOTE API asymmetry: threads passes E.(pt_sys) (a vector, one entry
-    # per replica on the shared-memory side); MPI passes the rank-local
-    # scalar energy E(sys). Both are "the local energy(ies)", but the
-    # signatures differ.
-    MonteCarloX.update!(pt, E(sys))
-end
-
-# Gather ragged per-ladder samples to root. One `MPI.gather` per ladder
-# position; could be compressed with a custom serialization, but kept
-# explicit for clarity.
-function gather_per_index(local_per_ladder, bk::MPIBackend)
-    n = length(local_per_ladder)
-    out = is_root(bk) ? [Float64[] for _ in 1:n] : Float64[]
-    for i in 1:n
-        chunks = MPI.gather(local_per_ladder[i], bk.comm; root=bk.root)
-        if is_root(bk)
-            append!(out[i], vcat(chunks...))
+time = @elapsed for s in 1:Int(n_samples / exchange_after_sample)
+    with_parallel(pt) do alg
+        sys = pt_sys
+        for _ in 1:n_burn_in
+            for _ in 1:n_sweep; update!(sys, alg); end
         end
+        reset!(alg)
+        for j in 1:exchange_after_sample
+            for _ in 1:n_sweep; update!(sys, alg); end
+            # here store all samples in a local vector ths is sorted later
+            push!(pt_samples_local, (index(pt), sys.x, E(sys)))
+        end
+        # replica exchange gets only local energy value, rest is handled by MPI (needs to be within parallel block to have access to local alg state)
+        MonteCarloX.update!(pt, E(sys))
     end
-    return out
 end
 
-pt_xs_root = gather_per_index(pt_xs_local, backend)
-pt_Es_root = gather_per_index(pt_Es_local, backend)
-
-# `acceptance_rates(pt)` already does an MPI.Reduce to root internally.
+# One gather for all samples, then group by ladder index on root.
+pt_samples_all = MPI.gather(pt_samples_local, backend.comm; root=backend.root)
 pt_acc = acceptance_rates(pt)
 
+pt_xs = [Float64[] for _ in 1:size(pt)]
+pt_Es = [Float64[] for _ in 1:size(pt)]
 if is_root(pt)
-    println("\n## Parallel Tempering (betas = $(round.(betas_pt; digits=2)))")
+    for (idx, x, e) in vcat(pt_samples_all...)
+        push!(pt_xs[idx], x)
+        push!(pt_Es[idx], e)
+    end
+end
+
+on_root(pt) do
+    println("\n## Parallel Tempering (betas = $(round.(betas_pt; digits=2))) took $(round(time; digits=2)) seconds")
     println("Exchange acceptance rates: ", round.(pt_acc; digits=3))
     for (i, b) in enumerate(betas_pt)
-        s = pt_xs_root[i]
+        s = pt_xs[i]
         println("  beta=$(round(b; digits=2)): $(length(s)) samples, mean=$(round(mean(s); digits=3)), std=$(round(std(s); digits=3))")
     end
 end
 
 # ## Multicanonical sampling with parallel chains
 #
-# Each rank runs a multicanonical chain; after each iteration we merge
-# histograms to root, refine the logweight on root, and broadcast the
+# Each rank runs a multicanonical sampler; after each iteration we merge
+# histograms to root, refine the logweight on root, and distribute the
 # new logweight back to all ranks.
-#
-# This is exactly the pattern the threads version wants (the "TODO: get
-# root for threads!" comment in parallel_chains_threads.jl), with `is_root`
-# making the asymmetric step explicit.
-
 pmuca_alg = Multicanonical(Xoshiro(3000 + rank(backend) + 1), Ebins)
 pmuca     = ParallelMulticanonical(backend, pmuca_alg)
 pmuca_sys = System(0.0)
@@ -198,44 +168,43 @@ pmuca_sys = System(0.0)
 # Initialize logweights with low temperature so chains stay in-range and
 # the first histogram merge has non-zero counts.
 beta_bound = beta_ref * 2
-if is_root(pmuca)
-    set!(logweight(algorithm(pmuca)), E -> -beta_bound * E)
+on_root(pmuca) do i
+    alg = algorithm(pmuca, i)
+    set!(logweight(alg), E -> -beta_bound * E)
 end
 distribute_logweight!(pmuca)
 
 E_left  = 0.0
 E_right = 3.0
 
-using ProgressMeter
 prog = is_root(pmuca) ? Progress(n_iter; desc="pmuca iter") : nothing
-for iter in 1:n_iter
-    alg = algorithm(pmuca)
-    sys = pmuca_sys
-    for _ in 1:n_burn_in
-        for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
+time_iter = @elapsed for iter in 1:n_iter
+    with_parallel(pmuca) do alg
+        sys = pmuca_sys
+        for _ in 1:n_burn_in
+            for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
+        end
+        reset!(alg)
+        for j in 1:Int(round(n_samples / n_iter * iter))
+            for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
+        end
     end
-    reset!(alg)
-    for j in 1:Int(round(n_samples / n_iter * iter))
-        for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
-    end
-
-    # Reduce histograms to root; refine logweight on root; broadcast.
     merge_histograms!(pmuca)
-    if is_root(pmuca)
+    on_root(pmuca) do i
+        alg = algorithm(pmuca, i)
         MonteCarloX.update!(ensemble(alg); mode=:simple)
         set!(logweight(alg), (E_right, E_max),
              E -> logweight(alg)(E_right) - beta_bound * (E - E_right))
+        next!(prog)
     end
     distribute_logweight!(pmuca)
-
-    is_root(pmuca) && next!(prog)
 end
-is_root(pmuca) && finish!(prog)
 
-# Production run with final weights: rank-local samples.
+# Production run with final weights.
 pmuca_xs_local = zeros(Float64, n_samples)
 pmuca_Es_local = zeros(Float64, n_samples)
-let alg = algorithm(pmuca), sys = pmuca_sys
+time_prod = @elapsed with_parallel(pmuca) do alg
+    sys = pmuca_sys
     for j in 1:n_samples
         for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
         pmuca_xs_local[j] = sys.x
@@ -243,24 +212,20 @@ let alg = algorithm(pmuca), sys = pmuca_sys
     end
 end
 
-# Gather all samples to root for reweighting / plotting.
-# NOTE these gathers MUST be called on every rank: MPI.gather is a
-# collective operation. Guarding with `is_root` would deadlock.
-pmuca_xs_chunks = MPI.gather(pmuca_xs_local, backend.comm; root=backend.root)
-pmuca_Es_chunks = MPI.gather(pmuca_Es_local, backend.comm; root=backend.root)
-pc_xs_chunks    = MPI.gather(pc_xs_local,    backend.comm; root=backend.root)
-pc_Es_chunks    = MPI.gather(pc_Es_local,    backend.comm; root=backend.root)
-pmuca_xs = is_root(backend) ? vcat(pmuca_xs_chunks...) : Float64[]
-pmuca_Es = is_root(backend) ? vcat(pmuca_Es_chunks...) : Float64[]
+# Gather samples into flat vectors on root for reweighting / plotting.
+pmuca_xs = zeros(Float64, n_samples * size(backend))
+pmuca_Es = zeros(Float64, n_samples * size(backend))
+MPI.Gather!(pmuca_xs_local, pmuca_xs, backend.comm; root=backend.root)
+MPI.Gather!(pmuca_Es_local, pmuca_Es, backend.comm; root=backend.root)
 
-# Acceptance rate per rank (collective, matches threads' per-chain printout).
 pmuca_acc_local = acceptance_rate(algorithm(pmuca))
 pmuca_acc_all   = MPI.gather(pmuca_acc_local, backend.comm; root=backend.root)
 
-if is_root(pmuca)
-    println("\n## Parallel Multicanonical")
+
+on_root(pmuca) do 
+    println("\n## Parallel Multicanonical took $(round(time_iter; digits=2)) seconds for iterations and $(round(time_prod; digits=2)) seconds for production runs")
+
     println("Acceptance rates (per rank): ", round.(pmuca_acc_all; digits=2))
-    # TODO: print metrics like roundtrips that still need to be implemented.
 end
 
 # ## Comparison plot (root only)
@@ -332,10 +297,10 @@ end
 if is_root(backend)
     idx_cold = findmin(abs.(betas_pt .- beta_ref))[2]
     p = make_comparison_plot(;
-        pt_cold_xs  = pt_xs_root[idx_cold],
-        pt_cold_Es  = pt_Es_root[idx_cold],
-        pc_chain_xs = pc_xs_chunks,
-        pc_chain_Es = pc_Es_chunks,
+        pt_cold_xs  = pt_xs[idx_cold],
+        pt_cold_Es  = pt_Es[idx_cold],
+        pc_chain_xs = pc_xs,
+        pc_chain_Es = pc_Es,
         pmuca_xs    = pmuca_xs,
         pmuca_Es    = pmuca_Es,
         lw_muca     = logweight(algorithm(pmuca)),

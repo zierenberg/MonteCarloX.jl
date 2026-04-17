@@ -31,14 +31,17 @@ end
 """
     merge_histograms!(pc)
 
-Sum histograms across all chains. After this call every chain (or rank)
-holds the merged histogram.
+Sum histograms across all chains into the root chain. After this call only the
+root holds the merged histogram; other chains' buffers are unchanged.
+Use `distribute_logweight!` to propagate the refined weights back.
 """
 function merge_histograms!(pc::ParallelChains{ThreadsBackend, <:Vector{<:ImportanceSampling{<:MulticanonicalEnsemble}}})
     n = size(pc)
-    merged = sum(ensemble(algorithm(pc, i)).histogram.values for i in 1:n)
+    r = root_chain(pc)
+    h_root = ensemble(algorithm(pc, r)).histogram.values
     for i in 1:n
-        ensemble(algorithm(pc, i)).histogram.values .= merged
+        i == r && continue
+        h_root .+= ensemble(algorithm(pc, i)).histogram.values
     end
     return nothing
 end
@@ -51,12 +54,14 @@ end
 """
     distribute_logweight!(pc)
 
-Broadcast logweights from root to all chains.
+Broadcast logweights from the root chain to all other chains.
 """
 function distribute_logweight!(pc::ParallelChains{ThreadsBackend, <:Vector{<:ImportanceSampling{<:MulticanonicalEnsemble}}})
-    root_lw = ensemble(algorithm(pc, 1)).logweight.values
+    r = root_chain(pc)
+    root_lw = ensemble(algorithm(pc, r)).logweight.values
     n = size(pc)
-    for i in 2:n
+    for i in 1:n
+        i == r && continue
         ensemble(algorithm(pc, i)).logweight.values .= root_lw
     end
     return nothing
