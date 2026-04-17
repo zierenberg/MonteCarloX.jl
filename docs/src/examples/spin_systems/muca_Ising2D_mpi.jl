@@ -37,12 +37,12 @@ end
 # Setup
 backend = init(:MPI)
 alg = Multicanonical(Xoshiro(1000 + rank(backend)), get_centers(exact_logdos))
-pmuca = ParallelMulticanonical(backend, alg, root=0)
+pmuca = ParallelMulticanonical(backend, alg)
 
 sys = Ising([L, L])
 init!(sys, :random, rng=alg.rng)
 
-if is_root(pmuca)
+on_root(pmuca) do
     println("════════════════════════════════════════")
     println(" MPI Multicanonical Ising (L = $(L))    ")
     println(" Ranks = $(size(pmuca)), Iterations = $n_iter")
@@ -66,7 +66,7 @@ for iter in 1:n_iter
 
     merge_histograms!(pmuca)
     
-    if is_root(pmuca)
+    on_root(pmuca) do
         MonteCarloX.update!(ensemble(alg); mode=:simple)
         rmse = rmse_exact(ensemble(alg).logweight)
         push!(mpi_hists, deepcopy(ensemble(alg).histogram))
@@ -76,7 +76,7 @@ for iter in 1:n_iter
     distribute_logweight!(pmuca)
 end
 
-if is_root(pmuca)
+on_root(pmuca) do
     println("Simulation finished!")
     final_rmse = rmse_exact(mpi_lws[end])
     println("Final RMSE (vs exact Beale): $(round(final_rmse, digits=4))")

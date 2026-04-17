@@ -19,7 +19,7 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 # Key differences from threads version (kept visible on purpose):
 # - Each rank owns exactly one `alg` and one `sys`;
 # - Data needs to be stored locally and exchanged via MPI;
-# - Parallelization is implicit in the one-algorithm-per-rank design; uses on_root(), is_root() and with_parallel() to manage asymmetric steps and rank-local operations;
+# - Parallelization is implicit in the one-algorithm-per-rank design; uses on_root() and with_parallel() to manage asymmetric steps and rank-local operations;
 # - MonteCarloX API on parallel chains uses individual objects, communication via API;
 
 using Random, Statistics, StatsBase, Plots, ProgressMeter
