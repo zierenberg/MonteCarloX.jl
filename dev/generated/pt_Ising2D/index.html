@@ -1,7 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Parallel tempering: Ising 2D · MonteCarloX</title><meta name="title" content="Parallel tempering: Ising 2D · MonteCarloX"/><meta property="og:title" content="Parallel tempering: Ising 2D · MonteCarloX"/><meta property="twitter:title" content="Parallel tempering: Ising 2D · MonteCarloX"/><meta name="description" content="Documentation for MonteCarloX."/><meta property="og:description" content="Documentation for MonteCarloX."/><meta property="twitter:description" content="Documentation for MonteCarloX."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><script src="../../assets/custom.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">MonteCarloX</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Getting Started</a></li><li><span class="tocitem">Guides</span><ul><li><a class="tocitem" href="../../monte_carlo_fundamentals/">Monte Carlo Fundamentals</a></li><li><a class="tocitem" href="../../importance_sampling_algorithms/">Importance Sampling</a></li><li><a class="tocitem" href="../../continuous_time_sampling_algorithms/">Continuous-Time Sampling</a></li><li><a class="tocitem" href="../../measurements/">Measurements</a></li><li><a class="tocitem" href="../../build_your_own_system/">Build Your Own System</a></li><li><a class="tocitem" href="../../checkpointing/">Checkpointing</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><input class="collapse-toggle" id="menuitem-3-1" type="checkbox"/><label class="tocitem" for="menuitem-3-1"><span class="docs-label">Getting Started with Examples</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../coin_flip/">Coin Flip (Bayesian inference)</a></li><li><a class="tocitem" href="../importance_Ising2D/">Importance sampling: Ising Model</a></li><li><a class="tocitem" href="../gillespie_birth_death/">Birth-Death Process (Gillespie)</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-2" type="checkbox" checked/><label class="tocitem" for="menuitem-3-2"><span class="docs-label">Spin Systems</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../importance_Ising2D/">Importance sampling: Ising 2D</a></li><li class="is-active"><a class="tocitem" href>Parallel tempering: Ising 2D</a><ul class="internal"><li><a class="tocitem" href="#Background"><span>Background</span></a></li><li><a class="tocitem" href="#Constants"><span>Constants</span></a></li><li><a class="tocitem" href="#Sweep-helper"><span>Sweep helper</span></a></li><li><a class="tocitem" href="#Threaded-PT-run"><span>Threaded PT run</span></a></li><li><a class="tocitem" href="#Distributed-PT-run"><span>Distributed PT run</span></a></li><li><a class="tocitem" href="#Plot-threaded-vs-distributed-vs-exact"><span>Plot threaded vs distributed vs exact</span></a></li></ul></li><li><a class="tocitem" href="../muca_Ising2D/">Multicanonical sampling: Ising 2D</a></li><li><a class="tocitem" href="../muca_BlumeCapel/">Multicanonical sampling: Blume-Capel</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-3" type="checkbox"/><label class="tocitem" for="menuitem-3-3"><span class="docs-label">Bayesian Inference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../coin_flip/">Importance sampling: Coin Flip</a></li><li><a class="tocitem" href="../house_price_prediction/">Importance sampling: House Price Prediction</a></li><li><a class="tocitem" href="../eight_schools/">Hierarchical sampling: Eight Schools</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-4" type="checkbox"/><label class="tocitem" for="menuitem-3-4"><span class="docs-label">Stochastic Processes</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../kmc_poisson/">Gillespie: Poisson Process</a></li><li><a class="tocitem" href="../gillespie_dimerization/">Gillespie: Dimerization Reaction</a></li><li><a class="tocitem" href="../muca_OU/">Multicanonical: Ornstein-Uhlenbeck</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-5" type="checkbox"/><label class="tocitem" for="menuitem-3-5"><span class="docs-label">Large Deviation Theory</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../muca_sum_gaussian/">Multicanonical: Sum of Gaussians</a></li><li><a class="tocitem" href="../muca_OU/">Multicanonical: Ornstein-Uhlenbeck</a></li></ul></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../systems/">Systems</a></li><li><a class="tocitem" href="../../weights/">Weights</a></li><li><a class="tocitem" href="../../helper/">Helper</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li><a class="is-disabled">Spin Systems</a></li><li class="is-active"><a href>Parallel tempering: Ising 2D</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Parallel tempering: Ising 2D</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/zierenberg/MonteCarloX.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/zierenberg/MonteCarloX.jl/blob/main/docs/src/examples/spin_systems/pt_Ising2D.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><pre><code class="language-julia hljs">using Random, Statistics, StatsBase, Plots
-using Distributed
-using Base.Threads
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Parallel tempering: Ising 2D · MonteCarloX</title><meta name="title" content="Parallel tempering: Ising 2D · MonteCarloX"/><meta property="og:title" content="Parallel tempering: Ising 2D · MonteCarloX"/><meta property="twitter:title" content="Parallel tempering: Ising 2D · MonteCarloX"/><meta name="description" content="Documentation for MonteCarloX."/><meta property="og:description" content="Documentation for MonteCarloX."/><meta property="twitter:description" content="Documentation for MonteCarloX."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><script src="../../assets/custom.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">MonteCarloX</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Getting Started</a></li><li><span class="tocitem">Guides</span><ul><li><a class="tocitem" href="../../monte_carlo_fundamentals/">Monte Carlo Fundamentals</a></li><li><a class="tocitem" href="../../importance_sampling_algorithms/">Importance Sampling</a></li><li><a class="tocitem" href="../../continuous_time_sampling_algorithms/">Continuous-Time Sampling</a></li><li><a class="tocitem" href="../../measurements/">Measurements</a></li><li><a class="tocitem" href="../../build_your_own_system/">Build Your Own System</a></li><li><a class="tocitem" href="../../checkpointing/">Checkpointing</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><input class="collapse-toggle" id="menuitem-3-1" type="checkbox"/><label class="tocitem" for="menuitem-3-1"><span class="docs-label">Getting Started with Examples</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../coin_flip/">Coin Flip (Bayesian inference)</a></li><li><a class="tocitem" href="../importance_Ising2D/">Importance sampling: Ising Model</a></li><li><a class="tocitem" href="../gillespie_birth_death/">Birth-Death Process (Gillespie)</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-2" type="checkbox" checked/><label class="tocitem" for="menuitem-3-2"><span class="docs-label">Spin Systems</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../importance_Ising2D/">Importance sampling: Ising 2D</a></li><li class="is-active"><a class="tocitem" href>Parallel tempering: Ising 2D</a><ul class="internal"><li><a class="tocitem" href="#Background"><span>Background</span></a></li><li><a class="tocitem" href="#Constants"><span>Constants</span></a></li><li><a class="tocitem" href="#Sweep-helper"><span>Sweep helper</span></a></li><li><a class="tocitem" href="#Serial-PT-run"><span>Serial PT run</span></a></li><li><a class="tocitem" href="#Plot-vs-exact"><span>Plot vs exact</span></a></li></ul></li><li><a class="tocitem" href="../muca_Ising2D/">Multicanonical sampling: Ising 2D</a></li><li><a class="tocitem" href="../muca_BlumeCapel/">Multicanonical sampling: Blume-Capel</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-3" type="checkbox"/><label class="tocitem" for="menuitem-3-3"><span class="docs-label">Bayesian Inference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../coin_flip/">Importance sampling: Coin Flip</a></li><li><a class="tocitem" href="../house_price_prediction/">Importance sampling: House Price Prediction</a></li><li><a class="tocitem" href="../eight_schools/">Hierarchical sampling: Eight Schools</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-4" type="checkbox"/><label class="tocitem" for="menuitem-3-4"><span class="docs-label">Stochastic Processes</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../kmc_poisson/">Gillespie: Poisson Process</a></li><li><a class="tocitem" href="../gillespie_dimerization/">Gillespie: Dimerization Reaction</a></li><li><a class="tocitem" href="../muca_OU/">Multicanonical: Ornstein-Uhlenbeck</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-5" type="checkbox"/><label class="tocitem" for="menuitem-3-5"><span class="docs-label">Large Deviation Theory</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../muca_sum_gaussian/">Multicanonical: Sum of Gaussians</a></li><li><a class="tocitem" href="../muca_OU/">Multicanonical: Ornstein-Uhlenbeck</a></li></ul></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../systems/">Systems</a></li><li><a class="tocitem" href="../../weights/">Weights</a></li><li><a class="tocitem" href="../../helper/">Helper</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li><a class="is-disabled">Spin Systems</a></li><li class="is-active"><a href>Parallel tempering: Ising 2D</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Parallel tempering: Ising 2D</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/zierenberg/MonteCarloX.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/zierenberg/MonteCarloX.jl/blob/main/docs/src/examples/spin_systems/pt_Ising2D.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><pre><code class="language-julia hljs">using Random, Statistics, StatsBase, Plots
 using MonteCarloX, SpinSystems</code></pre><p>%%</p><h2 id="Background"><a class="docs-heading-anchor" href="#Background">Background</a><a id="Background-1"></a><a class="docs-heading-anchor-permalink" href="#Background" title="Permalink"></a></h2><p>Parallel tempering (replica exchange) runs multiple replicas at different inverse temperatures <span>$\beta$</span>. Each replica performs local Metropolis sweeps, then neighboring replicas attempt an exchange.</p><p>The main practical benefit is robust sampling across continuous phase transitions and better exploration of rugged energy landscapes via repeated annealing across the temperature ladder.</p><p>In this example we keep the loop structure intentionally simple:</p><ol><li>thermalize,</li><li>run measurement sweeps,</li><li>attempt exchanges,</li><li>compare sampled energy distributions to exact references.</li></ol><p>%%</p><h2 id="Constants"><a class="docs-heading-anchor" href="#Constants">Constants</a><a id="Constants-1"></a><a class="docs-heading-anchor-permalink" href="#Constants" title="Permalink"></a></h2><pre><code class="language-julia hljs">const CI_MODE = get(ENV, &quot;MCX_SMOKE&quot;, get(ENV, &quot;MCX_CI&quot;, &quot;false&quot;)) == &quot;true&quot;
 
 L = 8
@@ -24,172 +22,78 @@ measurement_interval &gt;= 1 || throw(ArgumentError(&quot;measurement_interval m
         spin_flip!(sys, alg)
     end
     return nothing
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">sweep_replica! (generic function with 1 method)</code></pre><p>%%</p><h2 id="Threaded-PT-run"><a class="docs-heading-anchor" href="#Threaded-PT-run">Threaded PT run</a><a id="Threaded-PT-run-1"></a><a class="docs-heading-anchor-permalink" href="#Threaded-PT-run" title="Permalink"></a></h2><pre><code class="language-julia hljs">let
-    global betas = set_betas(nreplicas, inv(Tmax), inv(Tmin), :uniform)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">sweep_replica! (generic function with 1 method)</code></pre><p>%%</p><h2 id="Serial-PT-run"><a class="docs-heading-anchor" href="#Serial-PT-run">Serial PT run</a><a id="Serial-PT-run-1"></a><a class="docs-heading-anchor-permalink" href="#Serial-PT-run" title="Permalink"></a></h2><pre><code class="language-julia hljs">betas = set_betas(nreplicas, inv(Tmax), inv(Tmin), :uniform)
 
-    systems_t = [Ising([L, L]) for _ in 1:nreplicas]
-    algs_t = [Metropolis(MersenneTwister(seed + r); β=betas[r]) for r in 1:nreplicas]
-    pt_t = ParallelTempering(algs_t)
-
-    @threads for r in 1:nreplicas
-        init!(systems_t[r], :random; rng=algs_t[r].rng)
-        for _ in 1:ntherm_init
-            sweep_replica!(systems_t[r], algs_t[r], L)
-        end
-    end
-
-    energies_t = zeros(Float64, nreplicas)
-    mags_t = zeros(Float64, nreplicas)
-    meas_t = Measurements([
-        :energies =&gt; (_ -&gt; copy(energies_t)) =&gt; Vector{Vector{Float64}}(),
-        :mags =&gt; (_ -&gt; copy(mags_t)) =&gt; Vector{Vector{Float64}}(),
-    ], interval=measurement_interval)
-    index_trace_t = Vector{Vector{Int}}()
-
-    for meas in 1:nmeasurements
-        @threads for r in 1:nreplicas
-            sweep_replica!(systems_t[r], algs_t[r], L)
-            energies_t[r] = energy(systems_t[r])
-            mags_t[r] = magnetization(systems_t[r])
-        end
-
-        n_before = length(data(meas_t, :energies))
-        measure!(meas_t, nothing, meas)
-        if length(data(meas_t, :energies)) &gt; n_before
-            push!(index_trace_t, copy(pt_t.indices))
-        end
-
-        if meas % sweeps_between_exchange == 0
-            update!(pt_t, energies_t)
-
-            if ntherm_after_exchange &gt; 0
-                @threads for r in 1:nreplicas
-                    for _ in 1:ntherm_after_exchange
-                        sweep_replica!(systems_t[r], algs_t[r], L)
-                    end
-                end
-            end
-        end
-    end
-
-    global energy_samples_t = [Float64[] for _ in 1:nreplicas]
-    global mag_samples_t = [Float64[] for _ in 1:nreplicas]
-    energy_trace_t = data(meas_t, :energies)
-    mag_trace_t = data(meas_t, :mags)
-
-    @inbounds for k in eachindex(energy_trace_t)
-        idxs = index_trace_t[k]
-        es = energy_trace_t[k]
-        ms = mag_trace_t[k]
-        for r in eachindex(idxs)
-            push!(energy_samples_t[idxs[r]], es[r])
-            push!(mag_samples_t[idxs[r]], ms[r])
-        end
-    end
-
-    global rates_t = acceptance_rates(pt_t)
-
-    println(&quot;PT Ising2D threaded finished&quot;)
-    println(&quot;L = $(L), replicas = $(nreplicas), threads = $(nthreads())&quot;)
-    println(&quot;mean exchange acceptance = $(round(mean(rates_t), digits=4))&quot;)
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">PT Ising2D threaded finished
-L = 8, replicas = 4, threads = 1
-mean exchange acceptance = 0.3333</code></pre><p>%%</p><h2 id="Distributed-PT-run"><a class="docs-heading-anchor" href="#Distributed-PT-run">Distributed PT run</a><a id="Distributed-PT-run-1"></a><a class="docs-heading-anchor-permalink" href="#Distributed-PT-run" title="Permalink"></a></h2><pre><code class="language-julia hljs">distributed_result = nothing</code></pre><p>dist<em>addprocs = haskey(ENV, &quot;CI&quot;) ? 0 : max(1, min(nreplicas - 1, Sys.CPU</em>THREADS - 1))</p><pre><code class="language-julia hljs">dist_addprocs = 0
-dist_backend = init(:Distributed; addprocs=dist_addprocs)
-
-systems_d = [Ising([L, L]) for _ in 1:nreplicas]
-algs_d = [Metropolis(MersenneTwister(seed + r); β=betas[r]) for r in 1:nreplicas]
-pt_d = ParallelTempering(algs_d)
+systems = [Ising([L, L]) for _ in 1:nreplicas]
+pt = ParallelTempering(betas; seed=seed, rng=MersenneTwister)
 
 for r in 1:nreplicas
-    init!(systems_d[r], :random; rng=algs_d[r].rng)
-end
-
-for r in 1:nreplicas
+    init!(systems[r], :random; rng=algorithm(pt, r).rng)
     for _ in 1:ntherm_init
-        sweep_replica!(systems_d[r], algs_d[r], L)
+        sweep_replica!(systems[r], algorithm(pt, r), L)
     end
 end
 
-energies_d = zeros(Float64, nreplicas)
-mags_d = zeros(Float64, nreplicas)
-meas_d = Measurements([
-    :energies =&gt; (_ -&gt; copy(energies_d)) =&gt; Vector{Vector{Float64}}(),
-    :mags =&gt; (_ -&gt; copy(mags_d)) =&gt; Vector{Vector{Float64}}(),
+energies = zeros(Float64, nreplicas)
+mags = zeros(Float64, nreplicas)
+meas = Measurements([
+    :energies =&gt; (_ -&gt; copy(energies)) =&gt; Vector{Vector{Float64}}(),
+    :mags =&gt; (_ -&gt; copy(mags)) =&gt; Vector{Vector{Float64}}(),
 ], interval=measurement_interval)
-index_trace_d = Vector{Vector{Int}}()
+index_trace = Vector{Vector{Int}}()
 
-function _sweep_state(state, L)
-    sys, alg = state
-    for _ in 1:(L * L)
-        spin_flip!(sys, alg)
-    end
-    return (sys=sys, alg=alg, energy=energy(sys), mag=magnetization(sys))
-end
-
-for meas in 1:nmeasurements
-    states = collect(zip(systems_d, algs_d))
-    results = Distributed.pmap(st -&gt; _sweep_state(st, L), states)
-
-    for r in 1:nreplicas
-        systems_d[r] = results[r].sys
-        algs_d[r] = results[r].alg
-        energies_d[r] = results[r].energy
-        mags_d[r] = results[r].mag
-    end
-
-    n_before = length(data(meas_d, :energies))
-    measure!(meas_d, nothing, meas)
-    if length(data(meas_d, :energies)) &gt; n_before
-        push!(index_trace_d, copy(pt_d.indices))
-    end
-
-    if meas % sweeps_between_exchange == 0
-        update!(pt_d, energies_d)
-
-        if ntherm_after_exchange &gt; 0
-            for r in 1:nreplicas
-                for _ in 1:ntherm_after_exchange
-                    sweep_replica!(systems_d[r], algs_d[r], L)
-                end
+n_exchanges = nmeasurements ÷ sweeps_between_exchange
+let sample_counter = 0
+    for exch in 1:n_exchanges
+        # re-thermalize after exchange
+        for r in 1:nreplicas
+            for _ in 1:ntherm_after_exchange
+                sweep_replica!(systems[r], algorithm(pt, r), L)
             end
         end
+
+        # measure
+        for _ in 1:sweeps_between_exchange
+            for r in 1:nreplicas
+                sweep_replica!(systems[r], algorithm(pt, r), L)
+                energies[r] = energy(systems[r])
+                mags[r] = magnetization(systems[r])
+            end
+            sample_counter += 1
+            n_before = length(data(meas, :energies))
+            measure!(meas, nothing, sample_counter)
+            if length(data(meas, :energies)) &gt; n_before
+                push!(index_trace, copy(index(pt)))
+            end
+        end
+        # replica exchange
+        MonteCarloX.update!(pt, energies)
     end
 end
 
-energy_samples_d = [Float64[] for _ in 1:nreplicas]
-mag_samples_d = [Float64[] for _ in 1:nreplicas]
-energy_trace_d = data(meas_d, :energies)
-mag_trace_d = data(meas_d, :mags)
+energy_samples = [Float64[] for _ in 1:nreplicas]
+mag_samples = [Float64[] for _ in 1:nreplicas]
+energy_trace = data(meas, :energies)
+mag_trace = data(meas, :mags)
 
-@inbounds for k in eachindex(energy_trace_d)
-    idxs = index_trace_d[k]
-    es = energy_trace_d[k]
-    ms = mag_trace_d[k]
+@inbounds for k in eachindex(energy_trace)
+    idxs = index_trace[k]
+    es = energy_trace[k]
+    ms = mag_trace[k]
     for r in eachindex(idxs)
-        push!(energy_samples_d[idxs[r]], es[r])
-        push!(mag_samples_d[idxs[r]], ms[r])
+        push!(energy_samples[idxs[r]], es[r])
+        push!(mag_samples[idxs[r]], ms[r])
     end
 end
 
-rates_d = acceptance_rates(pt_d)
-distributed_result = (
-    energy_samples=energy_samples_d,
-    mag_samples=mag_samples_d,
-    rates=rates_d,
-    workers=Distributed.nworkers(),
-)
+rates = acceptance_rates(pt)
 
-println(&quot;PT Ising2D distributed finished&quot;)
-println(&quot;workers = $(Distributed.nworkers()), mean exchange acceptance = $(round(mean(rates_d), digits=4))&quot;)
-finalize!(dist_backend)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">PT Ising2D distributed finished
-workers = 1, mean exchange acceptance = 0.3333
-┌ Warning: rmprocs: process 1 not removed
-└ @ Distributed /opt/hostedtoolcache/julia/1.12.6/x64/share/julia/stdlib/v1.12/Distributed/src/cluster.jl:1065</code></pre><p>%%</p><h2 id="Plot-threaded-vs-distributed-vs-exact"><a class="docs-heading-anchor" href="#Plot-threaded-vs-distributed-vs-exact">Plot threaded vs distributed vs exact</a><a id="Plot-threaded-vs-distributed-vs-exact-1"></a><a class="docs-heading-anchor-permalink" href="#Plot-threaded-vs-distributed-vs-exact" title="Permalink"></a></h2><pre><code class="language-julia hljs">for (i, β) in enumerate(betas)
-    println(&quot;beta[$i] = $(round(β, digits=4)), threaded samples = $(length(energy_samples_t[i]))&quot;)
-    if distributed_result !== nothing
-        println(&quot;           distributed samples = $(length(distributed_result.energy_samples[i]))&quot;)
-    end
+println(&quot;PT Ising2D serial finished&quot;)
+println(&quot;L = $(L), replicas = $(nreplicas)&quot;)
+println(&quot;mean exchange acceptance = $(round(mean(rates), digits=4))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">PT Ising2D serial finished
+L = 8, replicas = 4
+mean exchange acceptance = 0.34</code></pre><p>%%</p><h2 id="Plot-vs-exact"><a class="docs-heading-anchor" href="#Plot-vs-exact">Plot vs exact</a><a id="Plot-vs-exact-1"></a><a class="docs-heading-anchor-permalink" href="#Plot-vs-exact" title="Permalink"></a></h2><pre><code class="language-julia hljs">for (i, β) in enumerate(betas)
+    println(&quot;beta[$i] = $(round(β, digits=4)), samples = $(length(energy_samples[i]))&quot;)
 end
 
 exact_logdos = logdos_exact_ising2D(L)
@@ -200,20 +104,11 @@ for (i, β) in enumerate(betas)
     p_i = plot(xlabel=&quot;Energy&quot;, ylabel=&quot;Probability&quot;,
                title=&quot;beta=$(round(β, digits=3))&quot;, legend=:topright)
 
-    samples_t = energy_samples_t[i]
-    if !isempty(samples_t)
-        hist_t = fit(Histogram, samples_t, edges, closed=:left)
-        dist_t = StatsBase.normalize(hist_t; mode=:probability)
-        plot!(p_i, dist_t; label=&quot;PT threads&quot;, lw=2, color=:steelblue)
-    end
-
-    if distributed_result !== nothing
-        samples_d = distributed_result.energy_samples[i]
-        if !isempty(samples_d)
-            hist_d = fit(Histogram, samples_d, edges, closed=:left)
-            dist_d = StatsBase.normalize(hist_d; mode=:probability)
-            plot!(p_i, dist_d; label=&quot;PT distributed&quot;, lw=2, color=:darkorange, ls=:dot)
-        end
+    samples_i = energy_samples[i]
+    if !isempty(samples_i)
+        hist_i = fit(Histogram, samples_i, edges, closed=:left)
+        dist_i = StatsBase.normalize(hist_i; mode=:probability)
+        plot!(p_i, dist_i; label=&quot;PT serial&quot;, lw=2, color=:steelblue)
     end
 
     dist_exact = distribution_exact_ising2D(L, β)
@@ -228,4 +123,4 @@ plot(plots...;
     size=(950, 720),
     margin=3Plots.mm,
     background_color=:white,
-    background_color_outside=:white)</code></pre><img src="ce737abb.svg" alt="Example block output"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../importance_Ising2D/">« Importance sampling: Ising 2D</a><a class="docs-footer-nextpage" href="../muca_Ising2D/">Multicanonical sampling: Ising 2D »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 13 April 2026 08:51">Monday 13 April 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+    background_color_outside=:white)</code></pre><img src="7566a28d.svg" alt="Example block output"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../importance_Ising2D/">« Importance sampling: Ising 2D</a><a class="docs-footer-nextpage" href="../muca_Ising2D/">Multicanonical sampling: Ising 2D »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Friday 17 April 2026 19:45">Friday 17 April 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
