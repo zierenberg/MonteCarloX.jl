@@ -34,7 +34,7 @@ function run_script(path::String; smoke::Bool=false)
 end
 
 ## -----------------------------------------------------------------------
-## Discovery — skips _mpi files, defaults.jl, runtests.jl
+## Discovery — skips _mpi files, _threads files, defaults.jl, runtests.jl
 ## -----------------------------------------------------------------------
 
 function discover_scripts(root::String)
@@ -46,6 +46,9 @@ function discover_scripts(root::String)
             f == "defaults.jl"             && continue
             occursin("_mpi", lowercase(f)) && continue
             occursin("_threads", lowercase(f)) && continue
+            ## checkpointing uses Serialization which cannot restore types
+            ## defined in anonymous modules (the include_string(Module(),...) pattern)
+            occursin("checkpointing", lowercase(f)) && continue
             push!(scripts, joinpath(dir, f))
         end
     end

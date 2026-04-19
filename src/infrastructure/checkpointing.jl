@@ -1,11 +1,11 @@
 # Checkpointing: rolling checkpoint/restore via Serialization
 #
 # Public API
-#   ckpt = init_checkpoint(file, linked)       -> create session & write initial checkpoint
-#   checkpoint!(ckpt; sweep=...)               -> serialize linked objects + metadata to file
-#   state = restore(file)                      -> deserialize checkpoint -> NamedTuple
-#   relink!(ckpt, linked)                      -> swap linked objects (e.g. after restore)
-#   finalize!(ckpt)                            -> remove checkpoint file
+#   ckpt = init_checkpoint(file, state; kw...)   -> create session & write initial checkpoint
+#   checkpoint!(ckpt; kw...)                     -> serialize state (merged with kw) to file
+#   ckpt = restore_checkpoint(file)              -> deserialize -> new CheckpointSession
+#   finalize!(ckpt)                              -> remove checkpoint file
+#   ckpt.sys, ckpt.alg, ...                      -> access stored objects directly
 
 using Serialization
 
@@ -15,34 +15,39 @@ using Serialization
 Holds the checkpoint file path and a `NamedTuple` of objects that will be
 serialized on every `checkpoint!` call.
 
-The linked objects are serialized together with any keyword metadata
-(e.g. `sweep=100`) into a single `NamedTuple` written atomically via a
-temporary file + rename.
+Fields are accessed directly on the session object:
+
+```julia
+ckpt = restore_checkpoint("run/ckpt.mcx")
+ckpt.sys          # restored system
+ckpt.alg          # restored algorithm
+ckpt.sweep        # metadata counter
+ckpt.file         # checkpoint file path (reserved)
+```
+
+Keyword arguments passed to `checkpoint!` override same-named fields,
+allowing progress counters (e.g. `sweep`) to be updated without mutating
+the stored tuple.
 """
 mutable struct CheckpointSession
     file::String
-    linked::NamedTuple
+    _state::NamedTuple
+end
+
+function Base.getproperty(ckpt::CheckpointSession, name::Symbol)
+    name === :file || name === :_state ? getfield(ckpt, name) : getfield(ckpt, :_state)[name]
 end
 
 """
     checkpoint!(ckpt::CheckpointSession; kwargs...)
 
-Serialize the linked objects together with keyword metadata to the
-checkpoint file.  Uses atomic write (tmp + mv) to avoid corruption.
-
-At least one keyword argument should be provided to track progress
-(e.g. `sweep=100`).
+Serialize the stored objects to the checkpoint file.  Keyword arguments
+override same-named fields (e.g. `sweep=100` updates the stored sweep
+counter).  Uses atomic write (tmp + mv) to avoid corruption.
 """
 function checkpoint!(ckpt::CheckpointSession; kwargs...)
-    meta = (; kwargs...)
-
-    for name in keys(ckpt.linked)
-        hasproperty(meta, name) &&
-            throw(ArgumentError("checkpoint metadata key `$(name)` conflicts with linked object name"))
-    end
-
+    state = merge(getfield(ckpt, :_state), (; kwargs...))
     tmp = ckpt.file * ".tmp"
-    state = (; meta..., ckpt.linked...)
     open(tmp, "w") do io
         serialize(io, state)
     end
@@ -51,55 +56,43 @@ function checkpoint!(ckpt::CheckpointSession; kwargs...)
 end
 
 """
-    relink!(ckpt::CheckpointSession, linked::NamedTuple)
-
-Replace the linked objects in a checkpoint session.
-Call this after `restore` to attach the newly deserialized objects.
-"""
-function relink!(ckpt::CheckpointSession, linked::NamedTuple)
-    ckpt.linked = linked
-    return ckpt
-end
-
-"""
-    init_checkpoint(file::String, linked::NamedTuple; kwargs...)
+    init_checkpoint(file::String, state::NamedTuple; kwargs...)
 
 Create a `CheckpointSession`, ensure the parent directory exists,
 and write an initial checkpoint.  Any keyword arguments (e.g. `sweep=0`)
-are stored as metadata in the initial snapshot.
+override same-named fields in `state` for the initial snapshot.
 
 # Example
 ```julia
-ckpt = init_checkpoint("run/ckpt.mcx", (sys=sys, alg=alg); sweep=0)
+ckpt = init_checkpoint("run/ckpt.mcx", (sys=sys, alg=alg, sweep=0))
 ```
 """
-function init_checkpoint(file::String, linked::NamedTuple; kwargs...)
+function init_checkpoint(file::String, state::NamedTuple; kwargs...)
     mkpath(dirname(file))
-    ckpt = CheckpointSession(file, linked)
+    ckpt = CheckpointSession(file, state)
     checkpoint!(ckpt; kwargs...)
     return ckpt
 end
 
 """
-    restore(path::String) -> NamedTuple
+    restore_checkpoint(path::String) -> CheckpointSession
 
-Deserialize a checkpoint file and return its contents as a `NamedTuple`.
-The tuple contains both metadata (e.g. `sweep`) and serialized objects
-(e.g. `sys`, `alg`).
+Deserialize a checkpoint file and return a new `CheckpointSession`.
+Access restored fields directly on the returned object.
 
 # Example
 ```julia
-state = restore("run/ckpt.mcx")
-sys = state.sys
-alg = state.alg
-start = state.sweep + 1
+ckpt  = restore_checkpoint("run/ckpt.mcx")
+sys   = ckpt.sys
+alg   = ckpt.alg
+start = ckpt.sweep + 1
 ```
 """
-function restore(path::String)
+function restore_checkpoint(path::String)
     state = open(path, "r") do io
         deserialize(io)
     end
-    return state
+    return CheckpointSession(path, state)
 end
 
 """

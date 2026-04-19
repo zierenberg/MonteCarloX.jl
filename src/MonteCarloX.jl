@@ -61,8 +61,7 @@ include("infrastructure/checkpointing.jl")
 export  CheckpointSession,
         init_checkpoint,
         checkpoint!,
-        restore,
-        relink!
+        restore_checkpoint
 
 # ── Measurements ────────────────────────────────────────────────────────────
 

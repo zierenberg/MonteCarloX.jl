@@ -64,6 +64,10 @@ makedocs(;
             "Multicanonical: Ornstein-Uhlenbeck"      => "generated/muca_OU.md",
             ],
 
+            "Infrastructure" => [
+            "Checkpointing"                          => "generated/checkpointing.md",
+            ],
+
             "Large Deviation Theory" => [
             "Multicanonical: Sum of Gaussians"        => "generated/muca_sum_gaussian.md",
             "Multicanonical: Ornstein-Uhlenbeck"      => "generated/muca_OU.md",
