@@ -41,13 +41,13 @@ time = @elapsed with_parallel(pc) do i, alg
         pc_xs[i, j] = sys.x
         pc_Es[i, j] = E(sys)
     end
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.537005971</code></pre><p>No need to merge samples, we have shared memory</p><pre><code class="language-julia hljs">on_root(pc) do
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.522798306</code></pre><p>No need to merge samples, we have shared memory</p><pre><code class="language-julia hljs">on_root(pc) do
     println(&quot;## Independent chains (beta=$beta_ref) took $(round(time; digits=2)) seconds&quot;)
     for i in 1:size(pc)
         println(&quot;  chain $i: mean_x=$(round(mean(pc_xs[i,:]); digits=3)), mean_E=$(round(mean(pc_Es[i,:]); digits=3))&quot;)
     end
     println(&quot;  merged:  mean_x=$(round(mean(pc_xs); digits=3)), mean_E=$(round(mean(pc_Es); digits=3))&quot;)
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">## Independent chains (beta=10.0) took 0.54 seconds
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">## Independent chains (beta=10.0) took 0.52 seconds
   chain 1: mean_x=-0.56, mean_E=0.053
   merged:  mean_x=-0.56, mean_E=0.053</code></pre><h2 id="Parallel-tempering"><a class="docs-heading-anchor" href="#Parallel-tempering">Parallel tempering</a><a id="Parallel-tempering-1"></a><a class="docs-heading-anchor-permalink" href="#Parallel-tempering" title="Permalink"></a></h2><p>Same potential, same number of samples, but now replicas at different temperatures exchange configurations.  High-temperature replicas cross the barrier freely; exchanges propagate this to the cold replica, producing correct bimodal sampling even at high beta.</p><pre><code class="language- hljs">pt_algs = [Metropolis(Xoshiro(2000 + i); β=betas_pt[i]) for i in 1:size(backend)]
 pt      = ParallelTempering(backend, pt_algs)
@@ -119,7 +119,7 @@ time_prod = @elapsed with_parallel(pmuca) do i, alg
         pmuca_xs[i, j] = sys.x
         pmuca_Es[i, j] = E(sys)
     end
-end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1.32561236</code></pre><p>No need to gather samples, we have shared memory.</p><pre><code class="language- hljs">pmuca_xs = vec(pmuca_xs)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1.326624254</code></pre><p>No need to gather samples, we have shared memory.</p><pre><code class="language- hljs">pmuca_xs = vec(pmuca_xs)
 pmuca_Es = vec(pmuca_Es)
 
 on_root(pmuca) do
@@ -193,4 +193,4 @@ p = make_comparison_plot(;
     xbins       = xbins,
     Ebins       = Ebins)
 
-savefig(p, &quot;parallel_chains_threads.png&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Tuesday 21 April 2026 08:32">Tuesday 21 April 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+savefig(p, &quot;parallel_chains_threads.png&quot;)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Tuesday 21 April 2026 10:23">Tuesday 21 April 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
