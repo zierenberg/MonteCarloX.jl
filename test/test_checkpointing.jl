@@ -21,12 +21,12 @@ function test_checkpoint_restore_importance_sampling()
         next_rand = rand(copy(alg.rng))
 
         file = _tmp_checkpoint_file(name)
-        ckpt = init_checkpoint(file, (alg=alg,); sweep=100)
+        ckpt = init_checkpoint(file, (alg=alg, sweep=100))
         pass &= check(isfile(file), "$name: checkpoint file created\n")
 
-        state = restore(file)
-        pass &= check(state.sweep == 100, "$name: metadata restored\n")
-        pass &= check(rand(state.alg.rng) == next_rand, "$name: rng restored\n")
+        ckpt2 = restore_checkpoint(file)
+        pass &= check(ckpt2.sweep == 100, "$name: sweep restored\n")
+        pass &= check(rand(ckpt2.alg.rng) == next_rand, "$name: rng restored\n")
 
         finalize!(ckpt)
         pass &= check(!isfile(file), "$name: finalize! cleans up\n")
@@ -45,9 +45,9 @@ function test_checkpoint_restore_ensembles()
     ens_muca.histogram.values .= 2 .* (0:10)
 
     file = _tmp_checkpoint_file("ens")
-    ckpt = init_checkpoint(file, (alg=alg_muca,); sweep=0)
-    state = restore(file)
-    pass &= check(ensemble(state.alg) == ens_muca, "muca ensemble restored\n")
+    ckpt = init_checkpoint(file, (alg=alg_muca, sweep=0))
+    ckpt2 = restore_checkpoint(file)
+    pass &= check(ensemble(ckpt2.alg) == ens_muca, "muca ensemble restored\n")
     finalize!(ckpt)
 
     # WangLandau ensemble: logweight + logf
@@ -57,9 +57,9 @@ function test_checkpoint_restore_ensembles()
     ens_wl.logf = 1.5
 
     file = _tmp_checkpoint_file("ens")
-    ckpt = init_checkpoint(file, (alg=alg_wl,); sweep=0)
-    state = restore(file)
-    pass &= check(ensemble(state.alg) == ens_wl, "wl ensemble restored\n")
+    ckpt = init_checkpoint(file, (alg=alg_wl, sweep=0))
+    ckpt2 = restore_checkpoint(file)
+    pass &= check(ensemble(ckpt2.alg) == ens_wl, "wl ensemble restored\n")
     finalize!(ckpt)
 
     return pass
@@ -71,30 +71,27 @@ function test_checkpoint_restore_kmc()
     alg.time  = 3.14
 
     file = _tmp_checkpoint_file("kmc")
-    ckpt = init_checkpoint(file, (alg=alg,); step=42)
-    state = restore(file)
+    ckpt = init_checkpoint(file, (alg=alg, step=42))
+    ckpt2 = restore_checkpoint(file)
 
-    pass = check(state.alg == alg, "KMC algorithm restored\n")
+    pass = check(ckpt2.alg == alg, "KMC algorithm restored\n")
 
     finalize!(ckpt)
     return pass
 end
 
-function test_relink()
+function test_checkpoint_override()
     rng = MersenneTwister(7)
     alg = Metropolis(rng, x -> -x^2)
 
-    file = _tmp_checkpoint_file("relink")
-    ckpt = init_checkpoint(file, (alg=alg,); sweep=0)
+    file = _tmp_checkpoint_file("override")
+    ckpt = init_checkpoint(file, (alg=alg, sweep=0))
 
-    # simulate restore + relink
-    state = restore(file)
-    alg2 = state.alg
-    relink!(ckpt, (alg=alg2,))
+    # checkpoint with sweep override
     checkpoint!(ckpt; sweep=1)
 
-    state2 = restore(file)
-    pass = check(state2.sweep == 1, "relink + checkpoint wrote updated sweep\n")
+    ckpt2 = restore_checkpoint(file)
+    pass = check(ckpt2.sweep == 1, "checkpoint override wrote updated sweep\n")
 
     finalize!(ckpt)
     return pass
@@ -127,13 +124,13 @@ function test_deterministic_restart()
     # with a fresh callable (anonymous functions cannot survive serialize
     # round-trips due to world-age issues).
     ckpt = init_checkpoint(file, (rng=copy(alg_chk.rng), x=x_chk,
-                                   steps=alg_chk.steps, accepted=alg_chk.accepted); sweep=1000)
+                                   steps=alg_chk.steps, accepted=alg_chk.accepted, sweep=1000))
 
-    state = restore(file)
-    alg_chk = Metropolis(state.rng, x -> -0.5x^2)
-    alg_chk.steps    = state.steps
-    alg_chk.accepted = state.accepted
-    x_chk   = state.x
+    ckpt2 = restore_checkpoint(file)
+    alg_chk = Metropolis(ckpt2.rng, x -> -0.5x^2)
+    alg_chk.steps    = ckpt2.steps
+    alg_chk.accepted = ckpt2.accepted
+    x_chk   = ckpt2.x
 
     samples_chk = Float64[]
     for _ in 1:1000
@@ -149,28 +146,10 @@ function test_deterministic_restart()
     return pass
 end
 
-function test_metadata_conflict()
-    alg = Metropolis(MersenneTwister(1), x -> -x^2)
-    file = _tmp_checkpoint_file("conflict")
-    ckpt = init_checkpoint(file, (alg=alg,); sweep=0)
-
-    pass = false
-    try
-        checkpoint!(ckpt; alg="conflict")
-    catch e
-        pass = e isa ArgumentError && occursin("conflicts", e.msg)
-    end
-    check(pass, "metadata key conflict detected\n")
-
-    finalize!(ckpt)
-    return pass
-end
-
 @testset "Checkpointing: checkpoint / restore" begin
     @test test_checkpoint_restore_importance_sampling()
     @test test_checkpoint_restore_ensembles()
     @test test_checkpoint_restore_kmc()
-    @test test_relink()
+    @test test_checkpoint_override()
     @test test_deterministic_restart()
-    @test test_metadata_conflict()
 end

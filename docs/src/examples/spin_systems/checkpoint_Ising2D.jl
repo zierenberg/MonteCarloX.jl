@@ -39,7 +39,7 @@ checkpoint_file = checkpoint_base * ".mcx"
 
 sys = Ising([L, L])
 alg = Metropolis(Xoshiro(2026); β=beta)
-ckpt = init_checkpoint(checkpoint_file, (sys=sys, alg=alg); sweep=0)
+ckpt = init_checkpoint(checkpoint_file, (sys=sys, alg=alg, sweep=0))
 
 function run_sweeps!(sys, alg, sweep_start::Int, sweep_stop::Int;
                      ckpt::CheckpointSession,
@@ -88,11 +88,10 @@ end
 # -----------------------------------------------------------------------------
 
 println("Phase 2: restoring and continuing to sweep $(total_sweeps)")
-state = restore(checkpoint_file)
-sys = state.sys
-alg = state.alg
-relink!(ckpt, (sys=sys, alg=alg))
-start_sweep = state.sweep + 1
+ckpt = restore_checkpoint(checkpoint_file)
+sys = ckpt.sys
+alg = ckpt.alg
+start_sweep = ckpt.sweep + 1
 
 if start_sweep <= total_sweeps
     run_sweeps!(
