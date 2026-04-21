@@ -40,7 +40,6 @@ function update!(sys::System, alg::AbstractImportanceSampling; delta=0.1)
 end
 
 # ## Parameters
-
 const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
 
 n_total = CI_MODE ? 100 : 1000
@@ -56,12 +55,11 @@ backend = init(:MPI)
 #
 # On HPC, set `MCX_RUN_DIR` to a job-specific path (e.g. containing
 # `SLURM_JOB_ID`).  Each rank writes its own checkpoint file.
-
 run_dir   = get(ENV, "MCX_RUN_DIR", tempdir())
 ckpt_file = joinpath(run_dir, "ckpt_rank$(rank(backend)).mcx")
+print("Rank $(rank(backend))) with checkpoint file: $(ckpt_file)\n")
 
 # ## Reference run (uninterrupted)
-
 ref_alg = Metropolis(Xoshiro(seed + rank(backend) + 1); β=β)
 ref_pc  = ParallelChains(backend, ref_alg)
 ref_sys = System(0.0)
@@ -86,7 +84,6 @@ end
 # a fresh backend on restore (MPI communicators are not serializable).
 
 # ### First half
-
 alg = Metropolis(Xoshiro(seed + rank(backend) + 1); β=β)
 pc  = ParallelChains(backend, alg)
 sys = System(0.0)
@@ -113,7 +110,6 @@ end
 #
 # Each rank restores its own checkpoint file independently.
 # The `ParallelChains` wrapper is reconstructed from the existing backend.
-
 ckpt  = restore_checkpoint(ckpt_file)
 sys   = ckpt.sys
 alg   = ckpt.alg

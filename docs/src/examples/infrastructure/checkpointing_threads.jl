@@ -7,8 +7,10 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 # # Checkpointing with Parallel Chains (Threads)
 #
 # Demonstrate checkpoint/restore for a multi-chain simulation using
-# threads.  We verify that a run interrupted at a checkpoint and then
-# continued produces **identical** results to an uninterrupted reference.
+# threads. Since all threads share the same memory space, we can checkpoint
+# the entire simulation state in one call. We verify that a run interrupted
+# at a checkpoint and then continued produces **identical** results to an
+# uninterrupted reference.
 #
 # Launch with:
 # ```bash
@@ -53,9 +55,9 @@ backend = ThreadsBackend()
 
 run_dir   = get(ENV, "MCX_RUN_DIR", mktempdir())
 ckpt_file = joinpath(run_dir, "ckpt.mcx")
+print("Checkpoint file: $(ckpt_file)\n")
 
 # ## Reference run (uninterrupted)
-
 ref_algs = [Metropolis(Xoshiro(seed + i); β=β) for i in 1:size(backend)]
 ref_pc   = ParallelChains(backend, ref_algs)
 ref_sys  = [System(0.0) for _ in 1:size(backend)]
@@ -77,7 +79,6 @@ println("Reference run: $(size(backend)) chains × $(n_total) samples")
 # full `ParallelChains` object and the vector of systems in one call.
 
 # ### First half
-
 algs = [Metropolis(Xoshiro(seed + i); β=β) for i in 1:size(backend)]
 pc   = ParallelChains(backend, algs)
 sys  = [System(0.0) for _ in 1:size(backend)]
