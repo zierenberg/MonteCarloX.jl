@@ -1,51 +1,52 @@
 # MonteCarloX.jl
 
-MonteCarloX is a compact Julia framework for Monte Carlo sampling.
-It is built around composable primitives, so algorithms stay reusable across very different models.
+MonteCarloX.jl is a modular Monte Carlo framework in Julia.
+It separates the sampling algorithm from the system under study:
+the user defines the system state and proposes changes; MonteCarloX provides the acceptance criterion.
+Because the algorithm is independent of the model, every simulation becomes a template — replacing the system yields a new application without modifying the algorithmic loop.
 
-## What this package gives you
+## Separation of concerns
 
-- Equilibrium samplers (`Metropolis`, `Glauber`, `HeatBath`, `Multicanonical`, `WangLandau`)
-- Continuous-time samplers (`Gillespie`)
-- Measurement/scheduling framework (`Measurements`)
-- Ensemble and weight tools (`BoltzmannEnsemble`, `BinnedObject`)
-- Event handler backends for event-driven dynamics
+A Monte Carlo simulation in this framework consists of two parts:
 
-## Core idea
+1. **Problem-specific** (provided by the user): the system state and a rule for proposing changes.
+2. **Reusable** (provided by MonteCarloX): the algorithm that decides whether a proposed change is accepted.
 
-A simulation needs 3 pieces:
+For discrete-state sampling, the central interface is `accept!(algorithm, x_new, x_old)`.
+For continuous-time dynamics, the equivalent is `advance!(algorithm, system, T)`, which selects event times and events from user-defined rates.
 
-1. **System**: state and model-specific operations
-2. **Weight/rates**: target distribution or transition intensities
-3. **Algorithm**: transition sampler
+This separation keeps algorithm code model-agnostic:
+the same `Metropolis` algorithm samples a posterior distribution in Bayesian inference, an Ising model at thermal equilibrium, or any other system for which a log-weight function can be defined.
 
-`Measurements` are optional convenience tools for organized observable collection.
+Because the user retains full control over the system definition and update rule, it is straightforward to build companion packages that provide these for entire model families.
+For example, `SpinSystems` implements states, updates, and observables for Ising and Blume-Capel models, so that a simulation reduces to choosing an algorithm and running the loop.
 
-This separation keeps algorithm code model-agnostic.
+## Algorithms
 
-## Reading path
+MonteCarloX provides the following sampling algorithms, each usable with any system that implements the required interface:
 
-If you are new, read in this order:
+- **Importance sampling**: `Metropolis`, `Glauber`, `HeatBath` — accept or reject proposed changes based on a log-weight ratio.
+- **Flat-histogram methods**: `Multicanonical`, `WangLandau` — iteratively adapt weights to achieve uniform sampling over an order parameter, enabling access to rare configurations.
+- **Extended-ensemble methods**: `ParallelTempering`, `ReplicaExchange` — run multiple replicas at different parameters and exchange configurations to overcome free-energy barriers.
+- **Continuous-time sampling**: `Gillespie` — exact stochastic simulation via event rates.
 
-1. Monte Carlo Fundamentals
-2. Importance Sampling Algorithms
-3. Continuous-Time Sampling Algorithms
-4. Build Your Own System
-5. Systems
-6. Weights
-7. Measurements
+## Examples as templates
 
+The documentation includes worked examples across several domains.
+Each example is a self-contained simulation that serves as a template:
+the algorithmic structure remains unchanged when the system is replaced.
 
-## Quick orientation
-
-- Use **importance sampling** for discrete-step update protocols (equilibrium or driven/non-equilibrium).
-- Use **continuous-time sampling** when physical/simulation time matters.
-- Use **companion model packages** (for example `SpinSystems`) for concrete systems.
+- **Bayesian inference**: posterior sampling for coin flips, linear regression, hierarchical models.
+- **Statistical mechanics**: importance sampling, multicanonical sampling, and parallel tempering for Ising and Blume-Capel models.
+- **Stochastic processes**: Poisson processes, birth-death dynamics, reversible dimerization via the Gillespie algorithm.
+- **Large deviation theory**: multicanonical sampling of rare fluctuations in sums of random variables and the Ornstein-Uhlenbeck process.
+- **Infrastructure**: checkpointing and parallel chains (MPI, threads).
 
 ## Scope
 
-MonteCarloX is the algorithmic core. Concrete model families are intentionally external.
-This keeps the framework concise and easier to extend.
+MonteCarloX provides the algorithmic core.
+Concrete model families (e.g., `SpinSystems`) are maintained as separate companion packages.
+This keeps the framework compact and allows independent development of new models.
 
 ## Related Julia packages
 

@@ -1,145 +1,84 @@
-# MonteCarloX.jl
+<img src="docs/logo/banner.png" alt="MonteCarloX.jl" width="800" />
 
 [![Docs: dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://zierenberg.github.io/MonteCarloX.jl/dev)
 [![CI: core](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_core.yml/badge.svg)](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_core.yml)
 [![CI: examples](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_examples.yml/badge.svg)](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_examples.yml)
 [![codecov](https://codecov.io/gh/zierenberg/MonteCarloX.jl/branch/main/graph/badge.svg?token=FUn6qFnsSN)](https://codecov.io/gh/zierenberg/MonteCarloX.jl)
 
-<img src="docs/logo/logo.png" alt="MonteCarloX logo" width="180" />
+MonteCarloX.jl is a modular Monte Carlo framework in Julia.
+It separates the sampling algorithm from the system under study:
+the user defines the system state and proposes changes; MonteCarloX provides the acceptance criterion.
+Because the algorithm is independent of the model, every simulation becomes a template — replacing the system yields a new application without modifying the algorithmic loop.
 
-MonteCarloX.jl is a concise, modular Monte Carlo framework in Julia.
-It provides reusable sampling algorithms and measurement tools, while model-specific code lives in companion packages (for example, `SpinSystems`).
+Companion packages can encapsulate entire model families (e.g., `SpinSystems` for Ising and Blume-Capel models), providing system definitions, update rules, and observables out of the box.
 
-To install MonteCarloX.jl, run import Pkg; Pkg.add("MonteCarloX") as a Julia language command. 
+## Example
 
-## Design in one sentence
+Sample a one-dimensional Gaussian target distribution via Metropolis.
+The user defines the state, the proposal, and the log-weight; MonteCarloX decides whether to accept.
 
-Build simulations from composable parts:
+```julia
+using Random, MonteCarloX
 
-- `System` object
-    - state
-    - properties
-- `Algorithm` object
-    - `logweight` function specifies distribution/ensemble
-    - random number generator & acceptance stats
-- `update!(sys, alg)` function
-    - modifies the system based on the algorithm
+rng = Xoshiro(42)
 
-Optional convenience layer:
+# Problem-specific: state, proposal, and target distribution
+x = 0.0
+propose(x) = x + 0.5 * randn(rng)
+logweight(x) = -0.5 * x^2
 
-- `Measurement` / `Measurements` (helpers for organized recording and schedules)
+# Algorithm (reusable across any system with a log-weight)
+alg = Metropolis(rng, logweight)
+
+# Simulation loop
+for step in 1:100_000
+    x_new = propose(x)
+    if accept!(alg, x_new, x)    # MonteCarloX decides
+        x = x_new
+    end
+end
+```
+
+Replace `x` with a spin configuration, a parameter vector, or any other state —
+the algorithm and the loop remain the same.
+Swap `Metropolis` for `Multicanonical` or `WangLandau` and only the acceptance criterion changes.
+
+## Algorithms
+
+- **Importance sampling**: `Metropolis`, `Glauber`, `HeatBath` — accept/reject based on a log-weight ratio.
+- **Flat-histogram methods**: `Multicanonical`, `WangLandau` — iteratively adapt weights for uniform sampling over an order parameter.
+- **Extended-ensemble methods**: `ParallelTempering`, `ReplicaExchange` — exchange configurations across parameters to overcome free-energy barriers.
+- **Continuous-time sampling**: `Gillespie` — exact stochastic simulation via event rates.
+
+## Application domains
+
+The [documentation](https://zierenberg.github.io/MonteCarloX.jl/dev) includes worked examples across several domains.
+Each serves as a template whose algorithmic structure is independent of the specific system.
+
+- **Bayesian inference**: posterior sampling for coin flips, linear regression, hierarchical models.
+- **Statistical mechanics**: Ising and Blume-Capel models with importance sampling, multicanonical sampling, and parallel tempering.
+- **Stochastic processes**: Poisson processes, birth-death dynamics, reversible dimerization via the Gillespie algorithm.
+- **Large deviation theory**: multicanonical sampling of rare fluctuations in sums of random variables and the Ornstein-Uhlenbeck process.
 
 ## Installation
 
-### Core package
-
 ```julia
-using Pkg
-Pkg.activate(".")
-Pkg.instantiate()
+import Pkg; Pkg.add("MonteCarloX")
 ```
 
-### Optional: SpinSystems (for Ising/Blume-Capel examples)
-
-From repository root:
+Optional companion package (from repository root):
 
 ```julia
-using Pkg
-Pkg.develop(path="SpinSystems")
-```
-
-## Example 1: generic Metropolis sampling (no model package required)
-
-This samples a 1D Gaussian target with custom log weight.
-It uses `Measurements` for convenience; you can collect values manually instead.
-
-```julia
-using Random
-using Statistics
-using MonteCarloX
-
-rng = MersenneTwister(42)
-
-μ, σ = 1.0, 1.0
-logweight(x) = -0.5 * ((x - μ) / σ)^2
-alg = Metropolis(rng, logweight)
-
-measurements = Measurements([
-    :x => (x -> x) => Float64[]
-], interval=1)
-
-function update(x, alg)
-    x_new = x + randn(alg.rng)
-    return accept!(alg, x_new, x) ? x_new : x
-end
-
-x = 0.0
-for step in 1:50_000
-    x = update(x, alg)
-    measure!(measurements, x, step)
-end
-
-println("acceptance rate = ", acceptance_rate(alg))
-println("sample mean     = ", mean(measurements[:x].data))
-println("sample std      = ", std(measurements[:x].data))
-```
-
-## Example 2: 2D Ising with Metropolis (requires SpinSystems)
-
-This example also uses `Measurements` as optional convenience.
-
-```julia
-using Random
-using Statistics
-using MonteCarloX
-using SpinSystems
-
-rng = MersenneTwister(7)
-
-sys = Ising([16, 16], J=1.0, periodic=true)
-init!(sys, :random, rng=rng)
-
-alg = Metropolis(rng; β=0.44)
-
-measurements = Measurements([
-    :energy => energy => Float64[],
-    :magnetization => magnetization => Float64[]
-], interval=16)
-
-for step in 1:200_000
-    spin_flip!(sys, alg)
-    measure!(measurements, sys, step)
-end
-
-println("acceptance rate = ", acceptance_rate(alg))
-println("⟨E⟩             = ", mean(measurements[:energy].data))
-println("⟨|M|⟩           = ", mean(measurements[:magnetization].data))
+using Pkg; Pkg.develop(path="SpinSystems")
 ```
 
 ## Documentation
-
-The docs focus on pedagogy and examples:
-
-- conceptual framework
-- algorithm intuition (Metropolis, HeatBath, Multicanonical, Wang-Landau, Gillespie)
-- measurement scheduling patterns
-- broad set of runnable example patterns
 
 Build locally:
 
 ```bash
 julia --project=docs -e 'using Pkg; Pkg.instantiate(); include("docs/make.jl")'
 ```
-
-Then open `docs/build/index.html`.
-
-## Repository layout
-
-- `src/`: core framework and algorithms
-- `SpinSystems/`: optional model package
-- `examples/`: notebooks and scripts (including stochastic-process and spin examples)
-- `docs/`: Documenter source
-- `test/`: core tests (`SpinSystems/test/` for model tests)
 
 ## Testing
 
