@@ -16,15 +16,18 @@ To install MonteCarloX.jl, run import Pkg; Pkg.add("MonteCarloX") as a Julia lan
 
 Build simulations from composable parts:
 
-- `System` (state + observables)
-- `LogWeight` / rates (target distribution or dynamics)
-- `Algorithm` (how transitions are sampled)
+- `System` object
+    - state
+    - properties
+- `Algorithm` object
+    - `logweight` function specifies distribution/ensemble
+    - random number generator & acceptance stats
+- `update!(sys, alg)` function
+    - modifies the system based on the algorithm
 
 Optional convenience layer:
 
 - `Measurement` / `Measurements` (helpers for organized recording and schedules)
-
-Only `System + LogWeight/rates + Algorithm` are required.
 
 ## Installation
 
