@@ -66,10 +66,10 @@ end
 const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
 
 N     = CI_MODE ? 100 : 1_000
-p     = 0.5
+p     = 0.2
 mu    = 1.0
-lambda = mu * 0.8  # sub-critical: lambda < mu
-h     = 1e-2
+lambda = mu * 0.9  # sub-critical: lambda < mu
+h     = 1e-1
 T     = CI_MODE ? 100.0 : 1_000.0
 dt_step = 10.0
 measure_times = collect(0.0:dt_step:T);
@@ -107,5 +107,7 @@ p = plot(times, activity/N; lw=2, label="Activity",
          xlabel="Time", ylabel="Active nodes (normalized)",
          title="Contact process (sub-critical: λ/μ = $(lambda/mu))",
          size=(700, 280), margin=5Plots.mm)
-hline!(p, [h / (mu - lambda)]; color=:red, linestyle=:dash, label="Analytical ρ")
+# cf. Martinello et al. PRX (2017)
+rho_mf = (lambda-mu-h + sqrt(4*h*lambda + (lambda-mu-h)^2)) / (2*lambda)
+hline!(p, [rho_mf]; color=:red, linestyle=:dash, label="MF prediction")
 p
