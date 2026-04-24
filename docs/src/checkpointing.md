@@ -7,23 +7,23 @@ MonteCarloX provides a simple checkpoint API based on Julia's `Serialization`.
 A `CheckpointSession` tracks a file path and a set of linked objects that are
 serialized together on every `checkpoint!` call.
 
+Checkpointing distinguishes between linked objects passed as named tuples upon init 
+(tracked throughout) and meta data provided at each checkpoint added as kwargs. 
+
 ## Lifecycle
 
 ```julia
 using MonteCarloX
 
-# 1. Create session — writes an initial checkpoint
-ckpt = init_checkpoint("run/ckpt.mcx", (sys=sys, alg=alg); sweep=0)
+# 1. Create session — writes an initial checkpoint 
+ckpt = init_checkpoint("ckpt.mcx", (sys=sys, alg=alg), sweep=0)
 
 # 2. Inside the loop — write rolling checkpoints
 checkpoint!(ckpt; sweep=sweep)
 
 # 3. On restart — restore state
-state = restore("run/ckpt.mcx")
-sys = state.sys
-alg = state.alg
-start_sweep = state.sweep + 1
-relink!(ckpt, (sys=sys, alg=alg))
+state = restore_checkpoint("run/ckpt.mcx")
+start_sweep = state.sweep
 
 # 4. After successful completion — clean up
 finalize!(ckpt)
@@ -32,47 +32,117 @@ finalize!(ckpt)
 The checkpoint file is written atomically (tmp + rename) so a crash during
 write never corrupts the previous checkpoint.
 
-## HPC example: checkpoint and resume
+## Single-chain example
 
 ```julia
-using Random, MonteCarloX
+using Random, Test
+using MonteCarloX
 
-checkpoint_file = "job/ckpt.mcx"
+# Define system
+mutable struct System
+    x::Float64
+end
+E(sys::System) = 1/4*(sys.x^2 - 2)^2
 
-if isfile(checkpoint_file)
-    state = restore(checkpoint_file)
-    sys = state.sys
-    alg = state.alg
-    start_sweep = state.sweep + 1
-    ckpt = init_checkpoint(checkpoint_file, (sys=sys, alg=alg); sweep=state.sweep)
-else
-    rng = MersenneTwister(42)
-    alg = Metropolis(rng; β=0.44)
-    sys = MySystem()
-    start_sweep = 1
-    ckpt = init_checkpoint(checkpoint_file, (sys=sys, alg=alg); sweep=0)
+function update!(sys::System, alg::AbstractImportanceSampling; delta=0.1)
+    x_new = sys.x + delta * randn(alg.rng)
+    accept!(alg, E(System(x_new)), E(sys)) && (sys.x = x_new)
 end
 
-x = 0.0
-for sweep in start_sweep:n_sweeps
-    x_new = x + randn(alg.rng)
-    x = accept!(alg, x_new, x) ? x_new : x
+# Parameters
+n_total = 1000
+n_sweep = 10
+n_half  = n_total ÷ 2
+seed    = 42
+β       = 2.0
 
-    if sweep % 100_000 == 0
-        checkpoint!(ckpt; sweep=sweep)
-    end
+# Run first half
+sys = System(0.0)
+alg = Metropolis(Xoshiro(seed); β=β)
+ckpt = init_checkpoint("ckpt.mcx", (sys=sys, alg=alg, sample=0))
+
+for j in 1:n_half
+    for _ in 1:n_sweep; update!(sys, alg); end
+end
+
+checkpoint!(ckpt; sample=n_half)
+
+# Restore and continue
+ckpt  = restore_checkpoint("ckpt.mcx")
+sys   = ckpt.sys
+alg   = ckpt.alg
+start = ckpt.sample + 1
+
+for j in start:n_total
+    for _ in 1:n_sweep; update!(sys, alg); end
 end
 
 finalize!(ckpt)
 ```
 
-## Continuous-time loops
+## Parallel chains with threads
 
-`advance!` accepts optional `ckpt` and `checkpoint_interval` keyword arguments:
+With thread-based parallelization, all chains share memory, so you can
+checkpoint the entire `ParallelChains` state plus system vector in one call:
 
 ```julia
-ckpt = init_checkpoint("kmc/ckpt.mcx", (alg=alg, sys=sys); step=0)
-advance!(alg, sys, 1e8; ckpt=ckpt, checkpoint_interval=1000)
+using Random, MonteCarloX
+
+backend = ThreadsBackend()
+algs    = [Metropolis(Xoshiro(42 + i); β=2.0) for i in 1:size(backend)]
+pc      = ParallelChains(backend, algs)
+sys     = [System(0.0) for _ in 1:size(backend)]
+
+# Create checkpoint session
+ckpt = init_checkpoint("ckpt.mcx", (sys=sys, pc=pc, sample=0))
+
+# Inside simulation loop
+checkpoint!(ckpt; sample=0)
+
+# On restart
+ckpt  = restore_checkpoint("ckpt.mcx")
+pc    = ckpt.pc
+sys   = ckpt.sys
+start = ckpt.sample + 1
+
+finalize!(ckpt)
+```
+
+## Parallel chains with MPI
+
+Each MPI rank writes its own checkpoint file. The `ParallelChains` object
+must be reconstructed from a fresh backend on restore (MPI communicators
+are not serializable):
+
+```julia
+using Random, MonteCarloX, MPI
+
+backend = init(:MPI)
+alg     = Metropolis(Xoshiro(42 + rank(backend)); β=2.0)
+pc      = ParallelChains(backend, alg)
+sys     = System(0.0)
+
+# Each rank writes its own file
+ckpt_file = joinpath("./", "ckpt_rank$(rank(backend)).mcx")
+ckpt = init_checkpoint(ckpt_file, (sys=sys, alg=alg, sample=0))
+
+# Restore on restart
+ckpt  = restore_checkpoint(ckpt_file)
+sys   = ckpt.sys
+alg   = ckpt.alg
+pc    = ParallelChains(backend, alg)  # reconstruct from existing backend
+start = ckpt.sample + 1
+
+finalize!(ckpt)
+```
+
+## HPC checkpoint directory
+
+Set `MCX_RUN_DIR` to a job-specific path (e.g. containing `SLURM_JOB_ID`):
+
+```julia
+run_dir   = get(ENV, "MCX_RUN_DIR", mktempdir())
+ckpt_file = joinpath(run_dir, "ckpt.mcx")
 ```
 
 ## API reference
@@ -81,7 +151,6 @@ advance!(alg, sys, 1e8; ckpt=ckpt, checkpoint_interval=1000)
 CheckpointSession
 init_checkpoint
 checkpoint!
-restore
-relink!
+restore_checkpoint
 finalize!
 ```
