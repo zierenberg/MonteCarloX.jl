@@ -1,6 +1,6 @@
 # Importance Sampling Algorithms
 
-Importance sampling in MonteCarloX is built around **local proposals + acceptance rules**.
+Importance sampling in MonteCarloX is built around **(local) proposals + acceptance rules**.
 The defining feature is a **discrete-step** update loop (proposal → decision → update).
 
 While this is most commonly used for equilibrium sampling, the same machinery can be used
@@ -10,7 +10,7 @@ in non-equilibrium protocols by changing parameters or target weights over steps
 
 Each step is:
 
-1. propose a local change
+1. propose a (local) change
 2. compute a local log-ratio (or local energy difference)
 3. accept/reject via the algorithm
 4. update counters and measure if needed
