@@ -10,7 +10,7 @@ Because the algorithm is independent of the model, every simulation becomes a te
 A Monte Carlo simulation in this framework consists of two parts:
 
 1. **Problem-specific** (provided by the user): the system state and a rule for proposing changes.
-2. **Reusable** (provided by MonteCarloX): the algorithm that decides whether a proposed change is accepted.
+2. **Algorithms** (provided by MonteCarloX): the development of the Markov Chain that can vary from simple to complex.
 
 For discrete-state sampling, the central interface is `accept!(algorithm, x_new, x_old)`.
 For continuous-time dynamics, the equivalent is `advance!(algorithm, system, T)`, which selects event times and events from user-defined rates.

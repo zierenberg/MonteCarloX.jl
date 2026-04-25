@@ -1,155 +1,155 @@
 # Build Your Own System
-This is the most practical way to start with MonteCarloX.
 
-## Minimal goal
-To run a custom model with MonteCarloX, you typically need:
-1. A state type (your system)
-2. A way to evaluate local quantities used by your update
-3. An update function that calls MonteCarloX algorithm primitives (`accept!` or `step!`)
+MonteCarloX provides **algorithms**, not complete simulations.
+Your job is to define the **system state** and **local update rules**.
+The framework handles acceptance, event scheduling, and sampling infrastructure.
 
-You do **not** need to implement the full framework at once.
+## Minimal requirements
 
-## Core abstractions in practice
-When building a model package, these abstractions define responsibilities.
+To use MonteCarloX algorithms, you need:
 
-### `AbstractSystem`
-Owns:
-- state variables
-- model parameters
-- model-specific observables (for example energy)
-- model-specific local update ingredients
+1. **System state type** — your model's configuration
+2. **Local update function** — proposes changes and uses `accept!` or `step!`
+3. **Quantities needed by the algorithm** — energy difference, event rates, etc.
 
-Should not own:
-- generic sampling logic
+You do *not* need to implement the full framework.
+Start simple and add advanced features incrementally.
 
-### `AbstractEnsemble`
-Encodes relative probability for equilibrium sampling.
-In canonical form,
-```math
-\pi(x) = \frac{e^{-\beta E(x)}}{Z(\beta)}
-```
+---
 
-up to additive constants in log space.
+## Discrete-state sampling (Metropolis, Glauber, HeatBath)
 
-- canonical ensemble: `BoltzmannEnsemble(β=β)`
-- generalized ensemble: tabulated `BinnedObject` wrapped by ensemble types
+### Core pattern
 
-Algorithms use local log-weight differences, so they remain model-agnostic.
-
-### `AbstractAlgorithm`
-Owns sampler state and statistics.
-
-Examples:
-- `Metropolis`, `Glauber`, `HeatBath`
-- `Multicanonical`, `WangLandau`
-- `Gillespie`
-
-Typical fields include RNG, counters (`steps`, `accepted`) and/or simulation time.
-Update mechanics are model-side functions (for example `spin_flip!`) that call
-algorithm primitives (`accept!`, `step!`, ...).
-
-## Example: minimal scalar model (`energy(x)`) with Metropolis
 ```julia
-using Random
 using MonteCarloX
 
-energy(x) = 0.5 * x^2
-delta_energy(x, x_new) = energy(x_new) - energy(x)
+# 1. Define system state
+mutable struct MySystem
+    # state variables
+end
 
-function local_update(x::Float64, alg::Metropolis)
-    x_new = x + randn(alg.rng)
-    ΔE = delta_energy(x, x_new)
-    if accept!(alg, ΔE)
-        return x_new
+# 2. Compute energy (or log-weight)
+energy(sys::MySystem, i) = # ... compute (local) total energy
+
+# 3. Local update proposes change and uses accept!
+function update!(sys::MySystem, alg::Metropolis; delta=0.1)
+    i = rand(alg.rng, 1:length(sys))
+    # backup old state
+    tmp = sys[i]
+    energy_old = energy(sys, i)
+    # local change
+    sys[i] += delta * (2 * rand(alg.rng) - 1)
+    energy_new = energy(sys, i)
+    if !accept!(alg, energy_new, energy_old)
+        sys[i] = tmp
     end
-    return x
 end
 
-rng = MersenneTwister(42)
-alg = Metropolis(rng; β=1.0)  # uses BoltzmannEnsemble(β=β)
-x = 0.0
-for _ in 1:10_000
-    x = local_update(x, alg)
+# 4. Run the simulation
+alg = Metropolis(Xoshiro(42); β=1.0)
+sys = MySystem(...)
+for step in 1:10_000
+    update!(sys, alg)
 end
 ```
 
-This is the smallest possible pattern: define `energy(x)`, derive `ΔE`, and let a
-framework algorithm (`Metropolis`) handle acceptance.
-
-## Checklist for importance-sampling systems
+### Checklist
 - Define your system state type.
-- Define local proposal/update logic.
-- Compute local old/new quantity (or delta) needed by `accept!`.
-- Apply state changes only after acceptance.
+- Define the total energy (or log-weight) function.
+- In your update function: propose → compute energies → `accept!(alg, E_new, E_old)` → apply if accepted / revert if rejected.
+- Pass the RNG from `alg.rng` to random operations.
 
-For many models, this is enough.
+---
 
-## Example: birth-death system with Gillespie
+## Continuous-time sampling (Gillespie)
+
+### Core pattern
+
 ```julia
-using Random
 using MonteCarloX
 
-mutable struct BirthDeathState <: AbstractSystem
-    n::Int
-    λ::Float64
-    μ::Float64
+mutable struct MyProcess <: AbstractSystem
+    # state variables
 end
 
-function rates(sys::BirthDeathState, t)
-    birth = sys.λ * sys.n
-    death = sys.μ * sys.n
-    return [birth, death]
+# 1. Provide event rates (must return a vector)
+function MonteCarloX.event_source(sys::MyProcess, t)
+    # compute rates for each possible event
+    return [rate1, rate2, ...]
 end
 
-function apply_event!(sys::BirthDeathState, event)
+# 2. Apply event (modify state in-place)
+function MonteCarloX.modify!(sys::MyProcess, event::Int, t)
+    # modify state based on event index
     if event == 1
-        sys.n += 1
+        # birth event
     elseif event == 2
-        sys.n = max(0, sys.n - 1)
+        # death event
     end
     return nothing
 end
 
-alg = Gillespie(MersenneTwister(7))
-sys = BirthDeathState(25, 0.2, 0.1)
-for _ in 1:10_000
-    t, event = step!(alg, rates(sys, alg.time))
-    event === nothing && break
-    apply_event!(sys, event)
-end
-```
+# 3. Run with step! or advance!
+alg = Gillespie(Xoshiro(42))
+sys = MyProcess(...)
+T = 100.0
 
-Same system with callback-style integration:
-```julia
-alg = Gillespie(MersenneTwister(8))
-sys = BirthDeathState(25, 0.2, 0.1)
-advance!(
-    alg,
-    sys,
-    100.0;
-    rates=(state, t) -> rates(state, t),
-    update!=(state, event, t) -> apply_event!(state, event),
+# Manual loop
+for _ in 1:10_000
+    t, event = step!(alg, event_source(sys, alg.time))
+    event === nothing && break
+    modify!(sys, event, t)
+end
+
+# Or use advance! with callbacks
+advance!(alg, sys, T;
+    rates=(state, t) -> event_source(state, t),
+    update!=(state, event, t) -> modify!(state, event, t),
 )
 ```
 
-## Checklist for continuous-time systems
-- Define state type.
-- Define `rates(state, t)` that returns event rates.
-- Define event-application logic for sampled event indices.
-- Use `step!` for manual loops or `advance!` for callback-based loops.
+### Checklist
+- Define state type (subtype `AbstractSystem`).
+- Implement `event_source(state, t)` returning event rate vector.
+- Implement `modify!(state, event, t)` to apply state changes.
+- Use `step!` for manual control or `advance!` for callback-based integration.
 
-## Where `Measurements` fit
-`Measurements` are optional helpers.
-You can record observables manually in vectors, or use `Measurement`/`Measurements`
-for scheduling convenience.
+---
 
-## Real model reference
-For a production-ready system implementation, inspect `SpinSystems`
-(for example Ising), where model logic is separated cleanly from MonteCarloX algorithms.
+## Measuring observables
 
-## Abstractions API reference
-```@docs
-AbstractSystem
-AbstractEnsemble
-AbstractAlgorithm
+`Measurements` is an optional helper for scheduling observations:
+
+```julia
+using MonteCarloX
+
+# Define what to measure and when
+# The second argument is either:
+#   - An interval (e.g., 1:10 means measure every 10 steps)
+#   - A vector of specific times/steps (e.g., collect(0:10:100) for steps 0,10,20,...)
+measurements = Measurements([
+    :energy => (sys -> energy(sys)) => Float64[],
+    :magnetization => (sys -> magnetization(sys)) => Float64[],
+], interval=10)
+
+# At each measurement opportunity:
+measure!(measurements, sys, step_index)
+
+# Access results:
+energy_data = measurements[:energy].data
 ```
+
+You can measure manually with vectors if you prefer — `Measurements` just adds convenience.
+
+---
+
+## Key points
+
+- **Algorithms are model-agnostic**: the same `Metropolis` works for spin systems, Bayesian posteriors, or custom models.
+- **State management is yours**: MonteCarloX never modifies your system directly; updates happen in your code or mediated by other packages (cf. SpinSystems).
+- **RNG is passed from algorithm**: always use `alg.rng` for randomness.
+- **Checkpointing**: serialize (e.g. `sys` and `alg`) for restart capability.
+- **Parallel extensions build on the same interface**: `ParallelTempering`, `ParallelMulticanonical`, etc.
+
+See the `SpinSystems` package as example for system implementations.
