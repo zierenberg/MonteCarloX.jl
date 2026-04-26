@@ -7,13 +7,17 @@ generated_dir = joinpath(@__DIR__, "src", "generated")
 
 include(joinpath(@__DIR__, "src", "examples", "defaults.jl"))
 for (root, dirs, files) in walkdir(example_dir)
-    for file in files
-        if endswith(file, ".jl")        &&
-           !endswith(file, "_mpi.jl")   &&
-           file != "runtests.jl"        &&
-           file != "defaults.jl"
-            filepath = joinpath(root, file)
-            Literate.markdown(filepath, generated_dir; documenter=true)
+    rel_path = relpath(root, example_dir)
+    filter!(d -> d != "todos", dirs)
+    if !contains(rel_path, "todos")
+        for file in files
+            if endswith(file, ".jl")        &&
+               !endswith(file, "_mpi.jl")   &&
+               file != "runtests.jl"        &&
+               file != "defaults.jl"
+                filepath = joinpath(root, file)
+                Literate.markdown(filepath, generated_dir; documenter=true)
+            end
         end
     end
 end
