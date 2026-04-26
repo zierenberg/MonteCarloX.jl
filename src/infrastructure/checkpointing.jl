@@ -73,6 +73,10 @@ function init_checkpoint(file::String, state::NamedTuple; kwargs...)
     checkpoint!(ckpt; kwargs...)
     return ckpt
 end
+# special constructors without file or state
+init_checkpoint(file::String; kwargs...) = init_checkpoint(file, (;); kwargs...)
+init_checkpoint(state::NamedTuple; kwargs...) = init_checkpoint(joinpath(mktempdir(), "ckpt.mcx"), state; kwargs...)
+init_checkpoint(; kwargs...) = init_checkpoint(joinpath(mktempdir(), "ckpt.mcx"), (;); kwargs...)
 
 """
     restore_checkpoint(path::String) -> CheckpointSession

@@ -1,4 +1,5 @@
 # Monte Carlo Fundamentals
+
 Monte Carlo methods estimate expectations by sampling.
 Let ``X`` be a random variable with target density or mass function ``\pi(x)``,
 and let ``f`` be an observable. The central quantity is
@@ -13,116 +14,79 @@ Given samples ``x_1, \dots, x_n`` distributed according to ``\pi``, Monte Carlo 
 ```
 
 ## 1) What is being sampled?
+
 Monte Carlo workflows differ mainly in the object whose distribution you sample.
 
 - **State sampling:** distributions over states ``x``
 - **Trajectory sampling:** distributions over paths ``\omega = (x_t)_{t \in [0,T]}``
 
-Examples of state sampling:
+## 2) State sampling: equilibrium ensembles
 
-- Bayesian inference:
+For equilibrium systems, the target distribution ``\pi(x)`` arises from a Hamiltonian or energy functional.
+
+### Canonical ensemble
+
 ```math
-\pi(\theta) = p(\theta \mid \mathcal{D}) \propto p(\mathcal{D} \mid \theta)\,p(\theta).
+\pi(x) = \frac{1}{Z(\beta)} e^{-\beta E(x)},
 ```
 
-- Statistical mechanics (microstates):
+where ``\beta = 1/(k_B T)`` is the inverse temperature and ``Z(\beta) = \sum_x e^{-\beta E(x)}`` is the partition function.
+Monte Carlo sampling produces configurations ``x`` distributed according to this Boltzmann weight.
+
+### Generalized ensembles
+
+For rugged energy landscapes or to access rare events, generalized ensembles modify the sampling measure.
+
+**Multicanonical:** ``\pi_{\text{muca}}(x) \propto e^{-\beta_{\text{ref}} E(x)} / w(E(x))``, where ``w(E)`` is a tuned weight to flatten the energy histogram.
+
+**Wang-Landau:** iteratively updates ``w(E)`` to achieve flat histogram sampling, estimating the density of states ``\Omega(E)``.
+
+### Extended ensembles
+
+**Parallel tempering** (replica exchange) introduces multiple replicas at different temperatures ``\{\beta_i\}`` and allows exchanges between them.
+The extended state is ``(\beta_i, x_i)``, and the target distribution factorizes as
 ```math
-\pi(x) = p(x \mid \beta) = \frac{e^{-\beta E(x)}}{Z(\beta)}.
+\Pi(\{(\beta_i, x_i)\}) = \prod_i \frac{1}{Z(\beta_i)} e^{-\beta_i E(x_i)}.
 ```
+Exchange moves ``(\beta_i, x_i) \leftrightarrow (\beta_j, x_j)`` enable sampling of low-temperature states via high-temperature replicas.
 
-- Statistical mechanics (energy variable):
+## 3) Trajectory sampling: kinetic processes
+
+For non-equilibrium or time-dependent processes, the target is a distribution over entire trajectories ``\omega = (x_t)_{t\in[0,T]}``.
+
+### Event-driven sampling
+
+Given state-dependent event rates ``\{r_k(x)\}``, the total rate is ``r_{\text{tot}} = \sum_k r_k(x)``.
+The waiting time ``\tau`` to the next event is exponentially distributed:
 ```math
-p(E \mid \beta) = \frac{\Omega(E)\,e^{-\beta E}}{Z(\beta)},
+p(\tau) = r_{\text{tot}}(x) e^{-r_{\text{tot}}(x) \tau}.
+```
+After drawing ``\tau``, an event ``k`` is selected with probability ``r_k(x)/r_{\text{tot}}(x)``.
+The process then advances: ``t \to t + \tau`` and ``x \to x'`` (modified according to event ``k``).
+
+This defines a path-space distribution where each trajectory ``\omega`` has probability weight proportional to the product of exponential waiting times and conditional event probabilities.
+
+## 4) Markov chain convergence
+
+For ergodic Markov chains:
+
+- **Detailed balance:** ``\pi(x') T(x' \leftarrow x) = \pi(x) T(x \leftarrow x')`` ensures ``\pi`` is stationary.
+- **Ergodiciy:** every state can be reached from every other state (eventually).
+
+Under these conditions, the chain converges to ``\pi`` regardless of the initial state.
+The *rate* of convergence depends on the algorithm and the target distribution's geometry (e.g., barrier heights, correlations).
+
+## 5) Sampling vs. integration
+
+Monte Carlo gives *stochastic estimates* of expectations:
+```math
+\hat{f} = \frac{1}{n}\sum_{i=1}^n f(x_i), \quad x_i \sim \pi.
 ```
 
-where ``\Omega(E)`` is the density of states.
-
-Examples of trajectory sampling:
-- chemical reaction networks
-- epidemic and contact processes
-- kinetic spin dynamics
-
-## 2) Unified view: trajectories are states in path space
-Conceptually, trajectory sampling is still state-distribution sampling, but over
-a higher-dimensional object space (path space).
-
-Why keep a separate class in practice?
-- trajectory methods preserve explicit physical or simulation time
-- event times and event identities are sampled jointly
-- APIs are event-driven rather than proposal/reject loops
-
-So the mathematics is unified, while computational interfaces are specialized.
-
-Path-space notation:
-- ``\omega``: entire trajectory
-- ``\pi(\omega) = p(\omega \mid \lambda)``: path distribution under model parameters ``\lambda``
-
-## 3) Two algorithmic interfaces
-
-### A. Discrete-step samplers (importance sampling / MCMC)
-
-Loop:
-1. propose a local change
-2. evaluate a log-ratio or local weight difference
-3. accept/reject
-
-Used in Bayesian inference, equilibrium statistical mechanics, and many
-optimization/sampling hybrids.
-
-### B. Continuous-time event samplers (kinetic Monte Carlo)
-
-Loop:
-1. compute event rates
-2. sample waiting time ``\mathrm{d}t``
-3. sample event index
-4. advance time and apply event
-
-Used when timing of events is part of the model output.
-
-## 4) Mapping to MonteCarloX
-Across both interfaces, MonteCarloX keeps the same decomposition:
-
-1. **System**: state and model-specific updates
-2. **Weight/rates**: target density or event intensities
-3. **Algorithm**: transition sampler
-
-`Measurements` are optional and independent of the core transition logic.
-
-## 5) Practical simulation recipe
-For most workflows, implementation follows one of two loops.
-
-### A. Discrete-step sketch
-```julia
-using Random
-using MonteCarloX
-
-rng = MersenneTwister(1)
-logdensity(x) = -0.5 * x^2
-alg = Metropolis(rng, logdensity)
-
-x = 0.0
-for _ in 1:10_000
-    x_new = x + randn(alg.rng)
-    x = accept!(alg, x_new, x) ? x_new : x
-end
+The statistical error scales as ``1/\sqrt{n}``, independent of dimensionality — this is the key advantage over deterministic quadrature.
+However, *correlated samples* from a Markov chain increase the asymptotic variance:
+```math
+\sigma^2_{\text{asymp}} = \sigma^2 \left(1 + 2\sum_{k=1}^\infty \rho_k\right),
 ```
-
-### B. Continuous-time sketch
-```julia
-using Random
-using MonteCarloX
-
-alg = Gillespie(MersenneTwister(2))
-rates = [0.2, 0.8]
-for _ in 1:10_000
-    t, event = step!(alg, rates)
-    # update your state using `event`
-end
-```
-
-## 6) Where to continue
-- For discrete-step methods and concrete examples:
-  - [Importance Sampling Algorithms](importance_sampling_algorithms.md)
-- For event-driven continuous-time methods and examples:
-  - [Continuous-Time Sampling Algorithms](continuous_time_sampling_algorithms.md)
-- Then implement your own model in [Build Your Own System](build_your_own_system.md).
+where ``\rho_k`` is the autocorrelation at lag ``k``.
+This is quantified by the *autocorrelation time* ``\tau_{\text{int}}``, so the effective sample size is ``n / \tau_{\text{int}}``.
