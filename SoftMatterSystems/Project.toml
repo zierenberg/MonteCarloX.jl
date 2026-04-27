@@ -1,0 +1,23 @@
+name = "SoftMatterSystems"
+uuid = "b82f78d4-0170-4332-a38c-35e6832ae2e9"
+version = "0.1.0"
+authors = ["Johannes Zierenberg"]
+
+[deps]
+MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[sources]
+MonteCarloX = {path = ".."}
+
+[compat]
+MonteCarloX = "≥ 0.2"
+StaticArrays = "1"
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
