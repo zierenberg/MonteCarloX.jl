@@ -1,64 +1,66 @@
 """
-    radius_of_gyration_sq(sys::LatticePolymer, m) -> Float64
+    center_of_mass(sys, n) -> SVector{D,Float64}
 
-Squared radius of gyration for polymer `m`:
-  Rg² = (1/N) Σᵢ (rᵢ - r_cm)²
-using minimum image convention for PBC.
+Center of mass of polymer `n` with minimum-image convention.
 """
-function radius_of_gyration_sq(sys::LatticePolymer, m::Int)
-    N = sys.N
-    poly = sys.polymers[m]
-    cm = center_of_mass(sys, m)
+function center_of_mass(sys::LatticePolymer{D}, n::Int) where {D}
+    poly = sys.polymers[n]
+    M = polymer_length(sys, n)
+    ref = poly[1]
+
+    # Mean displacement from reference monomer (minimum-image)
+    cm = zero(MVector{D,Float64})
+    for m in 1:M
+        cm .+= lattice_difference(poly[m], ref, sys.dims)
+    end
+    # Shift back to reference frame and wrap into [0, L)
+    for d in 1:D
+        cm[d] = mod(ref[d] + cm[d] / M, sys.dims[d])
+    end
+    return SVector{D,Float64}(cm)
+end
+
+"""
+    radius_of_gyration_sq(sys, n) -> Float64
+
+Squared radius of gyration for polymer `n` using minimum-image convention.
+"""
+function radius_of_gyration_sq(sys::LatticePolymer{D}, n::Int) where {D}
+    poly = sys.polymers[n]
+    M = polymer_length(sys, n)
+    cm = MVector{D,Float64}(center_of_mass(sys, n))
 
     rg2 = 0.0
-    for k in 1:N
-        x, y, z = site_coords(poly[k], sys.Lx, sys.Ly)
-        dx = lattice_difference(Float64(x), cm[1], sys.Lx)
-        dy = lattice_difference(Float64(y), cm[2], sys.Ly)
-        dz = lattice_difference(Float64(z), cm[3], sys.Lz)
-        rg2 += dx^2 + dy^2 + dz^2
+    for m in 1:M
+        rg2 += sum(abs2, lattice_difference(poly[m], cm, sys.dims))
     end
-    return rg2 / N
+    return rg2 / M
 end
 
 """
-    center_of_mass(sys::LatticePolymer, m) -> (Float64, Float64, Float64)
+    end_to_end_distance_sq(sys, n) -> Int
 
-Center of mass of polymer `m`, computed using the middle monomer as reference
-and minimum image convention for PBC.
+Squared end-to-end distance for polymer `n` with minimum-image convention.
 """
-function center_of_mass(sys::LatticePolymer, m::Int)
-    N = sys.N
-    poly = sys.polymers[m]
+end_to_end_distance_sq(sys::LatticePolymer, n::Int) =
+    lattice_distance_sq(sys.polymers[n][end], sys.polymers[n][1], sys.dims)
 
-    # Use middle monomer as reference point
-    ref = poly[N ÷ 2 + 1]
-    rx, ry, rz = site_coords(ref, sys.Lx, sys.Ly)
+"""
+    gyration_tensor(sys, n) -> Matrix{Float64}
 
-    cx, cy, cz = 0.0, 0.0, 0.0
-    for k in 1:N
-        x, y, z = site_coords(poly[k], sys.Lx, sys.Ly)
-        cx += lattice_difference(Float64(x), Float64(rx), sys.Lx)
-        cy += lattice_difference(Float64(y), Float64(ry), sys.Ly)
-        cz += lattice_difference(Float64(z), Float64(rz), sys.Lz)
+DxD gyration tensor for polymer `n`. Satisfies `tr(G) == radius_of_gyration_sq`.
+"""
+function gyration_tensor(sys::LatticePolymer{D}, n::Int) where {D}
+    poly = sys.polymers[n]
+    M = polymer_length(sys, n)
+    cm = MVector{D,Float64}(center_of_mass(sys, n))
+
+    G = zeros(Float64, D, D)
+    for m in 1:M
+        r = lattice_difference(poly[m], cm, sys.dims)
+        for i in 1:D, j in 1:D
+            G[i, j] += r[i] * r[j]
+        end
     end
-    cx = _wrap(rx + cx / N, sys.Lx)
-    cy = _wrap(ry + cy / N, sys.Ly)
-    cz = _wrap(rz + cz / N, sys.Lz)
-    return (cx, cy, cz)
-end
-
-"""
-    end_to_end_distance_sq(sys::LatticePolymer, m) -> Float64
-
-Squared end-to-end distance for polymer `m` with minimum image convention.
-"""
-function end_to_end_distance_sq(sys::LatticePolymer, m::Int)
-    poly = sys.polymers[m]
-    x1, y1, z1 = site_coords(poly[1], sys.Lx, sys.Ly)
-    xN, yN, zN = site_coords(poly[end], sys.Lx, sys.Ly)
-    dx = lattice_difference(Float64(xN), Float64(x1), sys.Lx)
-    dy = lattice_difference(Float64(yN), Float64(y1), sys.Ly)
-    dz = lattice_difference(Float64(zN), Float64(z1), sys.Lz)
-    return dx^2 + dy^2 + dz^2
+    return G / M
 end

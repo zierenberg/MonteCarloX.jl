@@ -1,80 +1,128 @@
 """
-    LatticePolymer{TJ<:Real} <: AbstractLatticeParticleSystem
+    LatticePolymer{D, TJ<:Real} <: AbstractLatticePolymerSystem
 
-Lattice polymer system: M self-avoiding polymers of N monomers each on a 3D
-cubic lattice with periodic boundary conditions.
+D-dimensional lattice polymer system on a hypercubic lattice with PBC.
 
-Energy:
-  E = -J_intra * (intra-polymer contacts - bonds) - J_inter * inter-polymer contacts
+# Type parameters
+- `D`: spatial dimension (compile-time for coordinate loop unrolling)
+- `TJ`: coupling type (Float64)
 
-where contacts count nearest-neighbor pairs of occupied sites belonging to the
-same polymer (intra) or different polymers (inter), and bonds are the N-1
-backbone connections per polymer that are always present.
+# Energy (all nearest-neighbor contacts, including backbone)
 
-# Fields
-- `site_occupant::Vector{Int}` -- site -> polymer ID (1-based) or 0
-- `polymers::Vector{Vector{Int}}` -- polymers[m][k] = site of k-th monomer (1-indexed)
-- `M::Int` -- number of polymers
-- `N::Int` -- monomers per polymer
-- `Lx, Ly, Lz, N_sites::Int` -- lattice dimensions
-- `nbrs::Vector{NTuple{6,Int}}` -- precomputed neighbor table
-- `J_intra::TJ`, `J_inter::TJ` -- coupling constants
-- `num_intra_contacts::Int` -- intra-polymer neighbor pairs / 2 minus bonds
-- `num_inter_contacts::Int` -- inter-polymer neighbor pairs / 2
-- `cached_energy::TJ`
+    E = -J_intra * (intra-polymer contacts) - J_inter * (inter-polymer contacts)
+
+Backbone bonds contribute a fixed -J_intra each and are included.
 """
-mutable struct LatticePolymer{TJ<:Real} <: AbstractLatticeParticleSystem
-    site_occupant::Vector{Int}
-    polymers::Vector{Vector{Int}}
-    M::Int
-    N::Int
-    Lx::Int
-    Ly::Int
-    Lz::Int
-    N_sites::Int
-    nbrs::Vector{NTuple{6,Int}}
+mutable struct LatticePolymer{D, TJ<:Real} <: AbstractLatticePolymerSystem
+    polymers::Vector{Vector{MVector{D,Int}}}
+    neighbors::Vector{Vector{Int}}   # precomputed: neighbors[site] = [nb1, nb2, ...]
+    dims::SVector{D,Int}
+    state::Vector{Int}               # state[site] = polymer ID (0 = empty)
     J_intra::TJ
     J_inter::TJ
-    num_intra_contacts::Int
-    num_inter_contacts::Int
-    cached_energy::TJ
+    cached_intra::Int                # total intra-polymer contact count
+    cached_inter::Int                # total inter-polymer contact count
 end
 
-"""
-    LatticePolymer(Lx, Ly, Lz; M, N, J_intra=0.0, J_inter=1.0)
+# ── Constructors ─────────────────────────────────────────────────────────────
 
-Construct an uninitialized LatticePolymer system. Call `init!` to place polymers.
 """
-function LatticePolymer(Lx::Int, Ly::Int, Lz::Int; M::Int, N::Int,
-                         J_intra::Real=0.0, J_inter::Real=1.0)
-    N_sites = Lx * Ly * Lz
-    @assert M * N <= N_sites "Not enough sites for $M polymers of length $N"
-    nbrs = build_cubic_neighbors(Lx, Ly, Lz)
-    TJ = promote_type(typeof(J_intra), typeof(J_inter))
-    LatticePolymer{TJ}(
+    LatticePolymer(; dims, polys, J_intra=0.0, J_inter=1.0)
+
+Primary constructor. `dims` is the box size per dimension, `polys` is a vector of
+polymer lengths.
+
+    LatticePolymer(; dims, num_poly, length_poly, J_intra=0.0, J_inter=1.0)
+
+Convenience for `num_poly` homopolymers of uniform `length_poly`.
+"""
+function LatticePolymer(; dims::AbstractVector{<:Integer},
+                          polys::Union{AbstractVector{<:Integer}, Nothing}=nothing,
+                          num_poly::Union{Integer, Nothing}=nothing,
+                          length_poly::Union{Integer, Nothing}=nothing,
+                          J_intra::Real=0.0, J_inter::Real=1.0)
+    if polys !== nothing
+        lengths = collect(Int, polys)
+    else
+        @assert num_poly !== nothing && length_poly !== nothing "Provide either `polys` or both `num_poly` and `length_poly`"
+        lengths = fill(Int(length_poly), Int(num_poly))
+    end
+    D = length(dims)
+    sv_dims = SVector{D,Int}(dims...)
+    N_sites = prod(sv_dims)
+    @assert sum(lengths) <= N_sites "Not enough sites for $(length(lengths)) polymers ($(sum(lengths)) monomers on $N_sites sites)"
+    graph = grid(sv_dims; periodic=true)
+    nbrs = [collect(neighbors(graph, s)) for s in 1:N_sites]
+    LatticePolymer{D, Float64}(
+        [Vector{MVector{D,Int}}([zero(MVector{D,Int}) for _ in 1:l]) for l in lengths],
+        nbrs, sv_dims,
         zeros(Int, N_sites),
-        [Int[] for _ in 1:M],
-        M, N, Lx, Ly, Lz, N_sites, nbrs,
-        TJ(J_intra), TJ(J_inter),
-        0, 0, zero(TJ)
+        Float64(J_intra), Float64(J_inter),
+        0, 0
     )
 end
 
-LatticePolymer(L::Int; kwargs...) = LatticePolymer(L, L, L; kwargs...)
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+num_polymers(sys::LatticePolymer) = length(sys.polymers)
+polymer_length(sys::LatticePolymer, n::Int) = length(sys.polymers[n])
+
+# ── Contact counting ─────────────────────────────────────────────────────────
 
 """
-    init!(sys::LatticePolymer, type::Symbol; rng=nothing)
+    site_contacts(sys, site) -> (intra::Int, inter::Int)
 
-Initialize polymer positions.
-
-- `:ordered` -- place polymers as straight rods along the z-axis
-- `:random` -- place polymers via random self-avoiding walks
+Count intra- and inter-polymer contacts at `site`. Pure integer arithmetic.
 """
-function init!(sys::LatticePolymer, type::Symbol; rng=nothing)
-    fill!(sys.site_occupant, 0)
-    for m in 1:sys.M
-        empty!(sys.polymers[m])
+@inline function site_contacts(sys::LatticePolymer, site::Int)
+    owner = sys.state[site]
+    owner == 0 && return (0, 0)
+    intra, inter = 0, 0
+    @inbounds for nb in sys.neighbors[site]
+        occ = sys.state[nb]
+        occ == 0 && continue
+        if occ == owner
+            intra += 1
+        else
+            inter += 1
+        end
     end
+    return (intra, inter)
+end
+
+"""
+    site_energy(sys, site)
+
+Energy contribution at `site`: `-J_intra * n_intra - J_inter * n_inter`.
+"""
+@inline function site_energy(sys::LatticePolymer, site::Int)
+    ni, ne = site_contacts(sys, site)
+    return -sys.J_intra * ni - sys.J_inter * ne
+end
+
+# ── Energy ───────────────────────────────────────────────────────────────────
+
+function _recompute_contacts!(sys::LatticePolymer)
+    intra, inter = 0, 0
+    @inbounds for site in eachindex(sys.state)
+        ci, ce = site_contacts(sys, site)
+        intra += ci
+        inter += ce
+    end
+    sys.cached_intra = intra ÷ 2
+    sys.cached_inter = inter ÷ 2
+    return nothing
+end
+
+function energy(sys::LatticePolymer; full::Bool=false)
+    full && _recompute_contacts!(sys)
+    return -sys.J_intra * sys.cached_intra - sys.J_inter * sys.cached_inter
+end
+
+# ── Initialization ────────────────────────────────────────────────────────────
+
+function init!(sys::LatticePolymer{D}, type::Symbol; rng=nothing) where {D}
+    fill!(sys.state, 0)
 
     if type == :ordered
         _init_ordered!(sys)
@@ -85,170 +133,80 @@ function init!(sys::LatticePolymer, type::Symbol; rng=nothing)
         error("Unknown initialization type: $type")
     end
 
-    _recompute_energy!(sys)
+    _recompute_contacts!(sys)
     return sys
 end
 
-function _init_ordered!(sys::LatticePolymer)
-    # Place polymers as straight rods along z-axis, equally spaced
-    placed = 0
-    for m in 1:sys.M
-        # Find a starting position that fits N monomers along z
-        # Distribute polymers in a grid on the xy-plane
-        grid_size = ceil(Int, sys.M^(1/2))
-        mx = (m - 1) % grid_size
-        my = ((m - 1) ÷ grid_size) % grid_size
-        x = mx * (sys.Lx ÷ max(grid_size, 1))
-        y = my * (sys.Ly ÷ max(grid_size, 1))
-
-        for k in 1:sys.N
-            z = (k - 1) % sys.Lz
-            site = site_index(x % sys.Lx, y % sys.Ly, z, sys.Lx, sys.Ly)
-            @assert sys.site_occupant[site] == 0 "Collision during ordered init at polymer $m, monomer $k"
-            sys.site_occupant[site] = m
-            push!(sys.polymers[m], site)
+function _init_ordered!(sys::LatticePolymer{D}) where {D}
+    @assert D >= 2 "Ordered init requires D >= 2"
+    N = num_polymers(sys)
+    spacing = sys.dims[1] ÷ N
+    @assert spacing >= 1 "Not enough x-space for $N polymers"
+    for n in 1:N
+        M = polymer_length(sys, n)
+        @assert M <= sys.dims[2] "Polymer $n length $M exceeds y-dimension $(sys.dims[2])"
+        x = (n - 1) * spacing
+        for m in 1:M
+            c = zero(MVector{D,Int})
+            c[1] = x
+            c[2] = m - 1
+            sys.polymers[n][m] = c
+            sys.state[coords_to_site(c, sys.dims)] = n
         end
-        placed += 1
     end
 end
 
-function _init_random!(sys::LatticePolymer, rng)
-    for m in 1:sys.M
-        # Try to grow a self-avoiding walk
+function _init_random!(sys::LatticePolymer{D}, rng) where {D}
+    for n in 1:num_polymers(sys)
+        M = polymer_length(sys, n)
         success = false
-        for attempt in 1:1000
-            _clear_polymer!(sys, m)
-            if _grow_saw!(sys, m, rng)
+        for _ in 1:1000
+            _reset_polymer!(sys, n)
+            if _grow_saw!(sys, n, M, rng)
                 success = true
                 break
             end
         end
-        if !success
-            error("Failed to place polymer $m after 1000 attempts")
+        success || error("Failed to place polymer $n after 1000 attempts")
+    end
+end
+
+function _reset_polymer!(sys::LatticePolymer, n::Int)
+    for c in sys.polymers[n]
+        s = coords_to_site(c, sys.dims)
+        if sys.state[s] == n
+            sys.state[s] = 0
         end
     end
 end
 
-function _clear_polymer!(sys::LatticePolymer, m)
-    for site in sys.polymers[m]
-        sys.site_occupant[site] = 0
-    end
-    empty!(sys.polymers[m])
-end
+function _grow_saw!(sys::LatticePolymer{D}, n::Int, M::Int, rng) where {D}
+    empty_sites = findall(iszero, sys.state)
+    isempty(empty_sites) && return false
+    start_site = rand(rng, empty_sites)
+    sys.state[start_site] = n
+    sys.polymers[n][1] = site_to_coords(start_site, sys.dims)
 
-function _grow_saw!(sys::LatticePolymer, m, rng)
-    # Pick random starting site
-    start = rand(rng, 1:sys.N_sites)
-    sys.site_occupant[start] != 0 && return false
-    sys.site_occupant[start] = m
-    push!(sys.polymers[m], start)
-
-    for k in 2:sys.N
-        # Try random neighbor of last monomer
-        last_site = sys.polymers[m][end]
-        # Shuffle neighbor order
-        nb_indices = collect(1:6)
-        for i in 6:-1:2
+    for m in 2:M
+        last_site = coords_to_site(sys.polymers[n][m-1], sys.dims)
+        nbrs = copy(sys.neighbors[last_site])
+        for i in length(nbrs):-1:2
             j = rand(rng, 1:i)
-            nb_indices[i], nb_indices[j] = nb_indices[j], nb_indices[i]
+            nbrs[i], nbrs[j] = nbrs[j], nbrs[i]
         end
         placed = false
-        for ni in nb_indices
-            nb = sys.nbrs[last_site][ni]
-            if sys.site_occupant[nb] == 0
-                sys.site_occupant[nb] = m
-                push!(sys.polymers[m], nb)
+        for nb_site in nbrs
+            if sys.state[nb_site] == 0
+                sys.state[nb_site] = n
+                sys.polymers[n][m] = site_to_coords(nb_site, sys.dims)
                 placed = true
                 break
             end
         end
         if !placed
-            _clear_polymer!(sys, m)
+            _reset_polymer!(sys, n)
             return false
         end
     end
     return true
-end
-
-"""
-    _recompute_energy!(sys::LatticePolymer)
-
-Full recomputation of contacts and cached energy from scratch.
-"""
-function _recompute_energy!(sys::LatticePolymer)
-    intra = 0
-    inter = 0
-    for m in 1:sys.M
-        id = m
-        for site in sys.polymers[m]
-            for nb in sys.nbrs[site]
-                occ = sys.site_occupant[nb]
-                if occ == id
-                    intra += 1
-                elseif occ > 0
-                    inter += 1
-                end
-            end
-        end
-    end
-    # Each pair counted twice; subtract backbone bonds from intra
-    intra = intra ÷ 2 - sys.M * (sys.N - 1)
-    inter = inter ÷ 2
-    sys.num_intra_contacts = intra
-    sys.num_inter_contacts = inter
-    sys.cached_energy = -sys.J_intra * intra - sys.J_inter * inter
-    return nothing
-end
-
-"""
-    energy(sys::LatticePolymer; full=false)
-
-Return the system energy. If `full=true`, recompute from scratch.
-"""
-@inline function energy(sys::LatticePolymer; full=false)
-    if full
-        _recompute_energy!(sys)
-    end
-    return sys.cached_energy
-end
-
-"""
-    _compute_polymer_contacts(sys::LatticePolymer, id) -> (intra, inter)
-
-Count contacts for polymer `id`. Intra contacts are counted once
-(by temporarily marking sites as empty). Inter contacts are counted once.
-"""
-function _compute_polymer_contacts(sys::LatticePolymer, id::Int)
-    intra = 0
-    inter = 0
-    for site in sys.polymers[id]
-        for nb in sys.nbrs[site]
-            occ = sys.site_occupant[nb]
-            if occ == id
-                intra += 1
-            elseif occ > 0
-                inter += 1
-            end
-        end
-    end
-    # intra: each pair counted twice
-    return (intra ÷ 2, inter)
-end
-
-"""
-    _delta_energy_polymer_move!(sys, id, new_sites)
-
-Compute delta energy for moving the monomers of polymer `id` from their
-current positions to `new_sites`. Does NOT apply the move.
-
-Returns (ΔE, Δintra, Δinter).
-"""
-function _delta_energy_full(sys::LatticePolymer)
-    intra_old = sys.num_intra_contacts
-    inter_old = sys.num_inter_contacts
-    _recompute_energy!(sys)
-    Δintra = sys.num_intra_contacts - intra_old
-    Δinter = sys.num_inter_contacts - inter_old
-    ΔE = -sys.J_intra * Δintra - sys.J_inter * Δinter
-    return (ΔE, Δintra, Δinter)
 end

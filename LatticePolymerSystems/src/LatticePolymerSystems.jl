@@ -1,59 +1,71 @@
 """
     LatticePolymerSystems
 
-Module for lattice-based particle systems (lattice gas, lattice polymers).
+Lattice polymer systems in arbitrary spatial dimension D.
 
-This module is designed to be used with MonteCarloX.jl and provides
-concrete implementations of AbstractSystem for lattice particle models.
+# Constructor
+    LatticePolymer(; dims, polys, ...)                  # explicit polymer lengths
+    LatticePolymer(; dims, num_poly, length_poly, ...)  # uniform homopolymers
+
+# Updates
+`slither_move!`, `translate_move!`, `pivot_move!`, `double_bridge_move!`
+
+# Observables
+`energy`, `radius_of_gyration_sq`, `center_of_mass`,
+`end_to_end_distance_sq`, `gyration_tensor`, `clusters`
 """
 module LatticePolymerSystems
 
-# using for type definitions and utilities
-using Random: randperm
-
+using Graphs
+using StaticArrays
 using MonteCarloX: AbstractSystem,
                    AbstractImportanceSampling,
-                   AbstractMetropolis,
                    accept!
 
-# import for extensions of MonteCarloX functions
-import MonteCarloX
+# ── Systems ─────────────────────────────────────────────────────────────────
 
-export AbstractLatticeParticleSystem,
-       # Geometry
-       site_index,
-       site_coords,
-       build_cubic_neighbors,
-       lattice_difference,
-       # Systems
-       LatticeGas,
-       LatticePolymer,
-       # Initialization
-       init!,
-       # Observables
-       energy,
-       num_contacts,
-       delta_energy,
-       # Updates
-       kawasaki_move!,
-       polymer_move!,
-       # Cluster analysis
-       flood_fill_clusters,
-       largest_cluster_size,
-       second_largest_cluster_size,
-       cluster_size_distribution,
-       # Polymer observables
-       radius_of_gyration_sq,
-       center_of_mass,
-       end_to_end_distance_sq
+include("systems/abstract_lattice_system.jl")
+export  site_to_coords,
+        coords_to_site,
+        apply_pbc,
+        lattice_difference,
+        lattice_distance_sq
 
-include("abstractions.jl")
-include("geometry/cubic_lattice.jl")
-include("systems/lattice_gas.jl")
 include("systems/lattice_polymer.jl")
-include("updates/kawasaki.jl")
-include("updates/polymer_moves.jl")
+export  LatticePolymer,
+        num_polymers,
+        polymer_length,
+        init!,
+        energy,
+        site_contacts,
+        site_energy
+
+# ── Updates ─────────────────────────────────────────────────────────────────
+
+include("updates/slither.jl")
+export  slither_move!
+
+include("updates/translate.jl")
+export  translate_move!
+
+include("updates/pivot.jl")
+export  pivot_move!
+
+include("updates/double_bridge.jl")
+export  double_bridge_move!
+
+# ── Observables ─────────────────────────────────────────────────────────────
+
 include("observables/cluster.jl")
+export  clusters,
+        largest_cluster_size,
+        second_largest_cluster_size,
+        cluster_size_distribution
+
 include("observables/polymer_observables.jl")
+export  radius_of_gyration_sq,
+        center_of_mass,
+        end_to_end_distance_sq,
+        gyration_tensor
 
 end # module LatticePolymerSystems

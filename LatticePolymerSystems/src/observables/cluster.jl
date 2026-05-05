@@ -1,96 +1,62 @@
 """
-    flood_fill_clusters(occupation, nbrs) -> Vector{Vector{Int}}
+    clusters(sys) -> Vector{Int}
 
-Find connected components of occupied sites on a lattice using union-find.
-
-# Arguments
-- `occupation::Vector{Bool}` -- per-site occupation
-- `nbrs::Vector{NTuple{6,Int}}` -- neighbor table
-
-# Returns
-Vector of clusters, each cluster is a vector of site indices.
+Cluster sizes (in monomers) from grouping polymers by inter-polymer
+nearest-neighbor contacts. Uses union-find on polymer indices.
+Returned sorted in descending order.
 """
-function flood_fill_clusters(occupation::Vector{Bool}, nbrs::Vector{NTuple{6,Int}})
-    N = length(occupation)
+function clusters(sys::LatticePolymer)
+    N = num_polymers(sys)
+    N == 0 && return Int[]
+
+    # set up a tree of parents and ranks from merges of polymers into clusters
     parent = collect(1:N)
-    rank = zeros(Int, N)
+    rnk = zeros(Int, N)
 
-    function find(x)
-        while parent[x] != x
-            parent[x] = parent[parent[x]]  # path compression
-            x = parent[x]
-        end
-        return x
-    end
-
-    function union!(a, b)
-        ra, rb = find(a), find(b)
-        ra == rb && return
-        if rank[ra] < rank[rb]
-            parent[ra] = rb
-        elseif rank[ra] > rank[rb]
-            parent[rb] = ra
-        else
-            parent[rb] = ra
-            rank[ra] += 1
-        end
-    end
-
-    # Union occupied neighbors
-    for site in 1:N
-        occupation[site] || continue
-        for nb in nbrs[site]
-            if occupation[nb]
-                union!(site, nb)
+    # Merge polymers connected by inter-polymer neighbor contacts
+    @inbounds for n in 1:N
+        for m in 1:polymer_length(sys, n)
+            site = coords_to_site(sys.polymers[n][m], sys.dims)
+            for nb in sys.neighbors[site]
+                n2 = sys.state[nb]
+                n2 != 0 && n2 != n && _union!(parent, rnk, n, n2)
             end
         end
     end
 
-    # Collect clusters
-    cluster_map = Dict{Int, Vector{Int}}()
-    for site in 1:N
-        occupation[site] || continue
-        root = find(site)
-        if haskey(cluster_map, root)
-            push!(cluster_map[root], site)
-        else
-            cluster_map[root] = [site]
+    # Collect cluster sizes in monomers
+    sizes = zeros(Int, N)
+    for n in 1:N
+        sizes[_find!(parent, n)] += polymer_length(sys, n)
+    end
+    return sort!(filter(!iszero, sizes); rev=true)
+end
+
+@inline function _find!(parent, x)
+    @inbounds while parent[x] != x
+        parent[x] = parent[parent[x]]
+        x = parent[x]
+    end
+    return x
+end
+
+@inline function _union!(parent, rnk, a, b)
+    @inbounds begin
+        ra, rb = _find!(parent, a), _find!(parent, b)
+        ra == rb && return
+        if rnk[ra] < rnk[rb]; parent[ra] = rb
+        elseif rnk[ra] > rnk[rb]; parent[rb] = ra
+        else; parent[rb] = ra; rnk[ra] += 1
         end
     end
-
-    return collect(values(cluster_map))
 end
 
-"""
-    largest_cluster_size(clusters) -> Int
+largest_cluster_size(c::Vector{Int}) = isempty(c) ? 0 : first(c)
+second_largest_cluster_size(c::Vector{Int}) = length(c) < 2 ? 0 : c[2]
 
-Size of the largest cluster. Returns 0 if no clusters.
-"""
-function largest_cluster_size(clusters::Vector{Vector{Int}})
-    isempty(clusters) && return 0
-    return maximum(length, clusters)
-end
-
-"""
-    second_largest_cluster_size(clusters) -> Int
-
-Size of the second largest cluster. Returns 0 if fewer than 2 clusters.
-"""
-function second_largest_cluster_size(clusters::Vector{Vector{Int}})
-    length(clusters) < 2 && return 0
-    sizes = sort!([length(c) for c in clusters]; rev=true)
-    return sizes[2]
-end
-
-"""
-    cluster_size_distribution(clusters) -> Dict{Int, Int}
-
-Histogram of cluster sizes: size => count.
-"""
-function cluster_size_distribution(clusters::Vector{Vector{Int}})
+function cluster_size_distribution(c::Vector{Int})
     dist = Dict{Int, Int}()
-    for c in clusters
-        s = length(c)
+    for s in c
         dist[s] = get(dist, s, 0) + 1
     end
     return dist
