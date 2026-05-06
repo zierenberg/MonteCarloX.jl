@@ -51,7 +51,7 @@ end
         init!(sys, :random; rng=Xoshiro(42))
         alg = Metropolis(Xoshiro(2); β=0.5)
         for _ in 1:200
-            translate_move!(sys, alg)
+            translate!(sys, alg)
             verify_invariants(sys)
         end
         @test acceptance_rate(alg) > 0.0
@@ -88,7 +88,7 @@ end
         sys = LatticePolymer(; dims=[10, 10], num_poly=4, length_poly=10, J_intra=0.5, J_inter=1.0)
         init!(sys, :random; rng=Xoshiro(99))
         alg = Metropolis(Xoshiro(0); β=0.3)
-        moves = [slither_move!, translate_move!, pivot_move!, double_bridge_move!]
+        moves = [slither_move!, translate!, pivot_move!, double_bridge_move!]
         for _ in 1:2000
             moves[rand(alg.rng, 1:4)](sys, alg)
         end

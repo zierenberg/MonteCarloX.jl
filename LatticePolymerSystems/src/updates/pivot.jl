@@ -35,9 +35,15 @@ function pivot_move!(sys::LatticePolymer{D}, alg::AbstractImportanceSampling) wh
         mc = poly[m]
         dx_ax  = lattice_difference(mc[axis], pivot_c[axis], sys.dims[axis])
         dx_sec = lattice_difference(mc[sec_axis], pivot_c[sec_axis], sys.dims[sec_axis])
-        nc = MVector{D,Int}(mc)
-        nc[axis]     = apply_pbc(pivot_c[axis]     - sin_a * dx_sec, sys.dims[axis])
-        nc[sec_axis] = apply_pbc(pivot_c[sec_axis] + sin_a * dx_ax,  sys.dims[sec_axis])
+        nc = SVector{D,Int}(ntuple(d -> begin
+            if d == axis
+                apply_pbc(pivot_c[axis] - sin_a * dx_sec, sys.dims[axis])
+            elseif d == sec_axis
+                apply_pbc(pivot_c[sec_axis] + sin_a * dx_ax, sys.dims[sec_axis])
+            else
+                mc[d]
+            end
+        end, Val(D)))
         new_site = coords_to_site(nc, sys.dims)
 
         # Self-overlap in rotated segment
@@ -64,10 +70,10 @@ function pivot_move!(sys::LatticePolymer{D}, alg::AbstractImportanceSampling) wh
         ci, ce = site_contacts(sys, changed[i]); intra_b += ci; inter_b += ce
     end
 
-    # Apply in-place: clear old, write new coords from stored sites
+    # Apply: clear old, write new coords from stored sites
     for i in 1:n_move; sys.state[changed[i]] = 0; end
     for (i, m) in enumerate(start_m:end_m)
-        site_to_coords!(poly[m], changed[n_move + i], sys.dims)
+        poly[m] = site_to_coords(changed[n_move + i], sys.dims)
         sys.state[changed[n_move + i]] = n
     end
 
@@ -85,7 +91,7 @@ function pivot_move!(sys::LatticePolymer{D}, alg::AbstractImportanceSampling) wh
     else
         for i in 1:n_move; sys.state[changed[n_move + i]] = 0; end
         for (i, m) in enumerate(start_m:end_m)
-            site_to_coords!(poly[m], changed[i], sys.dims)
+            poly[m] = site_to_coords(changed[i], sys.dims)
             sys.state[changed[i]] = n
         end
     end

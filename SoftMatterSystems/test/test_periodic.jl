@@ -1,3 +1,5 @@
+using StaticArrays: SVector
+
 @testset "Periodic Geometry" begin
     L = 10.0
 
@@ -10,34 +12,22 @@
     end
 
     @testset "wrap_position" begin
-        pos = SVector(12.0, -3.0, 25.0)
-        w = wrap_position(pos, L)
-        @test w[1] ≈ 2.0
-        @test w[2] ≈ 7.0
-        @test w[3] ≈ 5.0
+        @test wrap_position(SVector(12.0, -3.0, 25.0), L) ≈ SVector(2.0, 7.0, 5.0)
+        @test wrap_position(SVector(12.0, -3.0), L) ≈ SVector(2.0, 7.0)  # 2D
     end
 
     @testset "minimum_image_sq" begin
-        # Same position
         r1 = SVector(1.0, 1.0, 1.0)
         @test minimum_image_sq(r1, r1, L) ≈ 0.0
-
-        # Nearby
-        r2 = SVector(2.0, 1.0, 1.0)
-        @test minimum_image_sq(r1, r2, L) ≈ 1.0
-
-        # Across boundary: distance should be 2 not 8
-        r3 = SVector(1.0, 1.0, 1.0)
-        r4 = SVector(9.0, 1.0, 1.0)
-        @test minimum_image_sq(r3, r4, L) ≈ 4.0  # min image dist = 2
+        @test minimum_image_sq(r1, SVector(2.0, 1.0, 1.0), L) ≈ 1.0
+        # Across boundary: min-image distance is 2, not 8
+        @test minimum_image_sq(r1, SVector(9.0, 1.0, 1.0), L) ≈ 4.0
+        # 2D
+        @test minimum_image_sq(SVector(1.0, 1.0), SVector(9.0, 1.0), L) ≈ 4.0
     end
 
     @testset "minimum_image_displacement" begin
-        r1 = SVector(1.0, 1.0, 1.0)
-        r2 = SVector(9.0, 1.0, 1.0)
-        d = minimum_image_displacement(r1, r2, L)
-        @test d[1] ≈ 2.0  # 1 - 9 + 10 = 2
-        @test d[2] ≈ 0.0
-        @test d[3] ≈ 0.0
+        d = minimum_image_displacement(SVector(1.0, 1.0, 1.0), SVector(9.0, 1.0, 1.0), L)
+        @test d ≈ SVector(2.0, 0.0, 0.0)
     end
 end

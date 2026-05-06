@@ -1,88 +1,90 @@
 """
     SoftMatterSystems
 
-Module for off-lattice soft matter systems (particle gas, bead-spring polymers).
+Off-lattice soft matter systems in arbitrary spatial dimension D.
 
-This module is designed to be used with MonteCarloX.jl and provides
-concrete implementations of AbstractSystem with composable potentials.
+# Systems
+    ParticleGas(; D=3, N, L, pair_potential, delta=0.1)
+    BeadSpringPolymer(; D=3, num_poly, length_poly, L, pair_potential, bond_potential, ...)
 
-Systems are parameterized by potential types, allowing different interaction
-models to be combined at construction time:
+# Updates
+`translate!`
 
-```julia
-# LJ gas
-lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
-gas = ParticleGas(100; L=10.0, pair_potential=lj)
-
-# Flexible bead-spring polymer
-poly = BeadSpringPolymer(4, 20; L=20.0,
-    pair_potential = LennardJonesPotential(epsilon=1.0, sigma=1.0),
-    bond_potential = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5))
-
-# Semiflexible polymer (add bending stiffness)
-poly = BeadSpringPolymer(4, 20; L=20.0,
-    pair_potential = LennardJonesPotential(epsilon=1.0, sigma=1.0),
-    bond_potential = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5),
-    bending_potential = CosineBendingPotential(5.0))
-```
+# Observables
+`energy`, `energy_pair`, `energy_bond`, `energy_bending`,
+`radius_of_gyration_sq`, `center_of_mass`, `end_to_end_distance_sq`,
+`gyration_tensor`, `clusters`
 """
 module SoftMatterSystems
 
-using StaticArrays: SVector
-using Random
-
+using StaticArrays
 using MonteCarloX: AbstractSystem,
                    AbstractImportanceSampling,
-                   AbstractMetropolis,
                    accept!
 
-import MonteCarloX
+# ── Potentials ─────────────────────────────────────────────────────────────
 
-export AbstractSoftMatterSystem,
-       # Potentials
-       AbstractPairPotential,
-       AbstractBondPotential,
-       AbstractBendingPotential,
-       NoPotential,
-       NoBondPotential,
-       NoBendingPotential,
-       LennardJonesPotential,
-       FENEPotential,
-       CosineBendingPotential,
-       cutoff_sq,
-       # Geometry
-       wrap_coordinate,
-       wrap_position,
-       minimum_image_sq,
-       minimum_image_displacement,
-       # Systems
-       ParticleGas,
-       BeadSpringPolymer,
-       # Initialization
-       init!,
-       # Observables
-       energy,
-       energy_pair,
-       energy_bond,
-       energy_bending,
-       # Updates
-       particle_move!,
-       monomer_move!,
-       # Cluster analysis
-       geometric_clusters,
-       largest_cluster_size,
-       second_largest_cluster_size,
-       cluster_size_distribution
+abstract type AbstractSoftMatterSystem <: AbstractSystem end
 
-include("abstractions.jl")
-include("geometry/periodic.jl")
+include("potentials/abstractions.jl")
+export  AbstractPairPotential,
+        AbstractBondPotential,
+        AbstractBendingPotential,
+        NoPotential,
+        NoBondPotential,
+        NoBendingPotential,
+        cutoff_sq
+
 include("potentials/lennard_jones.jl")
+export  LennardJonesPotential
+
 include("potentials/fene.jl")
+export  FENEPotential
+
 include("potentials/bending.jl")
+export  CosineBendingPotential
+
+# ── Geometry ───────────────────────────────────────────────────────────────
+
+include("geometry/periodic.jl")
+export  wrap_coordinate,
+        wrap_position,
+        minimum_image_displacement,
+        minimum_image_sq
+
+# ── Systems ────────────────────────────────────────────────────────────────
+
 include("systems/particle_gas.jl")
+export  ParticleGas,
+        num_particles,
+        init!,
+        energy,
+        energy_pair
+
 include("systems/bead_spring_polymer.jl")
-include("updates/particle_shift.jl")
-include("updates/monomer_displacement.jl")
+export  BeadSpringPolymer,
+        num_polymers,
+        polymer_length,
+        energy_bond,
+        energy_bending
+
+# ── Updates ────────────────────────────────────────────────────────────────
+
+include("updates/translate.jl")
+export  translate!
+
+# ── Observables ────────────────────────────────────────────────────────────
+
 include("observables/cluster.jl")
+export  clusters,
+        largest_cluster_size,
+        second_largest_cluster_size,
+        cluster_size_distribution
+
+include("observables/polymer_observables.jl")
+export  center_of_mass,
+        radius_of_gyration_sq,
+        end_to_end_distance_sq,
+        gyration_tensor
 
 end # module SoftMatterSystems

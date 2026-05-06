@@ -9,15 +9,12 @@ function center_of_mass(sys::LatticePolymer{D}, n::Int) where {D}
     ref = poly[1]
 
     # Mean displacement from reference monomer (minimum-image)
-    cm = zero(MVector{D,Float64})
+    disp = zero(SVector{D,Float64})
     for m in 1:M
-        cm .+= lattice_difference(poly[m], ref, sys.dims)
+        disp += lattice_difference(poly[m], ref, sys.dims)
     end
     # Shift back to reference frame and wrap into [0, L)
-    for d in 1:D
-        cm[d] = mod(ref[d] + cm[d] / M, sys.dims[d])
-    end
-    return SVector{D,Float64}(cm)
+    SVector{D,Float64}(ntuple(d -> mod(ref[d] + disp[d] / M, sys.dims[d]), Val(D)))
 end
 
 """
@@ -28,7 +25,7 @@ Squared radius of gyration for polymer `n` using minimum-image convention.
 function radius_of_gyration_sq(sys::LatticePolymer{D}, n::Int) where {D}
     poly = sys.polymers[n]
     M = polymer_length(sys, n)
-    cm = MVector{D,Float64}(center_of_mass(sys, n))
+    cm = center_of_mass(sys, n)
 
     rg2 = 0.0
     for m in 1:M
@@ -53,7 +50,7 @@ DxD gyration tensor for polymer `n`. Satisfies `tr(G) == radius_of_gyration_sq`.
 function gyration_tensor(sys::LatticePolymer{D}, n::Int) where {D}
     poly = sys.polymers[n]
     M = polymer_length(sys, n)
-    cm = MVector{D,Float64}(center_of_mass(sys, n))
+    cm = center_of_mass(sys, n)
 
     G = zeros(Float64, D, D)
     for m in 1:M

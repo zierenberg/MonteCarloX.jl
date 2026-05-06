@@ -3,29 +3,29 @@
 
 Finitely Extensible Nonlinear Elastic (FENE) bond potential:
 
-    V(r) = -(K/2) R² ln(1 - ((r - l₀)/R)²),   |r - l₀| < R
-    V(r) = ∞,                                    |r - l₀| ≥ R
+    V(r) = -(K/2) R^2 ln(1 - ((r - l0)/R)^2),   |r - l0| < R
+    V(r) = Inf,                                    |r - l0| >= R
 
-where K is the spring constant, l₀ is the equilibrium bond length,
-and R = l_max - l₀ is the maximum extension.
+where K is the spring constant, l0 is the equilibrium bond length,
+and R = l_max - l0 is the maximum extension.
 
-Evaluated as a function of r² (takes sqrt internally for r).
+Evaluated as a function of r² (takes sqrt internally).
 """
 struct FENEPotential{T<:AbstractFloat} <: AbstractBondPotential
     spring_constant::T
     l0::T           # equilibrium distance
     R::T            # max extension = l_max - l0
-    R_sq::T         # R²
-    inv_R_sq::T     # -1/R²
-    prefactor::T    # -K/2 * R²
+    R_sq::T         # R^2
+    inv_R_sq::T     # -1/R^2
+    prefactor::T    # -K/2 * R^2
 end
 
-function FENEPotential(; spring_constant::T=30.0, l0::T=0.0,
-                         l_max::T=T(1.5)) where T<:AbstractFloat
-    R = l_max - l0
+function FENEPotential(; spring_constant=30.0, l0=0.0, l_max=1.5)
+    T = promote_type(typeof(spring_constant), typeof(l0), typeof(l_max))
+    K, l0_, lm = T(spring_constant), T(l0), T(l_max)
+    R = lm - l0_
     R_sq = R^2
-    FENEPotential{T}(spring_constant, l0, R, R_sq, -one(T)/R_sq,
-                      T(-0.5) * spring_constant * R_sq)
+    FENEPotential{T}(K, l0_, R, R_sq, -one(T)/R_sq, T(-0.5) * K * R_sq)
 end
 
 @inline function (pot::FENEPotential)(r_sq)

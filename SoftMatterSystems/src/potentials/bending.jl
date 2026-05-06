@@ -3,9 +3,9 @@
 
 Cosine bending potential for semiflexible chains:
 
-    V(θ) = κ (1 - cos θ)
+    V(theta) = kappa * (1 - cos(theta))
 
-where κ is the bending stiffness. Evaluated as a function of cos(θ).
+where kappa is the bending stiffness. Evaluated as a function of cos(theta).
 """
 struct CosineBendingPotential{T<:AbstractFloat} <: AbstractBendingPotential
     kappa::T

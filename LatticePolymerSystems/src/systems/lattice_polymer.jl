@@ -14,7 +14,7 @@ D-dimensional lattice polymer system on a hypercubic lattice with PBC.
 Backbone bonds contribute a fixed -J_intra each and are included.
 """
 mutable struct LatticePolymer{D, TJ<:Real} <: AbstractLatticePolymerSystem
-    polymers::Vector{Vector{MVector{D,Int}}}
+    polymers::Vector{Vector{SVector{D,Int}}}
     neighbors::Vector{Vector{Int}}   # precomputed: neighbors[site] = [nb1, nb2, ...]
     dims::SVector{D,Int}
     state::Vector{Int}               # state[site] = polymer ID (0 = empty)
@@ -54,7 +54,7 @@ function LatticePolymer(; dims::AbstractVector{<:Integer},
     graph = grid(sv_dims; periodic=true)
     nbrs = [collect(neighbors(graph, s)) for s in 1:N_sites]
     LatticePolymer{D, Float64}(
-        [Vector{MVector{D,Int}}([zero(MVector{D,Int}) for _ in 1:l]) for l in lengths],
+        [Vector{SVector{D,Int}}([zero(SVector{D,Int}) for _ in 1:l]) for l in lengths],
         nbrs, sv_dims,
         zeros(Int, N_sites),
         Float64(J_intra), Float64(J_inter),
@@ -147,9 +147,7 @@ function _init_ordered!(sys::LatticePolymer{D}) where {D}
         @assert M <= sys.dims[2] "Polymer $n length $M exceeds y-dimension $(sys.dims[2])"
         x = (n - 1) * spacing
         for m in 1:M
-            c = zero(MVector{D,Int})
-            c[1] = x
-            c[2] = m - 1
+            c = SVector{D,Int}(ntuple(d -> d == 1 ? x : d == 2 ? m - 1 : 0, Val(D)))
             sys.polymers[n][m] = c
             sys.state[coords_to_site(c, sys.dims)] = n
         end

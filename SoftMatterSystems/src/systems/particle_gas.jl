@@ -1,65 +1,50 @@
 """
-    ParticleGas{T, TPot} <: AbstractSoftMatterSystem
+    ParticleGas{D, T, TPair} <: AbstractSoftMatterSystem
 
-Off-lattice particle gas in a cubic box with periodic boundary conditions.
-The pair interaction is parameterized by `TPot <: AbstractPairPotential`,
-allowing e.g. Lennard-Jones, repulsive sphere, or custom potentials.
+D-dimensional particle gas in a cubic box with periodic boundary conditions.
 
-# Fields
-- `positions::Vector{SVector{3,T}}` -- particle positions
-- `N::Int` -- number of particles
-- `L::T` -- box side length
-- `pair_potential::TPot` -- pair interaction functor
-- `delta::T` -- max displacement per component in MC moves
-- `cached_energy::T` -- cached total potential energy
+# Constructor
+    ParticleGas(; D=3, N, L, pair_potential, delta=0.1)
+    ParticleGas(; D=3, N, rho, pair_potential, delta=0.1)   # from density
 """
-mutable struct ParticleGas{T<:AbstractFloat, TPot<:AbstractPairPotential} <: AbstractSoftMatterSystem
-    positions::Vector{SVector{3,T}}
+mutable struct ParticleGas{D, T<:AbstractFloat, TPair<:AbstractPairPotential} <: AbstractSoftMatterSystem
+    positions::Vector{SVector{D,T}}
     N::Int
     L::T
-    pair_potential::TPot
+    pair_potential::TPair
     delta::T
     cached_energy::T
 end
 
-"""
-    ParticleGas(N; L, pair_potential, delta=0.1)
+# ── Constructors ─────────────────────────────────────────────────────────────
 
-Construct an uninitialized ParticleGas. Call `init!` to place particles.
-"""
-function ParticleGas(N::Int; L::T, pair_potential::TPot,
-                      delta::T=T(0.1)) where {T<:AbstractFloat, TPot<:AbstractPairPotential}
-    positions = [zero(SVector{3,T}) for _ in 1:N]
-    ParticleGas{T,TPot}(positions, N, L, pair_potential, delta, zero(T))
+function ParticleGas(; D::Int=3,
+                       N::Integer,
+                       L=nothing,
+                       rho=nothing,
+                       pair_potential::AbstractPairPotential,
+                       delta=0.1)
+    @assert (L !== nothing) ⊻ (rho !== nothing) "Provide either `L` or `rho`, not both"
+    if rho !== nothing
+        L = (N / rho)^(1/D)
+    end
+    T = promote_type(typeof(float(L)), typeof(float(delta)))
+    positions = [zero(SVector{D,T}) for _ in 1:N]
+    ParticleGas{D, T, typeof(pair_potential)}(
+        positions, Int(N), T(L), pair_potential, T(delta), zero(T))
 end
 
-"""
-    ParticleGas(N; rho, pair_potential, delta=0.1)
+# ── Accessors ────────────────────────────────────────────────────────────────
 
-Convenience constructor from number density ρ = N/L³.
-"""
-function ParticleGas(N::Int, rho::T; pair_potential::TPot,
-                      delta::T=T(0.1)) where {T<:AbstractFloat, TPot<:AbstractPairPotential}
-    L = (N / rho)^(one(T)/3)
-    ParticleGas(N; L=L, pair_potential=pair_potential, delta=delta)
-end
+num_particles(sys::ParticleGas) = sys.N
 
-"""
-    init!(sys::ParticleGas, type::Symbol; rng=nothing)
+# ── Initialization ───────────────────────────────────────────────────────────
 
-Initialize particle positions.
-
-- `:random` -- place particles uniformly at random in the box
-"""
-function init!(sys::ParticleGas{T}, type::Symbol; rng=nothing) where T
+function init!(sys::ParticleGas{D,T}, type::Symbol; rng=nothing) where {D,T}
     if type == :random
         @assert rng !== nothing "Random initialization requires rng"
         for i in 1:sys.N
-            sys.positions[i] = SVector{3,T}(
-                rand(rng, T) * sys.L,
-                rand(rng, T) * sys.L,
-                rand(rng, T) * sys.L
-            )
+            sys.positions[i] = SVector{D,T}(ntuple(_ -> rand(rng, T) * sys.L, Val(D)))
         end
     else
         error("Unknown initialization type: $type")
@@ -68,9 +53,11 @@ function init!(sys::ParticleGas{T}, type::Symbol; rng=nothing) where T
     return sys
 end
 
-function _recompute_energy!(sys::ParticleGas{T}) where T
+# ── Energy ───────────────────────────────────────────────────────────────────
+
+function _recompute_energy!(sys::ParticleGas{D,T}) where {D,T}
     E = zero(T)
-    for i in 1:sys.N-1
+    @inbounds for i in 1:sys.N-1
         for j in i+1:sys.N
             r_sq = minimum_image_sq(sys.positions[i], sys.positions[j], sys.L)
             E += sys.pair_potential(r_sq)
@@ -80,19 +67,21 @@ function _recompute_energy!(sys::ParticleGas{T}) where T
     return nothing
 end
 
-@inline function energy(sys::ParticleGas; full=false)
+function energy(sys::ParticleGas; full::Bool=false)
     full && _recompute_energy!(sys)
     return sys.cached_energy
 end
 
+energy_pair(sys::ParticleGas) = energy(sys; full=true)
+
 """
-    _energy_of_particle(sys::ParticleGas, i) -> T
+    _energy_of_particle(sys, i) -> T
 
 Sum of pair interactions between particle i and all other particles.
 """
-@inline function _energy_of_particle(sys::ParticleGas{T}, i::Int) where T
+@inline function _energy_of_particle(sys::ParticleGas{D,T}, i::Int) where {D,T}
     E = zero(T)
-    for j in 1:sys.N
+    @inbounds for j in 1:sys.N
         j == i && continue
         r_sq = minimum_image_sq(sys.positions[i], sys.positions[j], sys.L)
         E += sys.pair_potential(r_sq)

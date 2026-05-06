@@ -38,7 +38,7 @@ function slither_move!(sys::LatticePolymer{D}, alg::AbstractImportanceSampling) 
     new_site != remove_site && sys.state[new_site] != 0 && return nothing
 
     intra_b, inter_b = site_contacts(sys, remove_site)
-    old_end = MVector{D,Int}(poly[remove_idx])
+    old_end = poly[remove_idx]
 
     sys.state[remove_site] = 0
     sys.state[new_site] = n

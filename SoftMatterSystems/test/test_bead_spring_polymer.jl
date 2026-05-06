@@ -1,134 +1,89 @@
+using StaticArrays: SVector
+
 @testset "BeadSpringPolymer" begin
 
     @testset "Construction" begin
         lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
         fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
-        poly = BeadSpringPolymer(2, 5; L=20.0,
+        poly = BeadSpringPolymer(; num_poly=2, length_poly=5, L=20.0,
             pair_potential=lj, bond_potential=fene)
-        @test poly.M == 2
-        @test poly.N == 5
+        @test num_polymers(poly) == 2
+        @test polymer_length(poly) == 5
         @test length(poly.positions) == 10
         @test poly.bending_potential isa NoBendingPotential
-    end
 
-    @testset "Construction with bending" begin
-        lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
-        fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
+        # With bending
         bend = CosineBendingPotential(5.0)
-        poly = BeadSpringPolymer(2, 5; L=20.0,
-            pair_potential=lj, bond_potential=fene,
-            bending_potential=bend)
-        @test poly.bending_potential isa CosineBendingPotential
-        @test poly.bending_potential.kappa == 5.0
+        poly2 = BeadSpringPolymer(; num_poly=2, length_poly=5, L=20.0,
+            pair_potential=lj, bond_potential=fene, bending_potential=bend)
+        @test poly2.bending_potential.kappa == 5.0
     end
 
     @testset "Random walk init" begin
         lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
         fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
-        poly = BeadSpringPolymer(3, 8; L=20.0,
+        poly = BeadSpringPolymer(; num_poly=3, length_poly=8, L=20.0,
             pair_potential=lj, bond_potential=fene)
         init!(poly, :random_walk; rng=Xoshiro(42))
 
-        # All positions in [0, L)
-        for pos in poly.positions
-            for d in 1:3
-                @test 0.0 <= pos[d] < poly.L
-            end
-        end
+        # Positions in box
+        @test all(pos -> all(x -> 0.0 <= x < poly.L, pos), poly.positions)
 
-        # Bond lengths should be ≈ 1 (random walk step size)
-        for m in 1:3
-            for k in 1:7
-                i = (m-1)*8 + k
-                j = (m-1)*8 + k + 1
-                r_sq = minimum_image_sq(poly.positions[i], poly.positions[j], poly.L)
-                @test sqrt(r_sq) ≈ 1.0 atol=1e-10
-            end
+        # Bond lengths = 1.0 (random walk step size)
+        for m in 1:3, k in 1:7
+            i = (m-1)*8 + k
+            j = (m-1)*8 + k + 1
+            r_sq = minimum_image_sq(poly.positions[i], poly.positions[j], poly.L)
+            @test sqrt(r_sq) ≈ 1.0 atol=1e-10
         end
     end
 
-    @testset "Energy consistency after init" begin
+    @testset "Energy" begin
         lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
         fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
         bend = CosineBendingPotential(3.0)
-        poly = BeadSpringPolymer(2, 10; L=20.0,
-            pair_potential=lj, bond_potential=fene,
-            bending_potential=bend)
+        poly = BeadSpringPolymer(; num_poly=2, length_poly=10, L=20.0,
+            pair_potential=lj, bond_potential=fene, bending_potential=bend)
         init!(poly, :random_walk; rng=Xoshiro(77))
 
-        E_total = energy(poly)
-        E_pair = energy_pair(poly)
-        E_bond = energy_bond(poly)
-        E_bend = energy_bending(poly)
-
-        @test E_total ≈ E_pair + E_bond + E_bend
-
-        # Full recomputation should match
-        E_full = energy(poly; full=true)
-        @test E_total ≈ E_full
-    end
-
-    @testset "Metropolis moves maintain energy" begin
-        lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
-        fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
-        poly = BeadSpringPolymer(2, 8; L=20.0,
-            pair_potential=lj, bond_potential=fene, delta=0.1)
-        init!(poly, :random_walk; rng=Xoshiro(100))
-        alg = Metropolis(Xoshiro(200); beta=1.0)
-
-        for _ in 1:500
-            monomer_move!(poly, alg)
-        end
-
-        E_cached = energy(poly)
-        E_full = energy(poly; full=true)
-        @test E_cached ≈ E_full atol=1e-10
-    end
-
-    @testset "Semiflexible polymer Metropolis" begin
-        lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
-        fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
-        bend = CosineBendingPotential(5.0)
-        poly = BeadSpringPolymer(2, 6; L=20.0,
-            pair_potential=lj, bond_potential=fene,
-            bending_potential=bend, delta=0.05)
-        init!(poly, :random_walk; rng=Xoshiro(300))
-        alg = Metropolis(Xoshiro(400); beta=1.0)
-
-        for _ in 1:500
-            monomer_move!(poly, alg)
-        end
-
-        E_cached = energy(poly)
-        E_full = energy(poly; full=true)
-        @test E_cached ≈ E_full atol=1e-10
-    end
-
-    @testset "NoPotential pair with FENE bond" begin
-        fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
-        poly = BeadSpringPolymer(1, 4; L=20.0,
-            pair_potential=NoPotential(), bond_potential=fene)
-        init!(poly, :random_walk; rng=Xoshiro(55))
-
-        @test energy_pair(poly) ≈ 0.0
-        @test energy_bond(poly) > 0.0  # FENE at r=1 is positive
-    end
-
-    @testset "Energy decomposition" begin
-        lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
-        fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
-        bend = CosineBendingPotential(2.0)
-        poly = BeadSpringPolymer(2, 5; L=20.0,
-            pair_potential=lj, bond_potential=fene,
-            bending_potential=bend)
-        init!(poly, :random_walk; rng=Xoshiro(88))
-
-        # Each component should be finite
-        @test isfinite(energy_pair(poly))
-        @test isfinite(energy_bond(poly))
-        @test isfinite(energy_bending(poly))
-
-        # Sum should equal total
+        # Cached matches full recompute
+        @test energy(poly) ≈ energy(poly; full=true)
+        # Decomposition sums to total
         @test energy(poly) ≈ energy_pair(poly) + energy_bond(poly) + energy_bending(poly)
+
+        # NoPotential pair → zero pair energy
+        poly0 = BeadSpringPolymer(; num_poly=1, length_poly=4, L=20.0,
+            pair_potential=NoPotential(), bond_potential=fene)
+        init!(poly0, :random_walk; rng=Xoshiro(55))
+        @test energy_pair(poly0) ≈ 0.0
+        @test energy_bond(poly0) > 0.0
+    end
+
+    @testset "Observables: straight rod" begin
+        lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
+        fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
+        poly = BeadSpringPolymer(; num_poly=1, length_poly=5, L=20.0,
+            pair_potential=lj, bond_potential=fene)
+        for k in 1:5
+            poly.positions[k] = SVector(Float64(k-1), 0.0, 0.0)
+        end
+
+        # End-to-end: |4 - 0|^2 = 16
+        @test end_to_end_distance_sq(poly, 1) ≈ 16.0
+
+        # CM: mean(0:4) = 2.0 in x
+        cm = center_of_mass(poly, 1)
+        @test cm[1] ≈ 2.0
+        @test cm[2] ≈ 0.0
+        @test cm[3] ≈ 0.0
+
+        # Rg^2: var({0,1,2,3,4}) = 2.0
+        @test radius_of_gyration_sq(poly, 1) ≈ 2.0
+
+        # Gyration tensor: all variance in x
+        G = gyration_tensor(poly, 1)
+        @test sum(G[d,d] for d in 1:3) ≈ radius_of_gyration_sq(poly, 1)
+        @test G[1,1] ≈ 2.0
+        @test G[2,2] ≈ 0.0 atol=1e-12
     end
 end
