@@ -4,7 +4,7 @@ const _ISING2D_DOS_CACHE = Dict{Int,Vector{Tuple{Int,Float64}}}()
 
 function _load_ising2d_dos(L::Integer)
     get!(_ISING2D_DOS_CACHE, Int(L)) do
-        path = joinpath(@__DIR__, "..", "data", "exact_solutions", "ising2D_$(L)x$(L).csv")
+        path = joinpath(@__DIR__, "..", "..", "data", "exact_solutions", "ising2D_$(L)x$(L).csv")
         isfile(path) || error("No exact 2D Ising logDOS for L=$L; add $path")
         raw = readdlm(path, ',', skipstart=1)
         [(Int(raw[i, 1]), Float64(raw[i, 2])) for i in axes(raw, 1)]

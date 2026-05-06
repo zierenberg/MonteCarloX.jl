@@ -6,8 +6,9 @@ using MonteCarloX
 using SpinSystems
 
 @testset "BlumeCapel bookkeeping" begin
-    sys = BlumeCapel([4, 4], J=1.0, D=0.5)
+    sys = BlumeCapel([4, 4]; J=1.0, D=0.5)
 
+    # all spins up: pair energy = -32, crystal = 0.5*16 = 8 => total = -24
     @test energy(sys) == -24.0
     @test energy(sys; full=true) == -24.0
     @test magnetization(sys) == 16
@@ -15,16 +16,11 @@ using SpinSystems
 
     i = 1
     s_new = Int8(0)
-    Δpair, Δspin, Δspin2 = SpinSystems.propose_changes(sys, i, s_new)
-    @test Δpair == -4.0
-    @test Δspin == -1
-    @test Δspin2 == -1
-
     ΔE = delta_energy(sys, i, s_new)
     @test ΔE == 3.5
 
     E_old = energy(sys)
-    modify!(sys, i, s_new, Δpair, Δspin, Δspin2)
+    modify!(sys, i, s_new)
     @test energy(sys) == E_old + ΔE
     @test energy(sys; full=true) == energy(sys)
     @test magnetization(sys) == 15
@@ -32,7 +28,7 @@ end
 
 @testset "BlumeCapel initialization" begin
     rng = MersenneTwister(11)
-    sys = BlumeCapel([4, 4], J=1.0, D=0.2)
+    sys = BlumeCapel([4, 4]; J=1.0, D=0.2)
 
     init!(sys, :down)
     @test all(==(Int8(-1)), sys.spins)
@@ -49,47 +45,51 @@ end
 end
 
 @testset "BlumeCapel constructor variants" begin
-    sys_g0 = BlumeCapel([2, 2], J=1.0, D=0.3)
-    @test sys_g0 isa SpinSystems.BlumeCapelGraphCouplingNoField
+    # Lattice (periodic, uniform J)
+    sys_l = BlumeCapel([2, 2]; J=1.0, D=0.3)
+    @test sys_l isa BlumeCapelLattice
 
-    sys_gu = BlumeCapel([2, 2], J=1.0, D=0.3, h=0.2)
-    @test sys_gu isa SpinSystems.BlumeCapelGraphCouplingUniformField
+    # Lattice with uniform field
+    sys_lh = BlumeCapel([2, 2]; J=1.0, D=0.3, h=0.2)
+    @test sys_lh isa BlumeCapelLattice
 
-    sys_gv = BlumeCapel([2, 2], J=1.0, D=0.3, h=[0.1, -0.2, 0.3, 0.0])
-    @test sys_gv isa SpinSystems.BlumeCapelGraphCouplingVectorField
+    # Lattice with vector field
+    sys_lv = BlumeCapel([2, 2]; J=1.0, D=0.3, h=[0.1, -0.2, 0.3, 0.0])
+    @test sys_lv isa BlumeCapelLattice
 
+    # Graph (non-periodic)
+    sys_g = BlumeCapel([2, 2]; J=1.0, D=0.3, periodic=false)
+    @test sys_g isa BlumeCapelGraph
+
+    # Matrix (sparse J)
     J = spzeros(Float64, 4, 4)
     J[1, 2] = J[2, 1] = 1.0
     J[2, 3] = J[3, 2] = 2.0
     J[3, 4] = J[4, 3] = 3.0
     J[4, 1] = J[1, 4] = 4.0
 
-    sys_m0 = BlumeCapel(J, 0.5)
-    @test sys_m0 isa SpinSystems.BlumeCapelMatrixCouplingNoField
+    sys_m = BlumeCapel(J, 0.5)
+    @test sys_m isa BlumeCapelMatrix
 
-    sys_mu = BlumeCapel(J, 0.5, h=0.2)
-    @test sys_mu isa SpinSystems.BlumeCapelMatrixCouplingUniformField
-
-    sys_mv = BlumeCapel(J, 0.5, h=[0.1, -0.2, 0.3, 0.0])
-    @test sys_mv isa SpinSystems.BlumeCapelMatrixCouplingVectorField
-
+    # Graph with explicit graph
     graph = Graphs.SimpleGraphs.grid([2, 2]; periodic=true)
+    sys_gg = BlumeCapel(graph, 1.0, 0.5)
+    @test sys_gg isa BlumeCapelGraph
+
+    # Vector J -> BlumeCapelMatrix
     Jvec = collect(range(1.0, length=ne(graph)))
     sys_gsg = BlumeCapel(graph, Jvec, 0.5)
-    @test sys_gsg isa SpinSystems.BlumeCapelMatrixCouplingNoField
-
-    sys_dsg = BlumeCapel([2, 2], J=Jvec, D=0.5, periodic=true)
-    @test sys_dsg isa SpinSystems.BlumeCapelMatrixCouplingNoField
+    @test sys_gsg isa BlumeCapelMatrix
 
     @test_throws AssertionError BlumeCapel(graph, Jvec[1:end-1], 0.5)
 end
 
 @testset "BlumeCapel Metropolis and HeatBath integration" begin
     rng = MersenneTwister(2026)
-    sys = BlumeCapel([4, 4], J=1.0, D=0.2, h=0.1)
+    sys = BlumeCapel([4, 4]; J=1.0, D=0.2, h=0.1)
     init!(sys, :random, rng=rng)
 
-    alg_m = Metropolis(rng, β=0.4)
+    alg_m = Metropolis(rng; β=0.4)
     for _ in 1:100
         spin_flip!(sys, alg_m)
     end
@@ -97,7 +97,7 @@ end
     @test energy(sys) == energy(sys; full=true)
     @test magnetization(sys) == magnetization(sys; full=true)
 
-    alg_h = HeatBath(rng, β=0.4)
+    alg_h = HeatBath(rng; β=0.4)
     for _ in 1:100
         spin_flip!(sys, alg_h)
     end

@@ -2,110 +2,84 @@
     AbstractSpinSystem <: AbstractSystem
 
 Base type for spin systems.
-
-A spin system typically contains:
-- Spins/states configuration
-- Graph/lattice structure
-- Interaction parameters
-- Cached quantities for efficient updates
 """
 abstract type AbstractSpinSystem <: AbstractSystem end
+
+"""
+    NoField
+
+Sentinel type indicating no external field. Zero-cost at runtime.
+"""
+struct NoField end
 
 """
     pick_site(rng, N)
 
 Randomly pick a site index from 1 to N.
 """
-@inline pick_site(rng, N) = rand(rng, UInt) % N + 1
+@inline pick_site(rng, N) = Int(rand(rng, UInt) % UInt(N)) + 1
 
-"""
-    local_pair_interactions(sys::AbstractSpinSystem, i)
+# -- Field helpers ------------------------------------------------------------
 
-Calculate the sum of sᵢsⱼ products for site i with all its neighbors.
+@inline _site_field(::NoField, i) = 0
+@inline _site_field(h::Real, i) = h
+@inline _site_field(h::AbstractVector, i) = @inbounds h[i]
 
-This represents the local contribution to pair interactions.
-
-# Arguments
-- `sys::AbstractSpinSystem`: Spin system with `spins` and `nbrs` fields
-- `i`: Site index
-
-# Returns
-- Sum of pair interactions: ∑ⱼ∈neighbors(i) sᵢsⱼ
-
-# Example
-```julia
-system = Ising([10, 10])
-interactions = local_pair_interactions(system, 5)
-```
-"""
-@inline function local_pair_interactions(sys::AbstractSpinSystem, i)
-    s = sys.spins[i]
-    acc = 0
-    for j in sys.nbrs[i]
-        acc += s * sys.spins[j]
+@inline _field_sum(::NoField, spins) = 0.0
+@inline _field_sum(h::Real, spins) = float(h) * sum(spins)
+@inline function _field_sum(h::AbstractVector, spins)
+    s = 0.0
+    @inbounds for i in eachindex(spins)
+        s += h[i] * spins[i]
     end
-    return acc
+    return s
 end
 
-# General spin flip update
-# This is the standard update for spin systems that can be customized by specific models
+# -- Cached field energy: derive from cached_mag when possible ----------------
+
+@inline _cached_field_energy(::NoField, cached_mag, cached_field) = 0.0
+@inline _cached_field_energy(h::Real, cached_mag, cached_field) = float(h) * cached_mag
+@inline _cached_field_energy(::AbstractVector, cached_mag, cached_field) = cached_field
+
+# -- Field cache update in modify!: only needed for vector fields -------------
+
+@inline _update_field_cache!(sys, ::NoField, i, delta) = nothing
+@inline _update_field_cache!(sys, ::Real, i, delta) = nothing
+@inline _update_field_cache!(sys, h::AbstractVector, i, delta) = (sys.cached_field += Float64(@inbounds h[i]) * delta)
+
+# -- Shared lattice neighbor builder ------------------------------------------
 
 """
-    spin_flip!(sys::AbstractSpinSystem, alg::AbstractImportanceSampling)
+    _build_lattice_neighbors(dims::NTuple{D,Int}) -> Vector{NTuple{2D,Int}}
 
-Perform a generic single spin flip update using importance sampling.
-
-This is a general update function that works for any spin system that implements:
-- `hamiltonian_terms(sys)`: Returns energy components (can be scalar, tuple, or named tuple)
-- `delta_hamiltonian_terms(sys, i, s_new)`: Returns change in energy components
-- `modify!(sys, i, s_new, ΔH)`: Applies the spin change and updates cached quantities
-- `sys.states`: Vector of possible spin states
-
-The energy terms are passed through the log weight function, allowing for:
-- Canonical sampling: logweight = -β * sum(H)
-- Generalized ensembles: logweight can depend on individual terms differently
-- Multicanonical sampling: logweight based on custom weight functions
-
-# Arguments
-- `sys::AbstractSpinSystem`: Spin system to update
-- `alg::AbstractImportanceSampling`: Algorithm with RNG and log weight function
-
-# Example
-```julia
-# For a simple Ising model with uniform temperature
-system = Ising([10, 10])
-alg = Metropolis(rng, β=1.0)
-spin_flip!(system, alg)
-
-# For Blume-Capel with crystal field
-system = BlumeCapel([10, 10], J=1.0, D=0.5)
-alg = Metropolis(rng, β=2.0)
-spin_flip!(system, alg)
-```
-
-# Notes
-- Systems can override this with specialized implementations for better performance
-- The energy terms can be vectors/tuples to separate different contributions
-  (e.g., exchange, field, crystal field terms)
+Build neighbor table for a D-dimensional periodic hypercubic lattice.
+Each site has exactly 2D neighbors (compile-time known).
 """
-function spin_flip!(sys::AbstractSpinSystem, alg::AbstractImportanceSampling)
-    # Pick a random spin site
-    i = pick_site(alg.rng, length(sys.spins))
-    
-    # System defines the possible spin states
-    s_new = rand(alg.rng, sys.states)
-    
-    # Get current Hamiltonian terms and the change from the proposed update
-    H_terms = hamiltonian_terms(sys)
-    ΔH_terms = delta_hamiltonian_terms(sys, i, s_new)
-    
-    # Evaluate log weight before and after
-    # Terms can be scalars, tuples, or named tuples - sum handles all cases
-    ens = ensemble(alg)
-    log_ratio = logweight(ens, H_terms .+ ΔH_terms) - logweight(ens, H_terms)
-    
-    # Accept or reject the move
-    if accept!(alg, log_ratio)
-        modify!(sys, i, s_new, ΔH_terms)
+function _build_lattice_neighbors(dims::NTuple{D,Int}) where D
+    N = prod(dims)
+    strides = ntuple(d -> d == 1 ? 1 : prod(dims[1:d-1]), Val(D))
+    nbrs = Vector{NTuple{2D,Int}}(undef, N)
+    for site in 1:N
+        s0 = site - 1
+        coords = ntuple(d -> (s0 ÷ strides[d]) % dims[d], Val(D))
+        nbrs[site] = ntuple(Val(2D)) do k
+            d = (k + 1) ÷ 2
+            dir = iseven(k) ? 1 : -1
+            site + (mod(coords[d] + dir, dims[d]) - coords[d]) * strides[d]
+        end
+    end
+    return nbrs
+end
+
+# -- Shared sparse matrix check -----------------------------------------------
+
+function _check_symmetric(J::SparseMatrixCSC)
+    n = size(J, 1)
+    @assert size(J, 2) == n "J must be square"
+    for col in 1:n
+        for ptr in J.colptr[col]:(J.colptr[col+1]-1)
+            row = J.rowval[ptr]
+            row != col && @assert J[row, col] == J[col, row] "J must be symmetric"
+        end
     end
 end

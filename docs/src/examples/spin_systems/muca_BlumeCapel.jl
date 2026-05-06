@@ -80,11 +80,14 @@ ens = CustomEnsemble(
 
 function spin_flip!(sys::SpinSystems.AbstractBlumeCapel, alg::AbstractImportanceSampling)
     i     = pick_site(alg.rng, length(sys.spins))
-    s_new = SpinSystems._propose_state(alg.rng, sys.spins[i])
-    Δpair, Δspin, Δspin2 = SpinSystems.propose_changes(sys, i, s_new)
-    H_old = (sys.J * sys.sum_pair_interactions, sys.sum_spins2)
-    H_new = (H_old[1] + sys.J * Δpair, H_old[2] + Δspin2)
-    accept!(alg, H_new, H_old) && modify!(sys, i, s_new, Δpair, Δspin, Δspin2)
+    s_new = propose_state(alg.rng, sys, i)
+    @inbounds s_old = Int(sys.spins[i])
+    Δspin = Int(s_new) - s_old
+    Δsq   = Int(s_new)^2 - s_old^2
+    coupling = SpinSystems._local_coupling(sys, i)
+    H_old = (sys.cached_pair, sys.cached_sq)
+    H_new = (H_old[1] + Δspin * coupling, H_old[2] + Δsq)
+    accept!(alg, H_new, H_old) && modify!(sys, i, s_new)
     return nothing
 end
 
