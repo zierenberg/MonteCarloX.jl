@@ -12,7 +12,9 @@ function translate!(sys::ParticleGas{D,T}, alg::AbstractImportanceSampling) wher
     E_old_i = _energy_of_particle(sys, i)
 
     displacement = SVector{D,T}(ntuple(_ -> sys.delta * (T(2) * rand(rng, T) - one(T)), Val(D)))
-    sys.positions[i] = wrap_position(old_pos + displacement, sys.L)
+    new_pos = wrap_position(old_pos + displacement, sys.L)
+    sys.positions[i] = new_pos
+    update_particle!(sys.cell_list, i, new_pos)
 
     E_new_i = _energy_of_particle(sys, i)
 
@@ -20,6 +22,7 @@ function translate!(sys::ParticleGas{D,T}, alg::AbstractImportanceSampling) wher
         sys.cached_energy += E_new_i - E_old_i
     else
         sys.positions[i] = old_pos
+        update_particle!(sys.cell_list, i, old_pos)
     end
     return nothing
 end
@@ -48,7 +51,9 @@ function _translate_monomer!(sys::BeadSpringPolymer{D,T}, alg::AbstractImportanc
     E_old = _monomer_energy(sys, idx)
 
     displacement = SVector{D,T}(ntuple(_ -> sys.delta * (T(2) * rand(rng, T) - one(T)), Val(D)))
-    sys.positions[idx] = wrap_position(old_pos + displacement, sys.L)
+    new_pos = wrap_position(old_pos + displacement, sys.L)
+    sys.positions[idx] = new_pos
+    update_particle!(sys.cell_list, idx, new_pos)
 
     E_new = _monomer_energy(sys, idx)
 
@@ -56,6 +61,7 @@ function _translate_monomer!(sys::BeadSpringPolymer{D,T}, alg::AbstractImportanc
         sys.cached_energy += E_new - E_old
     else
         sys.positions[idx] = old_pos
+        update_particle!(sys.cell_list, idx, old_pos)
     end
     return nothing
 end
@@ -68,44 +74,34 @@ function _translate_chain!(sys::BeadSpringPolymer{D,T}, alg::AbstractImportanceS
 
     displacement = SVector{D,T}(ntuple(_ -> sys.delta * (T(2) * rand(rng, T) - one(T)), Val(D)))
 
-    # Save old positions and compute old energy (pair only — bonds/bending unchanged)
+    # Save old positions and compute old energy (pair only -- bonds/bending unchanged)
     old_positions = sys.positions[start_idx:start_idx + M - 1]
     E_old = zero(T)
     for k in 0:M-1
-        E_old += _pair_energy_of(sys, start_idx + k)
+        E_old += _pair_energy_of_all(sys, start_idx + k)
     end
 
-    # Apply displacement
+    # Apply displacement and update cell list
     for k in 0:M-1
-        sys.positions[start_idx + k] = wrap_position(sys.positions[start_idx + k] + displacement, sys.L)
+        idx = start_idx + k
+        new_pos = wrap_position(sys.positions[idx] + displacement, sys.L)
+        sys.positions[idx] = new_pos
+        update_particle!(sys.cell_list, idx, new_pos)
     end
 
-    # Compute new pair energy
     E_new = zero(T)
     for k in 0:M-1
-        E_new += _pair_energy_of(sys, start_idx + k)
+        E_new += _pair_energy_of_all(sys, start_idx + k)
     end
 
     if accept!(alg, E_new, E_old)
         sys.cached_energy += E_new - E_old
     else
-        sys.positions[start_idx:start_idx + M - 1] .= old_positions
+        for k in 0:M-1
+            idx = start_idx + k
+            sys.positions[idx] = old_positions[k + 1]
+            update_particle!(sys.cell_list, idx, old_positions[k + 1])
+        end
     end
     return nothing
-end
-
-"""
-    _pair_energy_of(sys, idx) -> T
-
-Pair interaction energy of monomer `idx` with all other monomers.
-"""
-@inline function _pair_energy_of(sys::BeadSpringPolymer{D,T}, idx::Int) where {D,T}
-    E = zero(T)
-    n_total = sys.num_poly * sys.length_poly
-    @inbounds for j in 1:n_total
-        j == idx && continue
-        r_sq = minimum_image_sq(sys.positions[idx], sys.positions[j], sys.L)
-        E += sys.pair_potential(r_sq)
-    end
-    return E
 end

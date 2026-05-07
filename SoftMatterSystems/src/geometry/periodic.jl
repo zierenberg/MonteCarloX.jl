@@ -32,5 +32,20 @@ end
 Squared distance under minimum image convention.
 """
 @inline function minimum_image_sq(ri::SVector{D,T}, rj::SVector{D,T}, L) where {D,T}
-    sum(abs2, minimum_image_displacement(ri, rj, L))
+    _sq_dist(ri, rj, L)
+end
+
+"""
+    _sq_dist(ri, rj, L) -> T
+
+Fast squared minimum-image distance via scalar accumulation (no intermediate SVector).
+"""
+@inline function _sq_dist(ri::SVector{D,T}, rj::SVector{D,T}, L) where {D,T}
+    r_sq = zero(T)
+    @inbounds for d in 1:D
+        dx = ri[d] - rj[d]
+        dx -= T(L) * round(dx / T(L))
+        r_sq += dx * dx
+    end
+    return r_sq
 end

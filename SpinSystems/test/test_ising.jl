@@ -20,7 +20,7 @@ using SpinSystems
     ΔE = delta_energy(sys, 1)
     @test ΔE == 8
 
-    modify!(sys, 1)
+    modify!(sys, 1, SpinSystems.delta_sys(sys, 1, Int8(-sys.spins[1])))
     @test energy(sys) == -24
     @test energy(sys; full=true) == energy(sys)
     @test magnetization(sys) == 14
@@ -44,7 +44,7 @@ end
     ΔE = delta_energy(sys, 1)
     @test ΔE == 10.0
 
-    modify!(sys, 1)
+    modify!(sys, 1, SpinSystems.delta_sys(sys, 1, Int8(-sys.spins[1])))
     @test energy(sys) == 0.0
     @test energy(sys; full=true) == 0.0
     @test magnetization(sys) == 2

@@ -1,19 +1,23 @@
 """
-    ParticleGas{D, T, TPair} <: AbstractSoftMatterSystem
+    ParticleGas{D, T, TPair, TCell} <: AbstractSoftMatterSystem
 
 D-dimensional particle gas in a cubic box with periodic boundary conditions.
+
+When the pair potential has a finite cutoff, a cell list is automatically
+created for O(N) pair energy evaluation.
 
 # Constructor
     ParticleGas(; D=3, N, L, pair_potential, delta=0.1)
     ParticleGas(; D=3, N, rho, pair_potential, delta=0.1)   # from density
 """
-mutable struct ParticleGas{D, T<:AbstractFloat, TPair<:AbstractPairPotential} <: AbstractSoftMatterSystem
+mutable struct ParticleGas{D, T<:AbstractFloat, TPair<:AbstractPairPotential, TCell} <: AbstractSoftMatterSystem
     positions::Vector{SVector{D,T}}
     N::Int
     L::T
     pair_potential::TPair
     delta::T
     cached_energy::T
+    cell_list::TCell
 end
 
 # ── Constructors ─────────────────────────────────────────────────────────────
@@ -30,8 +34,20 @@ function ParticleGas(; D::Int=3,
     end
     T = promote_type(typeof(float(L)), typeof(float(delta)))
     positions = [zero(SVector{D,T}) for _ in 1:N]
-    ParticleGas{D, T, typeof(pair_potential)}(
-        positions, Int(N), T(L), pair_potential, T(delta), zero(T))
+    cl = _make_cell_list(Val(D), Int(N), T(L), pair_potential)
+    ParticleGas{D, T, typeof(pair_potential), typeof(cl)}(
+        positions, Int(N), T(L), pair_potential, T(delta), zero(T), cl)
+end
+
+function _make_cell_list(::Val{D}, N::Int, L, pot::AbstractPairPotential) where D
+    rc_sq = cutoff_sq(pot)
+    if isfinite(rc_sq)
+        rc = sqrt(rc_sq)
+        nc = floor(Int, L / rc)
+        nc >= 3 || return NoCellList()
+        return CellList{D}(N, L, rc)
+    end
+    return NoCellList()
 end
 
 # ── Accessors ────────────────────────────────────────────────────────────────
@@ -49,6 +65,7 @@ function init!(sys::ParticleGas{D,T}, type::Symbol; rng=nothing) where {D,T}
     else
         error("Unknown initialization type: $type")
     end
+    build!(sys.cell_list, sys.positions)
     _recompute_energy!(sys)
     return sys
 end
@@ -74,17 +91,33 @@ end
 
 energy_pair(sys::ParticleGas) = energy(sys; full=true)
 
-"""
-    _energy_of_particle(sys, i) -> T
+# ── Per-particle energy: NoCellList (brute force) ──────────────────────────
 
-Sum of pair interactions between particle i and all other particles.
-"""
-@inline function _energy_of_particle(sys::ParticleGas{D,T}, i::Int) where {D,T}
+@inline function _energy_of_particle(sys::ParticleGas{D,T,<:Any,NoCellList}, i::Int) where {D,T}
     E = zero(T)
     @inbounds for j in 1:sys.N
         j == i && continue
         r_sq = minimum_image_sq(sys.positions[i], sys.positions[j], sys.L)
         E += sys.pair_potential(r_sq)
+    end
+    return E
+end
+
+# ── Per-particle energy: CellList (O(1) via neighbor cells) ────────────────
+
+@inline function _energy_of_particle(sys::ParticleGas{D,T,<:Any,CellList{D}}, i::Int) where {D,T}
+    cl = sys.cell_list
+    pos_i = sys.positions[i]
+    pot = sys.pair_potential
+    rc_sq = cl.rc_sq
+    L = sys.L
+    E = zero(T)
+    @inbounds for nci in cl.neighbor_cells[cl.particle_cell[i]]
+        for j in cl.cells[nci]
+            j == i && continue
+            r_sq = _sq_dist(pos_i, sys.positions[j], L)
+            r_sq < rc_sq && (E += pot(r_sq))
+        end
     end
     return E
 end

@@ -20,7 +20,7 @@ using SpinSystems
     @test ΔE == 3.5
 
     E_old = energy(sys)
-    modify!(sys, i, s_new)
+    modify!(sys, i, SpinSystems.delta_sys(sys, i, s_new))
     @test energy(sys) == E_old + ΔE
     @test energy(sys; full=true) == energy(sys)
     @test magnetization(sys) == 15

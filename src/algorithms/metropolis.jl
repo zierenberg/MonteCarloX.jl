@@ -11,7 +11,7 @@ abstract type AbstractMetropolis <: AbstractImportanceSampling end
 
 Metropolis-family acceptance using a local state difference.
 """
-function accept!(alg::AbstractMetropolis, delta_state)
+@inline function accept!(alg::AbstractMetropolis, delta_state)
     log_ratio = logweight(ensemble(alg), delta_state)
     return _accept!(alg, log_ratio)
 end

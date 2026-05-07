@@ -6,6 +6,14 @@ Base type for spin systems.
 abstract type AbstractSpinSystem <: AbstractSystem end
 
 """
+    delta_sys(sys, i, s_new)
+
+Prepare a system-specific local move delta payload for site `i` and proposal `s_new`.
+Default behavior is identity (`s_new`), so existing models remain compatible.
+"""
+@inline delta_sys(sys::AbstractSpinSystem, i, s_new) = s_new
+
+"""
     NoField
 
 Sentinel type indicating no external field. Zero-cost at runtime.

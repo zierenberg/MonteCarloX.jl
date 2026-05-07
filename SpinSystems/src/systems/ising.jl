@@ -26,7 +26,8 @@ end
 
 # ── Interface: propose_state (not used by efficient Ising dispatch) ──────────
 
-@inline propose_state(rng, sys::AbstractIsing, i) = Int8(-sys.spins[i])
+@inline propose_state(rng::AbstractRNG, sys::AbstractIsing, i) = Int8(-sys.spins[i])
+@inline delta_sys(sys::AbstractIsing, i, s_new::Int8) = local_pair_interactions(sys, i)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # IsingLattice: D-dimensional periodic hypercubic lattice, uniform J
@@ -43,9 +44,8 @@ mutable struct IsingLattice{D, NN, TJ<:Real, TH} <: AbstractIsing
 end
 
 function IsingLattice(dims::AbstractVector{<:Integer}; J::Real = 1,  h=0)
-    N = prod(dims)
     if h isa AbstractVector
-        @assert length(h) == N "Field vector length must match number of sites"
+        @assert length(h) == prod(dims) "Field vector length must match number of sites"
         _ising_lattice(Tuple(Int.(dims)), J, collect(float.(h)))
     elseif h isa Real && !iszero(h)
         _ising_lattice(Tuple(Int.(dims)), J, float(h))
@@ -74,18 +74,28 @@ end
 end
 
 @inline delta_energy(sys::IsingLattice, i) = delta_energy(sys, i, local_pair_interactions(sys, i))
-@inline function delta_energy(sys::IsingLattice, i, lpi)
+
+@inline function delta_energy(sys::IsingLattice{D, NN, TJ, TH}, i, lpi) where {D, NN, TJ, TH<:Union{Real,AbstractVector}}
     @inbounds s = Int(sys.spins[i])
     return 2 * sys.J * lpi + 2 * _site_field(sys.h, i) * s
 end
 
-MonteCarloX.modify!(sys::IsingLattice, i::Int) = modify!(sys, i, local_pair_interactions(sys, i))
-function MonteCarloX.modify!(sys::IsingLattice, i::Int, lpi)
+@inline delta_energy(sys::IsingLattice{D, NN, TJ, NoField}, i, lpi) where {D, NN, TJ} = 2 * sys.J * lpi
+
+@inline function MonteCarloX.modify!(sys::IsingLattice{D, NN, TJ, TH}, i::Int, lpi) where {D, NN, TJ, TH}
     @inbounds s = Int(sys.spins[i])
     sys.spins[i] = Int8(-s)
     sys.cached_pair -= 2 * lpi
     sys.cached_mag -= 2 * s
     _update_field_cache!(sys, sys.h, i, -2.0 * s)
+    return nothing
+end
+
+@inline function MonteCarloX.modify!(sys::IsingLattice{D, NN, TJ, NoField}, i::Int, lpi) where {D, NN, TJ}
+    @inbounds s = Int(sys.spins[i])
+    sys.spins[i] = Int8(-s)
+    sys.cached_pair -= 2 * lpi
+    sys.cached_mag -= 2 * s
     return nothing
 end
 
@@ -156,18 +166,27 @@ end
 end
 
 @inline delta_energy(sys::IsingGraph, i) = delta_energy(sys, i, local_pair_interactions(sys, i))
-@inline function delta_energy(sys::IsingGraph, i, lpi)
+@inline function delta_energy(sys::IsingGraph{TJ, TH}, i, lpi) where {TJ, TH<:Union{Real,AbstractVector}}
     @inbounds s = Int(sys.spins[i])
     return 2 * sys.J * lpi + 2 * _site_field(sys.h, i) * s
 end
 
-MonteCarloX.modify!(sys::IsingGraph, i::Int) = modify!(sys, i, local_pair_interactions(sys, i))
-function MonteCarloX.modify!(sys::IsingGraph, i::Int, lpi)
+@inline delta_energy(sys::IsingGraph{TJ, NoField}, i, lpi) where {TJ} = 2 * sys.J * lpi
+
+@inline function MonteCarloX.modify!(sys::IsingGraph{TJ, TH}, i::Int, lpi) where {TJ, TH}
     @inbounds s = Int(sys.spins[i])
     sys.spins[i] = Int8(-s)
     sys.cached_pair -= 2 * lpi
     sys.cached_mag -= 2 * s
     _update_field_cache!(sys, sys.h, i, -2.0 * s)
+    return nothing
+end
+
+@inline function MonteCarloX.modify!(sys::IsingGraph{TJ, NoField}, i::Int, lpi) where {TJ}
+    @inbounds s = Int(sys.spins[i])
+    sys.spins[i] = Int8(-s)
+    sys.cached_pair -= 2 * lpi
+    sys.cached_mag -= 2 * s
     return nothing
 end
 
@@ -237,18 +256,27 @@ end
 end
 
 @inline delta_energy(sys::IsingMatrix, i) = delta_energy(sys, i, local_pair_interactions(sys, i))
-@inline function delta_energy(sys::IsingMatrix, i, lpi)
+@inline function delta_energy(sys::IsingMatrix{TJ, TH}, i, lpi) where {TJ, TH<:Union{Real,AbstractVector}}
     @inbounds s = Int(sys.spins[i])
     return 2 * lpi + 2 * _site_field(sys.h, i) * s
 end
 
-MonteCarloX.modify!(sys::IsingMatrix, i::Int) = modify!(sys, i, local_pair_interactions(sys, i))
-function MonteCarloX.modify!(sys::IsingMatrix, i::Int, lpi)
+@inline delta_energy(sys::IsingMatrix{TJ, NoField}, i, lpi) where {TJ} = 2 * lpi
+
+@inline function MonteCarloX.modify!(sys::IsingMatrix{TJ, TH}, i::Int, lpi) where {TJ, TH<:Union{Real,AbstractVector}}
     @inbounds s = Int(sys.spins[i])
     sys.spins[i] = Int8(-s)
     sys.cached_pair -= 2.0 * lpi
     sys.cached_mag -= 2 * s
     _update_field_cache!(sys, sys.h, i, -2.0 * s)
+    return nothing
+end
+
+@inline function MonteCarloX.modify!(sys::IsingMatrix{TJ, NoField}, i::Int, lpi) where {TJ}
+    @inbounds s = Int(sys.spins[i])
+    sys.spins[i] = Int8(-s)
+    sys.cached_pair -= 2.0 * lpi
+    sys.cached_mag -= 2 * s
     return nothing
 end
 

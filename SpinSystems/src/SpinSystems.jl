@@ -17,8 +17,9 @@ Three backends per model:
 
 # Interface (required for spin_flip!)
     propose_state(rng, sys, i) -> new spin state
-    delta_energy(sys, i, s_new) -> energy change
-    modify!(sys, i, s_new)     -> apply change
+    delta_sys(sys, i, s_new)   -> local move payload (optional; defaults to s_new)
+    delta_energy(sys, i, dsys) -> energy change
+    modify!(sys, i, dsys)      -> apply change
 
 # Updates
 `spin_flip!`
@@ -28,6 +29,7 @@ Three backends per model:
 """
 module SpinSystems
 
+using Random
 using Graphs
 using SparseArrays: SparseMatrixCSC, sparse
 using MonteCarloX: AbstractSystem,

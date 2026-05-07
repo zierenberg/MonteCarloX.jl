@@ -1,6 +1,7 @@
 abstract type AbstractBlumeCapel <: AbstractSpinSystem end
 
 const _BC_STATES = Int8[-1, 0, 1]
+const BlumeCapelDelta{T} = NamedTuple{(:s_new, :delta_spin, :delta_spin2, :coupling), Tuple{Int8, Int, Int, T}}
 
 # ── Shared observables ───────────────────────────────────────────────────────
 
@@ -30,7 +31,7 @@ end
 
 # ── Interface: propose_state ─────────────────────────────────────────────────
 
-@inline function propose_state(rng, sys::AbstractBlumeCapel, i)
+@inline function propose_state(rng::AbstractRNG, sys::AbstractBlumeCapel, i)
     @inbounds s_old = sys.spins[i]
     u = rand(rng, Bool)
     if s_old == Int8(-1)
@@ -44,41 +45,46 @@ end
 
 # ── Shared delta_energy (uses _local_coupling dispatched per backend) ────────
 
-@inline function delta_energy(sys::AbstractBlumeCapel, i, s_new::Int8)
+@inline function delta_sys(sys::AbstractBlumeCapel, i, s_new::Int8)
     @inbounds s_old = Int(sys.spins[i])
-    Δspin = Int(s_new) - s_old
-    Δsq = Int(s_new)^2 - s_old^2
+    delta_spin = Int(s_new) - s_old
+    delta_spin2 = Int(s_new)^2 - s_old^2
     coupling = _local_coupling(sys, i)
-    return -Δspin * coupling - _site_field(sys.h, i) * Δspin + sys.crystal * Δsq
+    return (s_new=s_new, delta_spin=delta_spin, delta_spin2=delta_spin2, coupling=coupling)
+end
+
+@inline function delta_energy(sys::AbstractBlumeCapel, i, s_new::Int8)
+    return delta_energy(sys, i, delta_sys(sys, i, s_new))
+end
+
+@inline function delta_energy(sys::AbstractBlumeCapel, i, dsys::BlumeCapelDelta)
+    local_term = dsys.coupling + _site_field(sys.h, i)
+    return -local_term * dsys.delta_spin + sys.Δ * dsys.delta_spin2
 end
 
 # ── Shared modify! ───────────────────────────────────────────────────────────
 
-function MonteCarloX.modify!(sys::AbstractBlumeCapel, i::Int, s_new::Int8)
-    @inbounds s_old = Int(sys.spins[i])
-    Δspin = Int(s_new) - s_old
-    Δsq = Int(s_new)^2 - s_old^2
-    coupling = _local_coupling(sys, i)
-    sys.spins[i] = s_new
-    sys.cached_pair += Δspin * coupling
-    sys.cached_mag += Δspin
-    sys.cached_sq += Δsq
-    _update_field_cache!(sys, sys.h, i, Float64(Δspin))
+@inline function MonteCarloX.modify!(sys::AbstractBlumeCapel, i::Int, dsys::BlumeCapelDelta)
+    sys.spins[i] = dsys.s_new
+    sys.cached_pair += dsys.delta_spin * dsys.coupling
+    sys.cached_mag += dsys.delta_spin
+    sys.cached_spin2 += dsys.delta_spin2
+    _update_field_cache!(sys, sys.h, i, Float64(dsys.delta_spin))
     return nothing
 end
 
 # ── Shared energy ────────────────────────────────────────────────────────────
 
 @inline _cached_energy(sys::AbstractBlumeCapel) =
-    -sys.cached_pair - _cached_field_energy(sys.h, sys.cached_mag, sys.cached_field) + float(sys.crystal) * sys.cached_sq
+    -sys.cached_pair - _cached_field_energy(sys.h, sys.cached_mag, sys.cached_field) + float(sys.Δ) * sys.cached_spin2
 
 function _full_energy(sys::AbstractBlumeCapel)
     pair_full = 0.0
     @inbounds for i in eachindex(sys.spins)
         pair_full += local_pair_interactions(sys, i)
     end
-    return -(pair_full / 2) - _field_sum(sys.h, sys.spins) +
-           float(sys.crystal) * sum(s -> Int(s)^2, sys.spins)
+        return -(pair_full / 2) - _field_sum(sys.h, sys.spins) +
+            float(sys.Δ) * sum(s -> Int(s)^2, sys.spins)
 end
 
 function _recompute_cached!(sys::AbstractBlumeCapel)
@@ -88,7 +94,7 @@ function _recompute_cached!(sys::AbstractBlumeCapel)
     end
     sys.cached_pair = pair_full / 2
     sys.cached_mag = sum(sys.spins)
-    sys.cached_sq = sum(s -> Int(s)^2, sys.spins)
+    sys.cached_spin2 = sum(s -> Int(s)^2, sys.spins)
     sys.cached_field = _field_sum(sys.h, sys.spins)
     return nothing
 end
@@ -101,31 +107,31 @@ mutable struct BlumeCapelLattice{D, NN, TJ<:Real, TC<:Real, TH} <: AbstractBlume
     spins::Vector{Int8}
     const nbrs::Vector{NTuple{NN,Int}}
     const J::TJ
-    const crystal::TC
+    const Δ::TC
     const h::TH
     cached_pair::Float64    # J-weighted half sum
     cached_mag::Int
-    cached_sq::Int          # Σ s_i²
+    cached_spin2::Int       # Σ s_i²
     cached_field::Float64
 end
 
-function BlumeCapelLattice(dims::AbstractVector{<:Integer}, J::Real, crystal::Real; h=0)
+function BlumeCapelLattice(dims::AbstractVector{<:Integer}, J::Real, Δ::Real; h=0)
     N = prod(dims)
     if h isa AbstractVector
         @assert length(h) == N "Field vector length must match number of sites"
-        _bc_lattice(Tuple(Int.(dims)), J, crystal, collect(float.(h)))
+        _bc_lattice(Tuple(Int.(dims)), J, Δ, collect(float.(h)))
     elseif h isa Real && !iszero(h)
-        _bc_lattice(Tuple(Int.(dims)), J, crystal, float(h))
+        _bc_lattice(Tuple(Int.(dims)), J, Δ, float(h))
     else
-        _bc_lattice(Tuple(Int.(dims)), J, crystal, NoField())
+        _bc_lattice(Tuple(Int.(dims)), J, Δ, NoField())
     end
 end
 
-function _bc_lattice(dims::NTuple{D,Int}, J, crystal, h) where D
+function _bc_lattice(dims::NTuple{D,Int}, J, Δ, h) where D
     N = prod(dims)
     nbrs = _build_lattice_neighbors(dims)
-    sys = BlumeCapelLattice{D, 2D, typeof(J), typeof(crystal), typeof(h)}(
-        ones(Int8, N), nbrs, J, crystal, h, 0.0, 0, 0, 0.0)
+    sys = BlumeCapelLattice{D, 2D, typeof(J), typeof(Δ), typeof(h)}(
+        ones(Int8, N), nbrs, J, Δ, h, 0.0, 0, 0, 0.0)
     _recompute_cached!(sys)
     return sys
 end
@@ -160,31 +166,31 @@ mutable struct BlumeCapelGraph{TJ<:Real, TC<:Real, TH} <: AbstractBlumeCapel
     const graph::SimpleGraph
     const nbrs::Vector{Vector{Int}}
     const J::TJ
-    const crystal::TC
+    const Δ::TC
     const h::TH
     cached_pair::Float64
     cached_mag::Int
-    cached_sq::Int
+    cached_spin2::Int
     cached_field::Float64
 end
 
-function BlumeCapelGraph(graph::SimpleGraph, J::Real, crystal::Real; h=0)
+function BlumeCapelGraph(graph::SimpleGraph, J::Real, Δ::Real; h=0)
     n = nv(graph)
     nbrs = [collect(Graphs.neighbors(graph, i)) for i in 1:n]
     if h isa AbstractVector
         @assert length(h) == n "Field vector length must match number of spins"
-        _bc_graph(graph, nbrs, J, crystal, collect(float.(h)))
+        _bc_graph(graph, nbrs, J, Δ, collect(float.(h)))
     elseif h isa Real && !iszero(h)
-        _bc_graph(graph, nbrs, J, crystal, float(h))
+        _bc_graph(graph, nbrs, J, Δ, float(h))
     else
-        _bc_graph(graph, nbrs, J, crystal, NoField())
+        _bc_graph(graph, nbrs, J, Δ, NoField())
     end
 end
 
-function _bc_graph(graph, nbrs, J, crystal, h)
+function _bc_graph(graph, nbrs, J, Δ, h)
     n = nv(graph)
-    sys = BlumeCapelGraph{typeof(J), typeof(crystal), typeof(h)}(
-        ones(Int8, n), graph, nbrs, J, crystal, h, 0.0, 0, 0, 0.0)
+    sys = BlumeCapelGraph{typeof(J), typeof(Δ), typeof(h)}(
+        ones(Int8, n), graph, nbrs, J, Δ, h, 0.0, 0, 0, 0.0)
     _recompute_cached!(sys)
     return sys
 end
@@ -213,31 +219,31 @@ end
 mutable struct BlumeCapelMatrix{TJ<:Real, TC<:Real, TH} <: AbstractBlumeCapel
     spins::Vector{Int8}
     const J::SparseMatrixCSC{TJ,Int}
-    const crystal::TC
+    const Δ::TC
     const h::TH
     cached_pair::Float64
     cached_mag::Int
-    cached_sq::Int
+    cached_spin2::Int
     cached_field::Float64
 end
 
-function BlumeCapelMatrix(J::SparseMatrixCSC{TJ,Int}, crystal::Real; h=0) where {TJ<:Real}
+function BlumeCapelMatrix(J::SparseMatrixCSC{TJ,Int}, Δ::Real; h=0) where {TJ<:Real}
     _check_symmetric(J)
     n = size(J, 1)
     if h isa AbstractVector
         @assert length(h) == n "Field vector length must match number of spins"
-        _bc_matrix(J, crystal, collect(float.(h)))
+        _bc_matrix(J, Δ, collect(float.(h)))
     elseif h isa Real && !iszero(h)
-        _bc_matrix(J, crystal, float(h))
+        _bc_matrix(J, Δ, float(h))
     else
-        _bc_matrix(J, crystal, NoField())
+        _bc_matrix(J, Δ, NoField())
     end
 end
 
-function _bc_matrix(J, crystal, h)
+function _bc_matrix(J, Δ, h)
     n = size(J, 1)
-    sys = BlumeCapelMatrix{eltype(J), typeof(crystal), typeof(h)}(
-        ones(Int8, n), J, crystal, h, 0.0, 0, 0, 0.0)
+    sys = BlumeCapelMatrix{eltype(J), typeof(Δ), typeof(h)}(
+        ones(Int8, n), J, Δ, h, 0.0, 0, 0, 0.0)
     _recompute_cached!(sys)
     return sys
 end
@@ -260,6 +266,8 @@ end
     end
     return s_i * acc
 end
+
+# ── NoField specializations: skip field terms/cache updates in hot path ─────
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # BlumeCapel factory constructors

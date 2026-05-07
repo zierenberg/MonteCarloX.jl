@@ -52,6 +52,10 @@ export  wrap_coordinate,
         minimum_image_displacement,
         minimum_image_sq
 
+include("geometry/cell_list.jl")
+export  CellList,
+        NoCellList
+
 # ── Systems ────────────────────────────────────────────────────────────────
 
 include("systems/particle_gas.jl")
