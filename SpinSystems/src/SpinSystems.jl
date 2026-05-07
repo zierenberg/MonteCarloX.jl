@@ -49,6 +49,7 @@ include("abstractions.jl")
 export  AbstractSpinSystem,
         NoField,
         pick_site,
+    neighbor_sum,
         local_pair_interactions,
         propose_state
 

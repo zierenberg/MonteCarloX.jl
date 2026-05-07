@@ -24,7 +24,7 @@ function init!(sys::AbstractIsing, type::Symbol; rng=nothing)
     return sys
 end
 
-# ── Interface: propose_state (not used by efficient Ising dispatch) ──────────
+# ── Interface: propose_state / delta_sys ─────────────────────────────────────
 
 @inline propose_state(rng::AbstractRNG, sys::AbstractIsing, i) = Int8(-sys.spins[i])
 @inline delta_sys(sys::AbstractIsing, i, s_new::Int8) = local_pair_interactions(sys, i)
@@ -62,15 +62,18 @@ function _ising_lattice(dims::NTuple{D,Int}, J, h) where D
     return sys
 end
 
-@inline function local_pair_interactions(sys::IsingLattice, i)
+@inline function neighbor_sum(sys::IsingLattice, i)
     @inbounds begin
-        s = sys.spins[i]
         acc = 0
         for j in sys.nbrs[i]
             acc += sys.spins[j]
         end
-        return s * acc
+        return acc
     end
+end
+
+@inline function local_pair_interactions(sys::IsingLattice, i)
+    @inbounds return Int(sys.spins[i]) * neighbor_sum(sys, i)
 end
 
 @inline delta_energy(sys::IsingLattice, i) = delta_energy(sys, i, local_pair_interactions(sys, i))
@@ -156,13 +159,16 @@ function _ising_graph(graph, nbrs, J, h)
     return sys
 end
 
-@inline function local_pair_interactions(sys::IsingGraph, i)
-    s = sys.spins[i]
+@inline function neighbor_sum(sys::IsingGraph, i)
     acc = 0
     @inbounds for j in sys.nbrs[i]
         acc += sys.spins[j]
     end
-    return s * acc
+    return acc
+end
+
+@inline function local_pair_interactions(sys::IsingGraph, i)
+    return Int(sys.spins[i]) * neighbor_sum(sys, i)
 end
 
 @inline delta_energy(sys::IsingGraph, i) = delta_energy(sys, i, local_pair_interactions(sys, i))
@@ -245,14 +251,17 @@ function _ising_matrix(J, h)
     return sys
 end
 
-@inline function local_pair_interactions(sys::IsingMatrix, i)
-    s_i = sys.spins[i]
+@inline function neighbor_sum(sys::IsingMatrix, i)
     acc = 0.0
     @inbounds for ptr in sys.J.colptr[i]:(sys.J.colptr[i+1]-1)
         j = sys.J.rowval[ptr]
         j != i && (acc += sys.J.nzval[ptr] * sys.spins[j])
     end
-    return s_i * acc
+    return acc
+end
+
+@inline function local_pair_interactions(sys::IsingMatrix, i)
+    return sys.spins[i] * neighbor_sum(sys, i)
 end
 
 @inline delta_energy(sys::IsingMatrix, i) = delta_energy(sys, i, local_pair_interactions(sys, i))

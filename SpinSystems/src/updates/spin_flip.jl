@@ -62,7 +62,7 @@ end
 
 @inline function spin_flip!(sys::AbstractBlumeCapel, alg::AbstractHeatBath)
     i = pick_site(alg.rng, length(sys.spins))
-    coupling = _local_coupling(sys, i)
+    coupling = neighbor_sum(sys, i)
     h_i = Float64(_site_field(sys.h, i))
 
     e1 = coupling + h_i + float(sys.Δ)
