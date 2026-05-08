@@ -13,9 +13,9 @@ D-dimensional lattice polymer system on a hypercubic lattice with PBC.
 
 Backbone bonds contribute a fixed -J_intra each and are included.
 """
-mutable struct LatticePolymer{D, TJ<:Real} <: AbstractLatticePolymerSystem
+mutable struct LatticePolymer{D, K, TJ<:Real} <: AbstractLatticePolymerSystem
     polymers::Vector{Vector{SVector{D,Int}}}
-    neighbors::Vector{Vector{Int}}   # precomputed: neighbors[site] = [nb1, nb2, ...]
+    neighbors::Vector{NTuple{K,Int}} # flat table: K=2D neighbors per site, no heap ptr
     dims::SVector{D,Int}
     state::Vector{Int}               # state[site] = polymer ID (0 = empty)
     J_intra::TJ
@@ -51,9 +51,8 @@ function LatticePolymer(; dims::AbstractVector{<:Integer},
     sv_dims = SVector{D,Int}(dims...)
     N_sites = prod(sv_dims)
     @assert sum(lengths) <= N_sites "Not enough sites for $(length(lengths)) polymers ($(sum(lengths)) monomers on $N_sites sites)"
-    graph = grid(sv_dims; periodic=true)
-    nbrs = [collect(neighbors(graph, s)) for s in 1:N_sites]
-    LatticePolymer{D, Float64}(
+    nbrs = _build_lattice_neighbors(sv_dims)
+    LatticePolymer{D, 2*D, Float64}(
         [Vector{SVector{D,Int}}([zero(SVector{D,Int}) for _ in 1:l]) for l in lengths],
         nbrs, sv_dims,
         zeros(Int, N_sites),
@@ -187,7 +186,7 @@ function _grow_saw!(sys::LatticePolymer{D}, n::Int, M::Int, rng) where {D}
 
     for m in 2:M
         last_site = coords_to_site(sys.polymers[n][m-1], sys.dims)
-        nbrs = copy(sys.neighbors[last_site])
+        nbrs = MVector(sys.neighbors[last_site])  # stack-allocated mutable copy for shuffle
         for i in length(nbrs):-1:2
             j = rand(rng, 1:i)
             nbrs[i], nbrs[j] = nbrs[j], nbrs[i]

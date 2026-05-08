@@ -6,22 +6,24 @@ Sentinel: no cell list acceleration. All-pairs loops are used.
 struct NoCellList end
 
 """
-    CellList{D}
+    CellList{D,K}
 
 D-dimensional cell list for O(1) per-particle energy evaluation.
 
 The box is divided into cells of size >= r_cutoff. Each cell knows its
-`3^D` neighbor cells (precomputed once). Particles are assigned to cells
-and energy evaluation iterates only particles in neighbor cells.
+`K = 3^D` neighbor cells (precomputed once, stored inline as `NTuple{K,Int}`
+— no heap pointer per cell). Particles are assigned to cells and energy
+evaluation iterates only particles in neighbor cells.
 
 Cell assignment is updated in-place when a particle moves — no rebuild needed.
 """
-struct CellList{D}
+struct CellList{D, K}
     cell_size::Float64
     rc_sq::Float64                          # cutoff^2 (for energy evaluation)
+    nc_per_dim::Int                         # cells per dimension (stored for hot path)
     cells::Vector{Vector{Int}}              # cell -> particle indices
     particle_cell::Vector{Int}              # particle -> cell index
-    neighbor_cells::Vector{Vector{Int}}     # cell -> neighbor cell indices
+    interaction_cells::Vector{NTuple{K,Int}} # cell -> interacting cell indices (self + neighbors)
 end
 
 function CellList{D}(N::Int, L::Real, r_cutoff::Real) where D
@@ -30,59 +32,35 @@ function CellList{D}(N::Int, L::Real, r_cutoff::Real) where D
     num_total = nc_per_dim^D
     cells = [Int[] for _ in 1:num_total]
     particle_cell = zeros(Int, N)
-    nbr_cells = _build_neighbor_cells(Val(D), nc_per_dim)
-    CellList{D}(cs, Float64(r_cutoff)^2, cells, particle_cell, nbr_cells)
+    int_cells = _build_interaction_cells(Val(D), SVector{D,Int}(ntuple(_ -> nc_per_dim, Val(D))))
+    CellList{D, 3^D}(cs, Float64(r_cutoff)^2, nc_per_dim, cells, particle_cell, int_cells)
 end
 
-# Number of cells per dimension
-@inline _nc_per_dim(cl::CellList{D}) where D = round(Int, length(cl.cells)^(1/D))
+# ── Precompute interaction cell indices ──────────────────────────────────────
 
-# ── Precompute neighbor cell indices ────────────────────────────────────────
-
-function _build_neighbor_cells(::Val{D}, nc::Int) where D
-    offsets = _build_neighbor_offsets(Val(D))
-    num_total = nc^D
-    nbrs = Vector{Vector{Int}}(undef, num_total)
-    for ci in 1:num_total
-        nbrs[ci] = [_neighbor_cell_index(ci, offset, nc) for offset in offsets]
+function _build_interaction_cells(::Val{D}, dims::SVector{D,Int}) where D
+    N = prod(dims)
+    strides = ntuple(d -> d == 1 ? 1 : prod(Tuple(dims)[1:d-1]), Val(D))
+    int_cells = Vector{NTuple{3^D, Int}}(undef, N)
+    for ci in 1:N
+        c0 = ci - 1
+        coords = ntuple(d -> (c0 ÷ strides[d]) % dims[d], Val(D))
+        int_cells[ci] = ntuple(Val(3^D)) do k
+            # Convert k to offset tuple (-1, 0, +1)^D (includes center at k=1+(D offsets))
+            offset = ntuple(Val(D)) do d
+                ((k - 1) ÷ (3^(d-1))) % 3 - 1
+            end
+            # Compute interaction cell index with wrapping
+            ci + sum(ntuple(d -> (mod(coords[d] + offset[d], dims[d]) - coords[d]) * strides[d], Val(D)))
+        end
     end
-    return nbrs
-end
-
-function _build_neighbor_offsets(::Val{D}) where D
-    offsets = NTuple{D,Int}[]
-    _enumerate_offsets!(offsets, Val(D), Int[])
-    return offsets
-end
-
-function _enumerate_offsets!(offsets, ::Val{0}, current)
-    push!(offsets, Tuple(current))
-    return nothing
-end
-
-function _enumerate_offsets!(offsets, ::Val{R}, current) where R
-    for d in -1:1
-        push!(current, d)
-        _enumerate_offsets!(offsets, Val(R-1), current)
-        pop!(current)
-    end
-    return nothing
-end
-
-function _neighbor_cell_index(base::Int, offset::NTuple{D,Int}, nc::Int) where D
-    idx = 1; stride = 1; rem = base - 1
-    @inbounds for d in 1:D
-        ci = rem % nc; rem = rem ÷ nc
-        idx += mod(ci + offset[d], nc) * stride
-        stride *= nc
-    end
-    return idx
+    return int_cells
 end
 
 # ── Cell index from position ────────────────────────────────────────────────
 
 @inline function cell_index(cl::CellList{D}, pos::SVector{D}) where D
-    nc = _nc_per_dim(cl)
+    nc = cl.nc_per_dim
     idx = 1; stride = 1
     @inbounds for d in 1:D
         ci = min(floor(Int, pos[d] / cl.cell_size), nc - 1)

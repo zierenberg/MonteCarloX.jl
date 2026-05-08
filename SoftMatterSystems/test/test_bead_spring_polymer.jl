@@ -86,4 +86,19 @@ using StaticArrays: SVector
         @test G[1,1] ≈ 2.0
         @test G[2,2] ≈ 0.0 atol=1e-12
     end
+
+    @testset "Heterogeneous lengths" begin
+        lj   = LennardJonesPotential(epsilon=1.0, sigma=1.0)
+        fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
+        poly = BeadSpringPolymer(; num_poly=3, lengths=[4, 6, 5], L=20.0,
+            pair_potential=lj, bond_potential=fene)
+        @test num_polymers(poly) == 3
+        @test polymer_length(poly, 1) == 4
+        @test polymer_length(poly, 2) == 6
+        @test polymer_length(poly, 3) == 5
+        @test total_monomers(poly) == 15
+        @test poly.offsets == [0, 4, 10]
+        init!(poly, :random_walk; rng=Xoshiro(99))
+        @test energy(poly) ≈ energy(poly; full=true)
+    end
 end

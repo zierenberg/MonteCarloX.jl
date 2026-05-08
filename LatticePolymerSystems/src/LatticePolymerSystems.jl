@@ -16,7 +16,6 @@ Lattice polymer systems in arbitrary spatial dimension D.
 """
 module LatticePolymerSystems
 
-using Graphs
 using StaticArrays
 using MonteCarloX: AbstractSystem,
                    AbstractImportanceSampling,

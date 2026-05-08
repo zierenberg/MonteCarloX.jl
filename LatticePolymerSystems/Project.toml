@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["Johannes Zierenberg"]
 
 [deps]
-Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"

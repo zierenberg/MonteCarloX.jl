@@ -4,10 +4,12 @@ using Printf
 using MonteCarloX
 using SoftMatterSystems
 
-# CLI: julia --project=. benchmark.jl [updates_global] [updates_equi] [repeats]
-const UPDATES_GLOBAL = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 500_000
-const UPDATES_EQUI = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 5_000
-const REPEATS = length(ARGS) >= 3 ? parse(Int, ARGS[3]) : 10
+# CLI: julia --project=. benchmark.jl [updates_global] [updates_equi] [repeats] [--kernels]
+const NUMERIC_ARGS = [arg for arg in ARGS if !startswith(arg, "--")]
+const RUN_KERNELS = "--kernels" in ARGS
+const UPDATES_GLOBAL = length(NUMERIC_ARGS) >= 1 ? parse(Int, NUMERIC_ARGS[1]) : 500_000
+const UPDATES_EQUI = length(NUMERIC_ARGS) >= 2 ? parse(Int, NUMERIC_ARGS[2]) : 5_000
+const REPEATS = length(NUMERIC_ARGS) >= 3 ? parse(Int, NUMERIC_ARGS[3]) : 10
 const CHAIN_RELAX_STEPS = 10_000
 
 @inline make_rng(seed::Integer) = Xoshiro(seed)
@@ -25,9 +27,9 @@ const CHAIN_RELAX_STEPS = 10_000
     return nothing
 end
 
-function setup_particle_gas(; N::Int, L::Float64, delta::Float64)
+function setup_particle_gas(; N::Int, L::Float64)
     lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
-    sys = ParticleGas(; D=3, N=N, L=L, pair_potential=lj, delta=delta)
+    sys = ParticleGas(; D=3, N=N, L=L, pair_potential=lj)
     return sys
 end
 
@@ -38,24 +40,26 @@ function setup_bead_spring(; num_poly::Int, length_poly::Int, L::Float64,
     if with_bending
         bend = CosineBendingPotential(3.0)
         return BeadSpringPolymer(; D=3, num_poly=num_poly, length_poly=length_poly, L=L,
-            pair_potential=lj, bond_potential=fene, bending_potential=bend, delta=delta)
+            pair_potential=lj, bond_potential=fene, bending_potential=bend), delta
     end
     return BeadSpringPolymer(; D=3, num_poly=num_poly, length_poly=length_poly, L=L,
-        pair_potential=lj, bond_potential=fene, delta=delta)
+        pair_potential=lj, bond_potential=fene), delta
 end
 
 function benchmark_case(case::AbstractString, mode::AbstractString,
                         seed::Integer, β::Real, setup_sys::Function, move!::Function;
                         init_type::Symbol, chain::Bool=false, pre_relax_chain::Bool=false)
     rng_sys = make_rng(seed)
-    sys = setup_sys()
+    setup = setup_sys()
+    sys = setup isa Tuple ? setup[1] : setup
+    Δ = setup isa Tuple ? setup[2] : nothing
     init!(sys, init_type; rng=rng_sys)
     alg = Metropolis(make_rng(seed + 1); β=β)
 
     if pre_relax_chain
         # Chain translations preserve internal geometry; short monomer relaxation helps
         # remove pathological random-walk overlaps before timing rigid-chain moves.
-        run_updates!(sys, alg, translate!, CHAIN_RELAX_STEPS; chain=false)
+        run_updates!(sys, alg, (s, a; chain=false) -> translate!(s, a, Δ; chain=chain), CHAIN_RELAX_STEPS; chain=false)
     end
 
     run_updates!(sys, alg, move!, UPDATES_EQUI; chain=chain)
@@ -91,6 +95,53 @@ function benchmark_case(case::AbstractString, mode::AbstractString,
     return nothing
 end
 
+function run_kernel_microbenchmarks()
+    println()
+    println("Kernel microbenchmarks")
+    println("Configuration: loops=20000")
+    @printf("%-44s %12s\n", "kernel", "ns/call")
+    @printf("%-44s %12s\n", "--------------------------------------------", "------------")
+
+    loops = 20_000
+
+    gas = setup_particle_gas(; N=256, L=32.0)
+    init!(gas, :random; rng=make_rng(4001))
+    t0 = time_ns()
+    for rep in 1:loops
+        i = 1 + ((rep - 1) % gas.N)
+        SoftMatterSystems._energy_of_particle(gas, i)
+    end
+    t1 = time_ns()
+    @printf("%-44s %12.3f\n", "ParticleGas local energy", (t1 - t0) / loops)
+
+    poly = first(setup_bead_spring(; num_poly=6, length_poly=12, L=20.0, delta=0.08))
+    init!(poly, :random_walk; rng=make_rng(4002))
+    n_total = length(poly.positions)
+    t0 = time_ns()
+    for rep in 1:loops
+        idx = 1 + ((rep - 1) % n_total)
+        SoftMatterSystems._monomer_energy(poly, idx)
+    end
+    t1 = time_ns()
+    @printf("%-44s %12.3f\n", "BeadSpring monomer local energy", (t1 - t0) / loops)
+
+    t0 = time_ns()
+    for rep in 1:loops
+        n = 1 + ((rep - 1) % poly.num_poly)
+        start_idx = poly.offsets[n] + 1
+        M   = poly.lengths[n]
+        acc = 0.0
+        for k in 0:M-1
+            acc += SoftMatterSystems._pair_energy_of_all(poly, start_idx + k)
+        end
+        acc
+    end
+    t1 = time_ns()
+    @printf("%-44s %12.3f\n", "BeadSpring chain pair-only sweep", (t1 - t0) / loops)
+
+    return nothing
+end
+
 println("SoftMatterSystems benchmark")
 println("Configuration: updates_equi=$(UPDATES_EQUI), updates_global=$(UPDATES_GLOBAL), repeats=$(REPEATS)")
 println()
@@ -101,20 +152,22 @@ println()
 
 cases = [
     (name="ParticleGas(D=3,N=256,LJ)", mode="translate!", seed=2030, β=1.0,
-     setup_fn=() -> setup_particle_gas(; N=256, L=32.0, delta=0.20),
-     move_fn=translate!, init_type=:random, chain=false, pre_relax_chain=false),
+    setup_fn=() -> setup_particle_gas(; N=256, L=32.0),
+    move_fn=((sys, alg) -> translate!(sys, alg, 0.20)), init_type=:random, chain=false, pre_relax_chain=false),
     (name="BeadSpring(D=3,6x12,LJ+FENE)", mode="translate!", seed=2031, β=1.0,
      setup_fn=() -> setup_bead_spring(; num_poly=6, length_poly=12, L=20.0, delta=0.08),
-     move_fn=translate!, init_type=:random_walk, chain=false, pre_relax_chain=false),
+        move_fn=((sys, alg; chain=false) -> translate!(sys, alg, 0.08; chain=chain)), init_type=:random_walk, chain=false, pre_relax_chain=false),
     (name="BeadSpring(D=3,6x12,LJ+FENE)", mode="translate! (chain)", seed=2032, β=1.0,
      setup_fn=() -> setup_bead_spring(; num_poly=6, length_poly=12, L=20.0, delta=0.05),
-     move_fn=translate!, init_type=:random_walk, chain=true, pre_relax_chain=true),
+        move_fn=((sys, alg; chain=false) -> translate!(sys, alg, 0.05; chain=chain)), init_type=:random_walk, chain=true, pre_relax_chain=true),
     (name="BeadSpring(D=3,6x12,LJ+FENE+bending)", mode="translate!", seed=2033, β=1.0,
      setup_fn=() -> setup_bead_spring(; num_poly=6, length_poly=12, L=20.0, delta=0.08, with_bending=true),
-     move_fn=translate!, init_type=:random_walk, chain=false, pre_relax_chain=false),
+        move_fn=((sys, alg; chain=false) -> translate!(sys, alg, 0.08; chain=chain)), init_type=:random_walk, chain=false, pre_relax_chain=false),
 ]
 
 for case in cases
     benchmark_case(case.name, case.mode, case.seed, case.β, case.setup_fn, case.move_fn;
         init_type=case.init_type, chain=case.chain, pre_relax_chain=case.pre_relax_chain)
 end
+
+RUN_KERNELS && run_kernel_microbenchmarks()

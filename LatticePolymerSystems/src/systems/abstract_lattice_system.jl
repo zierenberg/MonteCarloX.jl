@@ -6,7 +6,7 @@ Base type for lattice-based polymer systems on a D-dimensional hypercubic lattic
 abstract type AbstractLatticePolymerSystem <: AbstractSystem end
 
 # ── Coordinate conversion ─────────────────────────────────────────────────────
-# Column-major ordering (first dimension has stride 1), matching Graphs.jl's grid().
+# Column-major ordering (first dimension has stride 1).
 
 """
     site_to_coords(site::Int, L::SVector{D,Int}) -> SVector{D,Int}
@@ -76,6 +76,37 @@ end
 
 @inline function lattice_difference(c1::SVector{D}, c2::SVector{D}, L::SVector{D,Int}) where {D}
     SVector{D,Float64}(ntuple(d -> lattice_difference(c1[d], c2[d], L[d]), Val(D)))
+end
+
+# ── Neighbor table ────────────────────────────────────────────────────────────
+
+"""
+    _build_lattice_neighbors(dims::SVector{D,Int}) -> Vector{NTuple{2D,Int}}
+
+Build a flat neighbor table for a D-dimensional periodic hypercubic lattice.
+Each site has exactly 2D neighbors (compile-time constant), stored inline
+in a contiguous `Vector{NTuple{2D,Int}}` — no heap pointer per site.
+
+Ordering: column-major (dimension 1 has stride 1).
+Neighbors are sorted by site index to match Graphs.jl ordering for determinism.
+"""
+function _build_lattice_neighbors(dims::SVector{D,Int}) where D
+    N = prod(dims)
+    strides = ntuple(d -> d == 1 ? 1 : prod(Tuple(dims)[1:d-1]), Val(D))
+    nbrs = Vector{NTuple{2D,Int}}(undef, N)
+    for site in 1:N
+        s0 = site - 1
+        coords = ntuple(d -> (s0 ÷ strides[d]) % dims[d], Val(D))
+        # Collect neighbors in (-d1, +d1, -d2, +d2, ...) order, then sort
+        neighbors_unsorted = ntuple(Val(2D)) do k
+            d = (k + 1) ÷ 2
+            dir = iseven(k) ? 1 : -1
+            site + (mod(coords[d] + dir, dims[d]) - coords[d]) * strides[d]
+        end
+        # Sort to match Graphs.jl ordering
+        nbrs[site] = ntuple(i -> sort(collect(neighbors_unsorted))[i], Val(2D))
+    end
+    return nbrs
 end
 
 """

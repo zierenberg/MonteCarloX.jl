@@ -32,11 +32,11 @@ end
 
     @testset "translate! ParticleGas: per-step invariants" begin
         lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
-        gas = ParticleGas(; N=30, L=10.0, pair_potential=lj, delta=0.2)
+        gas = ParticleGas(; N=30, L=10.0, pair_potential=lj)
         init!(gas, :random; rng=Xoshiro(42))
         alg = Metropolis(Xoshiro(1); β=1.0)
         for _ in 1:500
-            translate!(gas, alg)
+            translate!(gas, alg, 0.2)
             verify_invariants(gas)
         end
         @test acceptance_rate(alg) > 0.0
@@ -44,11 +44,11 @@ end
 
     @testset "translate! ParticleGas 2D: per-step invariants" begin
         lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
-        gas = ParticleGas(; D=2, N=20, L=10.0, pair_potential=lj, delta=0.2)
+        gas = ParticleGas(; D=2, N=20, L=10.0, pair_potential=lj)
         init!(gas, :random; rng=Xoshiro(42))
         alg = Metropolis(Xoshiro(2); β=1.0)
         for _ in 1:300
-            translate!(gas, alg)
+            translate!(gas, alg, 0.2)
             verify_invariants(gas)
         end
         @test acceptance_rate(alg) > 0.0
@@ -58,11 +58,11 @@ end
         lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
         fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
         poly = BeadSpringPolymer(; num_poly=2, length_poly=8, L=20.0,
-            pair_potential=lj, bond_potential=fene, delta=0.1)
+            pair_potential=lj, bond_potential=fene)
         init!(poly, :random_walk; rng=Xoshiro(42))
         alg = Metropolis(Xoshiro(3); β=1.0)
         for _ in 1:500
-            translate!(poly, alg)
+            translate!(poly, alg, 0.1)
             verify_invariants(poly)
         end
         @test acceptance_rate(alg) > 0.0
@@ -74,11 +74,11 @@ end
         bend = CosineBendingPotential(5.0)
         poly = BeadSpringPolymer(; num_poly=2, length_poly=6, L=20.0,
             pair_potential=lj, bond_potential=fene,
-            bending_potential=bend, delta=0.05)
+            bending_potential=bend)
         init!(poly, :random_walk; rng=Xoshiro(42))
         alg = Metropolis(Xoshiro(4); β=1.0)
         for _ in 1:500
-            translate!(poly, alg)
+            translate!(poly, alg, 0.05)
             verify_invariants(poly)
         end
         @test acceptance_rate(alg) > 0.0
@@ -88,11 +88,11 @@ end
         lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
         fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
         poly = BeadSpringPolymer(; num_poly=2, length_poly=8, L=20.0,
-            pair_potential=lj, bond_potential=fene, delta=0.1)
+            pair_potential=lj, bond_potential=fene)
         init!(poly, :random_walk; rng=Xoshiro(42))
         alg = Metropolis(Xoshiro(5); β=1.0)
         for _ in 1:500
-            translate!(poly, alg; chain=true)
+            translate!(poly, alg, 0.1; chain=true)
             verify_invariants(poly)
         end
         @test acceptance_rate(alg) > 0.0
@@ -102,11 +102,11 @@ end
         lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
         fene = FENEPotential(spring_constant=30.0, l0=0.0, l_max=1.5)
         poly = BeadSpringPolymer(; num_poly=3, length_poly=8, L=20.0,
-            pair_potential=lj, bond_potential=fene, delta=0.1)
+            pair_potential=lj, bond_potential=fene)
         init!(poly, :random_walk; rng=Xoshiro(99))
         alg = Metropolis(Xoshiro(0); β=0.5)
         for _ in 1:2000
-            translate!(poly, alg)
+            translate!(poly, alg, 0.1)
         end
         verify_invariants(poly)
         @test 0.0 < acceptance_rate(alg) < 1.0

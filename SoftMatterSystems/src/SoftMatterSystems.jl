@@ -4,11 +4,11 @@
 Off-lattice soft matter systems in arbitrary spatial dimension D.
 
 # Systems
-    ParticleGas(; D=3, N, L, pair_potential, delta=0.1)
+    ParticleGas(; D=3, N, L, pair_potential)
     BeadSpringPolymer(; D=3, num_poly, length_poly, L, pair_potential, bond_potential, ...)
 
 # Updates
-`translate!`
+`translate!(sys, alg, Δ; chain=false)`
 
 # Observables
 `energy`, `energy_pair`, `energy_bond`, `energy_bending`,
@@ -69,6 +69,7 @@ include("systems/bead_spring_polymer.jl")
 export  BeadSpringPolymer,
         num_polymers,
         polymer_length,
+        total_monomers,
         energy_bond,
         energy_bending
 
