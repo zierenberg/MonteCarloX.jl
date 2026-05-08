@@ -40,7 +40,7 @@ end
         init!(sys, :random; rng=Xoshiro(42))
         alg = Metropolis(Xoshiro(1); β=0.5)
         for _ in 1:200
-            slither_move!(sys, alg)
+            slither!(sys, alg)
             verify_invariants(sys)
         end
         @test acceptance_rate(alg) > 0.0
@@ -62,7 +62,7 @@ end
         init!(sys, :random; rng=Xoshiro(42))
         alg = Metropolis(Xoshiro(3); β=0.5)
         for _ in 1:200
-            pivot_move!(sys, alg)
+            pivot!(sys, alg)
             verify_invariants(sys)
         end
         @test acceptance_rate(alg) > 0.0
@@ -76,8 +76,8 @@ end
         # Mix in slither to rearrange and create bridge opportunities
         alg_mix = Metropolis(Xoshiro(5); β=0.5)
         for _ in 1:500
-            slither_move!(sys, alg_mix)
-            double_bridge_move!(sys, alg)
+            slither!(sys, alg_mix)
+            double_bridge!(sys, alg)
             verify_invariants(sys)
         end
         @test acceptance_rate(alg) > 0.0
@@ -88,7 +88,7 @@ end
         sys = LatticePolymer(; dims=[10, 10], num_poly=4, length_poly=10, J_intra=0.5, J_inter=1.0)
         init!(sys, :random; rng=Xoshiro(99))
         alg = Metropolis(Xoshiro(0); β=0.3)
-        moves = [slither_move!, translate!, pivot_move!, double_bridge_move!]
+        moves = [slither!, translate!, pivot!, double_bridge!]
         for _ in 1:2000
             moves[rand(alg.rng, 1:4)](sys, alg)
         end

@@ -1,10 +1,10 @@
 """
-    pivot_move!(sys, alg)
+    pivot!(sys, alg)
 
 Pivot move: rotate one end of a chain by ±90° in a random plane.
 Works in D=2 and D=3.
 """
-function pivot_move!(sys::LatticePolymer{D}, alg::AbstractImportanceSampling) where {D}
+function pivot!(sys::LatticePolymer{D}, alg::AbstractImportanceSampling) where {D}
     (D == 2 || D == 3) || return nothing
 
     n = rand(alg.rng, 1:num_polymers(sys))

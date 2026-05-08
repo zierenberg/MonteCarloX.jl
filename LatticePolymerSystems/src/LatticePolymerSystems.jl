@@ -8,7 +8,7 @@ Lattice polymer systems in arbitrary spatial dimension D.
     LatticePolymer(; dims, num_poly, length_poly, ...)  # uniform homopolymers
 
 # Updates
-`translate!`, `slither_move!`, `pivot_move!`, `double_bridge_move!`
+`translate!`, `slither!`, `pivot!`, `double_bridge!`
 
 # Observables
 `energy`, `radius_of_gyration_sq`, `center_of_mass`,
@@ -43,16 +43,16 @@ export  LatticePolymer,
 # ── Updates ─────────────────────────────────────────────────────────────────
 
 include("updates/slither.jl")
-export  slither_move!
+export  slither!
 
 include("updates/translate.jl")
 export  translate!
 
 include("updates/pivot.jl")
-export  pivot_move!
+export  pivot!
 
 include("updates/double_bridge.jl")
-export  double_bridge_move!
+export  double_bridge!
 
 # ── Observables ─────────────────────────────────────────────────────────────
 

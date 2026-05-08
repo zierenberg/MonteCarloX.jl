@@ -9,18 +9,23 @@ const SWEEPS_EQUI = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 1_000
 const BETA_ISING = 0.44
 const BETA_BC = 0.40
 
+@inline function benchmark_steps(alg)
+    hasproperty(alg, :steps) || throw(ArgumentError("Benchmark algorithm $(typeof(alg)) does not expose a steps counter"))
+    return getproperty(alg, :steps)
+end
+
 function benchmark_case(case::AbstractString, mode::AbstractString, rng::AbstractString, seed::Integer, β::Real, sys, alg)
     run_updates!(sys, alg, SWEEPS_EQUI)
 
-    steps_before = hasproperty(alg, :steps) ? getproperty(alg, :steps) : 0
+    steps_before = benchmark_steps(alg)
     t0 = time_ns()
     run_updates!(sys, alg, SWEEPS_GLOBAL)
     t1 = time_ns()
-    steps_after = hasproperty(alg, :steps) ? getproperty(alg, :steps) : 0
+    steps_after = benchmark_steps(alg)
 
     elapsed_ns = t1 - t0
-    nsteps = SWEEPS_GLOBAL * length(sys.spins)
-    nsteps_measured = hasproperty(alg, :steps) ? (steps_after - steps_before) : nsteps
+    nsteps_measured = steps_after - steps_before
+    nsteps_measured > 0 || throw(ArgumentError("Benchmark case $(case) / $(mode) produced no updates; steps_before=$(steps_before), steps_after=$(steps_after)"))
     cpu_ms = elapsed_ns / 1.0e6
     ns_per_flip = elapsed_ns / nsteps_measured
     final_E = energy(sys)
@@ -152,7 +157,7 @@ function main()
     # Local tight Ising kernel first (same benchmark_case path)
     sys_local = LocalTightIsing(64, Xoshiro(seed))
     alg_local = LocalTightMetropolis(Xoshiro(seed); β=BETA_ISING)
-    benchmark_case("Local Ising 64x64", "local", "xoshiro", seed, BETA_ISING, sys_local, alg_local)
+    benchmark_case("Local Ising 64x64", "table", "xoshiro", seed, BETA_ISING, sys_local, alg_local)
 
     # Framework Ising: tabulated and continuous, two RNGs
     rng_init_tbl_x = Xoshiro(seed)

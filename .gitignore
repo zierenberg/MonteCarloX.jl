@@ -15,3 +15,7 @@ Manifest.toml
 docs/Manifest.toml
 examples/Manifest.toml
 SpinSystems/Manifest.toml
+
+# some specific files
+SpinSystems/references/ising_cpu
+SpinSystems/references/ising_cpu_modes
