@@ -35,6 +35,14 @@ function benchmark_case(case::AbstractString, mode::AbstractString, rng::Abstrac
     return nothing
 end
 
+@inline function run_updates!(sys, alg, sweeps::Int)
+    nsteps = sweeps * length(sys.spins)
+    for _ in 1:nsteps
+        spin_flip!(sys, alg)
+    end
+    return nothing
+end
+
 # tabulated version
 mutable struct TableMetropolis{R<:AbstractRNG} <: AbstractMetropolis
     rng::R
@@ -54,14 +62,6 @@ TableMetropolis(rng::AbstractRNG; β::Real) =
     accepted = rand(alg.rng) < p
     alg.accepted += accepted
     return accepted
-end
-
-@inline function run_updates!(sys, alg, sweeps::Int)
-    nsteps = sweeps * length(sys.spins)
-    for _ in 1:nsteps
-        spin_flip!(sys, alg)
-    end
-    return nothing
 end
 
 # local super optimized version
