@@ -1,8 +1,8 @@
 using Test
 using Random
-using SoftMatterSystems
+using MCXSoftMatter
 
-@testset "SoftMatterSystems" begin
+@testset "MCXSoftMatter" begin
     include("test_periodic.jl")
     include("test_potentials.jl")
     include("test_particle_gas.jl")

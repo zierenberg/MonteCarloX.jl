@@ -1,4 +1,4 @@
-using LatticePolymerSystems
+using MCXLatticeMatter
 using Test
 using Random
 

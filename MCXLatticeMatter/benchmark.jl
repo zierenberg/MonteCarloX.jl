@@ -2,7 +2,7 @@ using Random
 using Statistics
 using Printf
 using MonteCarloX
-using LatticePolymerSystems
+using MCXLatticeMatter
 
 # CLI: julia --project=. benchmark.jl [updates_global] [updates_equi] [repeats]
 const UPDATES_GLOBAL = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 600_000
@@ -65,7 +65,7 @@ function benchmark_case(case::AbstractString, mode::AbstractString,
     return nothing
 end
 
-println("LatticePolymerSystems benchmark")
+println("MCXLatticeMatter benchmark")
 println("Configuration: updates_equi=$(UPDATES_EQUI), updates_global=$(UPDATES_GLOBAL), repeats=$(REPEATS)")
 println()
 @printf("%-30s %-15s %-7s %8s %6s %10s %12s %10s %9s %9s %12s\n",

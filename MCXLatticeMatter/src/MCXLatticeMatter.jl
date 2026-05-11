@@ -1,5 +1,5 @@
 """
-    LatticePolymerSystems
+    MCXLatticeMatter
 
 Lattice polymer systems in arbitrary spatial dimension D.
 
@@ -14,7 +14,7 @@ Lattice polymer systems in arbitrary spatial dimension D.
 `energy`, `radius_of_gyration_sq`, `center_of_mass`,
 `end_to_end_distance_sq`, `gyration_tensor`, `clusters`
 """
-module LatticePolymerSystems
+module MCXLatticeMatter
 
 using StaticArrays
 using MonteCarloX: AbstractSystem,
@@ -67,4 +67,4 @@ export  radius_of_gyration_sq,
         end_to_end_distance_sq,
         gyration_tensor
 
-end # module LatticePolymerSystems
+end # module MCXLatticeMatter

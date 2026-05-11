@@ -15,7 +15,7 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 
 using Random, StatsBase, Plots
 using MonteCarloX: update!
-using MonteCarloX, SpinSystems
+using MonteCarloX, MCXSpins
 using MPI
 
 # Parameters

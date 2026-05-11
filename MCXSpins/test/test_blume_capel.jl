@@ -3,7 +3,7 @@ using Random
 using SparseArrays
 using Graphs
 using MonteCarloX
-using SpinSystems
+using MCXSpins
 
 @testset "BlumeCapel bookkeeping" begin
     sys = BlumeCapel([4, 4]; J=1.0, D=0.5)
@@ -20,7 +20,7 @@ using SpinSystems
     @test ΔE == 3.5
 
     E_old = energy(sys)
-    modify!(sys, i, SpinSystems.delta_sys(sys, i, s_new))
+    modify!(sys, i, MCXSpins.delta_sys(sys, i, s_new))
     @test energy(sys) == E_old + ΔE
     @test energy(sys; full=true) == energy(sys)
     @test magnetization(sys) == 15

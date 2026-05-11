@@ -10,7 +10,7 @@ It separates the sampling algorithm from the system under study:
 the user defines the system state and proposes changes; MonteCarloX provides the acceptance criterion.
 Because the algorithm is independent of the model, every simulation becomes a template — replacing the system yields a new application without modifying the algorithmic loop.
 
-Companion packages can encapsulate entire model families (e.g., `SpinSystems` for Ising and Blume-Capel models), providing system definitions, update rules, and observables out of the box.
+Companion packages can encapsulate entire model families (e.g., `MCXSpins` for Ising and Blume-Capel models), providing system definitions, update rules, and observables out of the box.
 
 ## Example
 
@@ -69,7 +69,7 @@ import Pkg; Pkg.add("MonteCarloX")
 Optional companion package (from repository root):
 
 ```julia
-using Pkg; Pkg.develop(path="SpinSystems")
+using Pkg; Pkg.develop(path="MCXSpins")
 ```
 
 ## Documentation
@@ -83,4 +83,4 @@ julia --project=docs -e 'using Pkg; Pkg.instantiate(); include("docs/make.jl")'
 ## Testing
 
 - Core: `julia --project -e 'using Pkg; Pkg.test()'`
-- SpinSystems: `julia --project=SpinSystems -e 'using Pkg; Pkg.test()'`
+- MCXSpins: `julia --project=MCXSpins -e 'using Pkg; Pkg.test()'`

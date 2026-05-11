@@ -1,5 +1,5 @@
 """
-    SoftMatterSystems
+    MCXSoftMatter
 
 Off-lattice soft matter systems in arbitrary spatial dimension D.
 
@@ -15,7 +15,7 @@ Off-lattice soft matter systems in arbitrary spatial dimension D.
 `radius_of_gyration_sq`, `center_of_mass`, `end_to_end_distance_sq`,
 `gyration_tensor`, `clusters`
 """
-module SoftMatterSystems
+module MCXSoftMatter
 
 using StaticArrays
 using MonteCarloX: AbstractSystem,
@@ -92,4 +92,4 @@ export  center_of_mass,
         end_to_end_distance_sq,
         gyration_tensor
 
-end # module SoftMatterSystems
+end # module MCXSoftMatter

@@ -8,7 +8,7 @@
 | Homopolymers | Explicit-solvent mixtures | Rigid molecules |
 | Diblock / heteropolymers | `HardWallBox` environment | |
 
-Lattice polymers and HP models → `LatticePolymerSystems`.
+Lattice polymers and HP models → `MCXLatticeMatter`.
 
 ---
 

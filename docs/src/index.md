@@ -19,7 +19,7 @@ This separation keeps algorithm code model-agnostic:
 the same `Metropolis` algorithm samples a posterior distribution in Bayesian inference, an Ising model at thermal equilibrium, or any other system for which a log-weight function can be defined.
 
 Because the user retains full control over the system definition and update rule, it is straightforward to build companion packages that provide these for entire model families.
-For example, `SpinSystems` implements states, updates, and observables for Ising and Blume-Capel models, so that a simulation reduces to choosing an algorithm and running the loop.
+For example, `MCXSpins` implements states, updates, and observables for Ising and Blume-Capel models, so that a simulation reduces to choosing an algorithm and running the loop.
 
 ## Algorithms
 
@@ -45,7 +45,7 @@ the algorithmic structure remains unchanged when the system is replaced.
 ## Scope
 
 MonteCarloX provides the algorithmic core.
-Concrete model families (e.g., `SpinSystems`) are maintained as separate companion packages.
+Concrete model families (e.g., `MCXSpins`) are maintained as separate companion packages.
 This keeps the framework compact and allows independent development of new models.
 
 ## Related Julia packages

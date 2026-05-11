@@ -12,7 +12,7 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 # (3) validation against the exact solution.
 
 using Random, StatsBase, Plots, BenchmarkTools
-using MonteCarloX, SpinSystems
+using MonteCarloX, MCXSpins
 using Graphs, SparseArrays
 
 # ## CI parameters

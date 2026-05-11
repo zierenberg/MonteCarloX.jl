@@ -12,7 +12,7 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 # [Beale (1996)](https://doi.org/10.1103/PhysRevLett.76.78).
 
 using Random, StatsBase, Plots
-using MonteCarloX, SpinSystems
+using MonteCarloX, MCXSpins
 
 # ## Parameters
 const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"

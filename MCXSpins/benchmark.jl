@@ -1,7 +1,7 @@
 using Random
 using Printf
 using MonteCarloX
-using SpinSystems
+using MCXSpins
 
 # CLI: julia --project=. benchmark.jl [sweeps_global] [sweeps_equi]
 const SWEEPS_GLOBAL = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 100_000
@@ -91,7 +91,7 @@ LocalTightMetropolis(rng::AbstractRNG; β::Real) =
 
 Base.length(sys::LocalTightIsing) = length(sys.spins)
 
-function SpinSystems.energy(sys::LocalTightIsing)
+function MCXSpins.energy(sys::LocalTightIsing)
     e = 0
     spins = sys.spins
     L = sys.L
@@ -144,7 +144,7 @@ end
 end
 
 function main()
-    println("SpinSystems benchmark")
+    println("MCXSpins benchmark")
     println("Configuration: sweeps_equi=$(SWEEPS_EQUI), sweeps_global=$(SWEEPS_GLOBAL)")
     println()
     @printf("%-22s %-8s %-7s %8s %6s %10s %10s %10s %10s\n",

@@ -15,7 +15,7 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 
 using Random, Statistics, StatsBase, Plots
 using MonteCarloX: update!
-using MonteCarloX, SpinSystems, MPI
+using MonteCarloX, MCXSpins, MPI
 
 MPI.Initialized() || MPI.Init()
 

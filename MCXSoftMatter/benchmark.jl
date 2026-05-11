@@ -2,7 +2,7 @@ using Random
 using Statistics
 using Printf
 using MonteCarloX
-using SoftMatterSystems
+using MCXSoftMatter
 
 # CLI: julia --project=. benchmark.jl [updates_global] [updates_equi] [repeats] [--kernels]
 const NUMERIC_ARGS = [arg for arg in ARGS if !startswith(arg, "--")]
@@ -109,7 +109,7 @@ function run_kernel_microbenchmarks()
     t0 = time_ns()
     for rep in 1:loops
         i = 1 + ((rep - 1) % gas.N)
-        SoftMatterSystems._energy_of_particle(gas, i)
+        MCXSoftMatter._energy_of_particle(gas, i)
     end
     t1 = time_ns()
     @printf("%-44s %12.3f\n", "ParticleGas local energy", (t1 - t0) / loops)
@@ -120,7 +120,7 @@ function run_kernel_microbenchmarks()
     t0 = time_ns()
     for rep in 1:loops
         idx = 1 + ((rep - 1) % n_total)
-        SoftMatterSystems._monomer_energy(poly, idx)
+        MCXSoftMatter._monomer_energy(poly, idx)
     end
     t1 = time_ns()
     @printf("%-44s %12.3f\n", "BeadSpring monomer local energy", (t1 - t0) / loops)
@@ -132,7 +132,7 @@ function run_kernel_microbenchmarks()
         M   = poly.lengths[n]
         acc = 0.0
         for k in 0:M-1
-            acc += SoftMatterSystems._pair_energy_of_all(poly, start_idx + k)
+            acc += MCXSoftMatter._pair_energy_of_all(poly, start_idx + k)
         end
         acc
     end
@@ -142,7 +142,7 @@ function run_kernel_microbenchmarks()
     return nothing
 end
 
-println("SoftMatterSystems benchmark")
+println("MCXSoftMatter benchmark")
 println("Configuration: updates_equi=$(UPDATES_EQUI), updates_global=$(UPDATES_GLOBAL), repeats=$(REPEATS)")
 println()
 @printf("%-44s %-18s %-7s %8s %6s %10s %12s %10s %9s %9s %12s\n",

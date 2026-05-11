@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Core Monte Carlo algorithms: Metropolis, heat bath, Gillespie, importance sampling
 - Kinetic Monte Carlo
-- SpinSystems subpackage (Ising 2D, Blume-Capel models)
+- MCXSpins subpackage (Ising 2D, Blume-Capel models)
 - Multicanonical sampling
 - Basic measurement utilities
 - Binned data structures

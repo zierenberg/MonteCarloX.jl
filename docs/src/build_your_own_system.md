@@ -147,9 +147,9 @@ You can measure manually with vectors if you prefer — `Measurements` just adds
 ## Key points
 
 - **Algorithms are model-agnostic**: the same `Metropolis` works for spin systems, Bayesian posteriors, or custom models.
-- **State management is yours**: MonteCarloX never modifies your system directly; updates happen in your code or mediated by other packages (cf. SpinSystems).
+- **State management is yours**: MonteCarloX never modifies your system directly; updates happen in your code or mediated by other packages (cf. MCXSpins).
 - **RNG is passed from algorithm**: always use `alg.rng` for randomness.
 - **Checkpointing**: serialize (e.g. `sys` and `alg`) for restart capability.
 - **Parallel extensions build on the same interface**: `ParallelTempering`, `ParallelMulticanonical`, etc.
 
-See the `SpinSystems` package as example for system implementations.
+See the `MCXSpins` package as example for system implementations.

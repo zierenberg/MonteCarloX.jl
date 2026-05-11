@@ -7,11 +7,11 @@ The framework provides algorithms; companion packages provide concrete models.
 - model packages can evolve independently
 - the same sampler can be reused across many domains
 
-## Example: `SpinSystems` with Ising
+## Example: `MCXSpins` with Ising
 ```julia
 using Random
 using MonteCarloX
-using SpinSystems
+using MCXSpins
 
 rng = MersenneTwister(123)
 sys = Ising([16, 16], J=1.0, periodic=true)

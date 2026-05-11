@@ -1,4 +1,4 @@
-using LatticePolymerSystems
+using MCXLatticeMatter
 using MonteCarloX: Metropolis, acceptance_rate
 using Test
 using Random

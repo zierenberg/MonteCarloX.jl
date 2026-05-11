@@ -1,5 +1,5 @@
 """
-    SpinSystems
+    MCXSpins
 
 Spin system models (Ising, Blume-Capel) for use with MonteCarloX.jl.
 
@@ -27,7 +27,7 @@ Three backends per model:
 # Observables
 `energy`, `magnetization`, `delta_energy`, `local_pair_interactions`
 """
-module SpinSystems
+module MCXSpins
 
 using Random
 using Graphs
@@ -82,4 +82,4 @@ include("exact_solutions/ising2d_exact.jl")
 export  logdos_exact_ising2D,
         distribution_exact_ising2D
 
-end # module SpinSystems
+end # module MCXSpins

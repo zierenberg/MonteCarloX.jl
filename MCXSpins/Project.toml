@@ -1,18 +1,23 @@
-name = "LatticePolymerSystems"
-uuid = "460288b9-9ed3-483d-96fc-2a1b1c25ab26"
+name = "MCXSpins"
+uuid = "8a5c3c8d-1234-5678-9abc-def012345678"
 version = "0.1.0"
-authors = ["Johannes Zierenberg"]
+authors = ["Johannes Zierenberg", "Martin Weigel"]
 
 [deps]
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
-StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [sources]
 MonteCarloX = {path = ".."}
 
 [compat]
+DelimitedFiles = "1.9.1"
+Graphs = "1"
 MonteCarloX = "≥ 0.2"
+Random = "1.11.0"
 julia = "1"
 
 [extras]

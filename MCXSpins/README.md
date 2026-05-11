@@ -1,10 +1,10 @@
-# SpinSystems.jl
+# MCXSpins.jl
 
 A submodule of MonteCarloX.jl providing spin system implementations.
 
 ## Overview
 
-SpinSystems.jl provides concrete implementations of spin models for use with MonteCarloX.jl's Monte Carlo algorithms. This separation allows MonteCarloX to focus on algorithms while SpinSystems handles model-specific details.
+MCXSpins.jl provides concrete implementations of spin models for use with MonteCarloX.jl's Monte Carlo algorithms. This separation allows MonteCarloX to focus on algorithms while MCXSpins handles model-specific details.
 
 ## Implemented Models
 
@@ -24,7 +24,7 @@ H = -J ∑_{<i,j>} sᵢsⱼ
 **Example usage:**
 ```julia
 using MonteCarloX
-using SpinSystems
+using MCXSpins
 
 # Create 8×8 Ising model
 sys = Ising([8, 8], J=1, periodic=true)
@@ -56,7 +56,7 @@ where spins can take values {-1, 0, +1}.
 **Example usage:**
 ```julia
 using MonteCarloX
-using SpinSystems
+using MCXSpins
 
 # Create BlumeCapel model
 sys = BlumeCapel([8, 8], J=1, D=0.5, periodic=true)
@@ -94,13 +94,13 @@ All spin systems inherit from `AbstractSpinSystem` and provide:
 
 ## Integration with MonteCarloX
 
-SpinSystems is designed to work seamlessly with MonteCarloX's algorithms:
+MCXSpins is designed to work seamlessly with MonteCarloX's algorithms:
 
 ```julia
 using Random
 using StatsBase
 using MonteCarloX
-using SpinSystems
+using MCXSpins
 
 rng = MersenneTwister(42)
 sys = Ising([8, 8])
@@ -126,7 +126,7 @@ println("Average energy: ", mean(measurements[:energy].data))
 
 ## Design Philosophy
 
-SpinSystems follows the MonteCarloX philosophy of separation of concerns:
+MCXSpins follows the MonteCarloX philosophy of separation of concerns:
 - **System**: Holds state and provides observables
 - **Algorithm**: Implements sampling strategy
 - **Update**: Coordinates system and algorithm
