@@ -1,64 +1,68 @@
 # Environment
 
-Metric + boundary enforcement. Confinement potentials are interactions, not geometry.
+Geometry: metric + boundary. Three functions, one required.
 
 ```julia
 abstract type AbstractEnvironment{D,T} end
 ```
 
-Required interface — four functions:
+## Interface
 
-| Function | Returns | Meaning |
+| Function | Default | Override for |
 |---|---|---|
-| `difference(env, a, b)` | `SVector{D,T}` | shortest vector **from b to a** (minimum-image if periodic) |
-| `distance(env, a, b)` | `T` | scalar distance; derived: `sqrt(sum(abs2, difference(env,a,b)))` |
-| `move(env, x, Δ)` | `SVector{D,T}` | apply displacement Δ to position x and enforce boundary: `wrap(env, x + Δ)` |
-| `is_valid(env, x)` | `Bool` | only needed for hard walls; default `true` |
+| `difference(env, a, b)` | — (required) | all types (defines the metric) |
+| `constrain(env, x)` | `x` (identity) | `PeriodicBox` (wrapping) |
+| `is_valid(env, x)` | `true` | `HardWallBox`, `HardSphere`, complex geometry |
 
-`difference` and `distance` are the metric. `move` is how particles are displaced —
-it wraps the result into the domain so callers never call `wrap` manually.
-
+Derived (never override):
 ```julia
-# Default implementations (override only if needed)
-@inline distance(env, a, b)  = sqrt(sum(abs2, difference(env, a, b)))
-@inline move(env, x, Δ)      = wrap(env, x + Δ)
+@inline distance(env, a, b) = sqrt(sum(abs2, difference(env, a, b)))
 ```
 
-A trial move in any update function reduces to:
+### Usage in updates
+
 ```julia
-x_new = move(env, x_old, Δ)   # propose
-is_valid(env, x_new) || return  # hard-wall rejection (no-op for PeriodicBox)
+x_new = constrain(env, x_old + Δ)
+is_valid(env, x_new) || return nothing
 ΔE = local_energy(sys, idx, x_new) - local_energy(sys, idx, x_old)
-accept!(alg, ΔE) ? (positions[idx] = x_new) : nothing
+accept!(alg, ΔE) && (positions[idx] = x_new; ...)
 ```
+
+- `constrain` always returns a position (wrapping for PBC, identity otherwise).
+- `is_valid` always returns a bool (`true` by default, hard geometry overrides).
+- For `PeriodicBox`/`FreeSpace`: `is_valid` returns `true` unconditionally → compiled away.
+- Updates are **environment-agnostic** — dispatch happens inside these functions.
+
+Soft confinement (harmonic traps etc.) is an energy contribution on the system,
+not part of the environment. See `02_system_model.md`.
 
 ---
 
 ## Concrete types
 
 ```julia
-# Primary. Cell list lives inside — chosen automatically from cutoff and N.
-struct PeriodicBox{D, T<:AbstractFloat, Nbr} <: AbstractEnvironment{D,T}
+struct PeriodicBox{D, T<:AbstractFloat} <: AbstractEnvironment{D,T}
     L::T
-    neighbors::Nbr   # CellList{D,K} | NoCellList
 end
+@inline difference(env::PeriodicBox, a, b) = a - b - env.L * round((a - b) / env.L)
+@inline constrain(env::PeriodicBox, x)     = x - env.L * floor.(x / env.L)
 
-function PeriodicBox{D,T}(L; pair_potential=nothing, N=nothing) where {D,T}
-    nbr = _build_neighbor_backend(Val(D), T(L), N, pair_potential)
-    PeriodicBox{D,T,typeof(nbr)}(T(L), nbr)
-end
-
-@inline difference(env::PeriodicBox{D,T}, a, b) where {D,T} =
-    a - b - env.L * round((a - b) / env.L)
-@inline wrap(env::PeriodicBox{D,T}, x) where {D,T} =
-    x - env.L * floor.(x / env.L)
-
-# Open boundary — single-chain studies, cluster sampling.
 struct FreeSpace{D, T<:AbstractFloat} <: AbstractEnvironment{D,T} end
-
 @inline difference(::FreeSpace, a, b) = a - b
-@inline wrap(::FreeSpace, x)          = x
+
+struct HardWallBox{D, T<:AbstractFloat} <: AbstractEnvironment{D,T}
+    L::T
+end
+@inline difference(::HardWallBox, a, b) = a - b
+@inline is_valid(env::HardWallBox{D}, x) where D =
+    all(d -> 0 <= x[d] < env.L, 1:D)
 ```
 
-**Future**: `HardWallBox` — just `is_valid(env, x) = all(0 .<= x .< env.L)`; MC rejects, no reflection.
-Non-cubic box: generalise `L::T` to `L::SVector{D,T}`; only `displacement`/`wrap` change.
+---
+
+## Future
+
+- **Non-cubic box**: generalize `L::T` to `L::SVector{D,T}`.
+- **`HardSphere`**: `is_valid` checks distance from center < R.
+- **Complex geometry** (channels, cavities): custom `is_valid` on a user-defined environment type.
+- **Slit geometry**: periodic in x/y, confined in z → composite type or dedicated implementation.
