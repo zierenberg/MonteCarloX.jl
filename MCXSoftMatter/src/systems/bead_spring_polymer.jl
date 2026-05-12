@@ -172,23 +172,81 @@ end
     pot = sys.pair_potential
     rc_sq = cl.rc_sq
     L = sys.L
-    own_ci = cl.particle_cell[i]
     mol_id = sys.molecule_id
     mono_k = sys.monomer_k
     m = Int(mol_id[i])
     k = Int(mono_k[i])
     E = zero(T)
-    @inbounds for ci in cl.interaction_cells[own_ci]
-        for j in cl.cells[ci]
-            j == i && continue
-            r_sq = _sq_dist(pos_i, sys.positions[j], L)
-            if r_sq < rc_sq
-                Int(mol_id[j]) == m && abs(Int(mono_k[j]) - k) == 1 && continue
-                E += pot(r_sq)
+    @inbounds for ci in cl.interaction_cells[cl.particle_cell[i]]
+        j = cl.head[ci]
+        while j != 0
+            if j != i
+                r_sq = _sq_dist(pos_i, sys.positions[j], L)
+                if r_sq < rc_sq
+                    if !(Int(mol_id[j]) == m && abs(Int(mono_k[j]) - k) == 1)
+                        E += pot(r_sq)
+                    end
+                end
             end
+            j = cl.next[j]
         end
     end
     return E
+end
+
+@inline function _pair_energy_change_excl(sys::ParticleSystem{D,T,TPair,<:Polymer,TC,NoCellList},
+                                     i::Int, new_pos::SVector{D,T}) where {D,T,TPair,TC}
+    old_pos = sys.positions[i]
+    pot = sys.pair_potential
+    L = sys.L
+    mol_id = sys.molecule_id
+    mono_k = sys.monomer_k
+    m = Int(mol_id[i])
+    k = Int(mono_k[i])
+    dE = zero(T)
+    @inbounds for j in 1:length(sys.positions)
+        j == i && continue
+        Int(mol_id[j]) == m && abs(Int(mono_k[j]) - k) == 1 && continue
+        pos_j = sys.positions[j]
+        dE += pot(minimum_image_sq(new_pos, pos_j, L)) -
+              pot(minimum_image_sq(old_pos, pos_j, L))
+    end
+    return dE
+end
+
+@inline function _pair_energy_change_excl(sys::ParticleSystem{D,T,TPair,<:Polymer,TC,CellList{D,K}},
+                                     i::Int, new_pos::SVector{D,T}) where {D,T,TPair,TC,K}
+    cl = sys.cell_list
+    old_pos = sys.positions[i]
+    pot = sys.pair_potential
+    rc_sq = cl.rc_sq
+    L = sys.L
+    mol_id = sys.molecule_id
+    mono_k = sys.monomer_k
+    m = Int(mol_id[i])
+    k = Int(mono_k[i])
+    dE = zero(T)
+    @inbounds for ci in cl.interaction_cells[cl.particle_cell[i]]
+        j = cl.head[ci]
+        while j != 0
+            if j != i && !(Int(mol_id[j]) == m && abs(Int(mono_k[j]) - k) == 1)
+                r_sq = _sq_dist(old_pos, sys.positions[j], L)
+                r_sq < rc_sq && (dE -= pot(r_sq))
+            end
+            j = cl.next[j]
+        end
+    end
+    @inbounds for ci in cl.interaction_cells[cell_index(cl, new_pos)]
+        j = cl.head[ci]
+        while j != 0
+            if j != i && !(Int(mol_id[j]) == m && abs(Int(mono_k[j]) - k) == 1)
+                r_sq = _sq_dist(new_pos, sys.positions[j], L)
+                r_sq < rc_sq && (dE += pot(r_sq))
+            end
+            j = cl.next[j]
+        end
+    end
+    return dE
 end
 
 function _monomer_energy(sys::ParticleSystem{D,T,P,<:Polymer}, idx::Int) where {D,T,P}
@@ -210,4 +268,50 @@ function _monomer_energy(sys::ParticleSystem{D,T,P,<:Polymer}, idx::Int) where {
     end
 
     return E
+end
+
+function _monomer_energy_change(sys::ParticleSystem{D,T,P,<:Polymer}, idx::Int, new_pos::SVector{D,T}) where {D,T,P}
+    m   = Int(sys.molecule_id[idx])
+    k   = Int(sys.monomer_k[idx])
+    mol = sys.molecules[m]
+    off = mol.offset
+    M   = mol.length
+    old_pos = sys.positions[idx]
+    L = sys.L
+
+    dE = _pair_energy_change_excl(sys, idx, new_pos)
+
+    if k > 1
+        nb = sys.positions[off+k-1]
+        dE += mol.bond(minimum_image_sq(new_pos, nb, L)) -
+              mol.bond(minimum_image_sq(old_pos, nb, L))
+    end
+    if k < M
+        nb = sys.positions[off+k+1]
+        dE += mol.bond(minimum_image_sq(new_pos, nb, L)) -
+              mol.bond(minimum_image_sq(old_pos, nb, L))
+    end
+
+    if !(mol.bend isa NoBendingPotential)
+        if k > 1 && k < M
+            prev = sys.positions[off+k-1]
+            next = sys.positions[off+k+1]
+            dE += mol.bend(_cos_angle(prev, new_pos, next, L)) -
+                  mol.bend(_cos_angle(prev, old_pos, next, L))
+        end
+        if k > 2
+            pp = sys.positions[off+k-2]
+            prev = sys.positions[off+k-1]
+            dE += mol.bend(_cos_angle(pp, prev, new_pos, L)) -
+                  mol.bend(_cos_angle(pp, prev, old_pos, L))
+        end
+        if k < M-1
+            next  = sys.positions[off+k+1]
+            next2 = sys.positions[off+k+2]
+            dE += mol.bend(_cos_angle(new_pos, next, next2, L)) -
+                  mol.bend(_cos_angle(old_pos, next, next2, L))
+        end
+    end
+
+    return dE
 end

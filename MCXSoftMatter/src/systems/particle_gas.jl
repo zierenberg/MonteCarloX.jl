@@ -47,3 +47,6 @@ end
 
 @inline _monomer_energy(sys::ParticleSystem{D,T,P,Monatomic}, i::Int) where {D,T,P} =
     _local_pair_energy_no_excl(sys, i)
+
+@inline _monomer_energy_change(sys::ParticleSystem{D,T,P,Monatomic}, i::Int, new_pos::SVector{D,T}) where {D,T,P} =
+    _pair_energy_change(sys, i, new_pos)

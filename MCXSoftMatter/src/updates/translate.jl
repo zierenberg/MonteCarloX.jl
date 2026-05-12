@@ -10,21 +10,15 @@ function _translate_monomer!(sys::ParticleSystem{D,T}, alg::AbstractImportanceSa
     rng = alg.rng
     idx = rand(rng, 1:length(sys.positions))
 
-    old_pos = sys.positions[idx]
-    E_old = _monomer_energy(sys, idx)
-
     displacement = SVector{D,T}(ntuple(_ -> Δ * (T(2) * rand(rng, T) - one(T)), Val(D)))
-    new_pos = wrap_position(old_pos + displacement, sys.L)
-    sys.positions[idx] = new_pos
-    update_particle!(sys.cell_list, idx, new_pos)
+    new_pos = wrap_position(sys.positions[idx] + displacement, sys.L)
 
-    E_new = _monomer_energy(sys, idx)
+    dE = _monomer_energy_change(sys, idx, new_pos)
 
-    if accept!(alg, E_new, E_old)
-        sys.cache.pair += E_new - E_old
-    else
-        sys.positions[idx] = old_pos
-        update_particle!(sys.cell_list, idx, old_pos)
+    if accept!(alg, dE, zero(T))
+        sys.positions[idx] = new_pos
+        update_particle!(sys.cell_list, idx, new_pos)
+        sys.cache.pair += dE
     end
     return nothing
 end
@@ -38,32 +32,16 @@ function _translate_chain!(sys::ParticleSystem{D,T,P,<:Polymer}, alg::AbstractIm
 
     displacement = SVector{D,T}(ntuple(_ -> Δ * (T(2) * rand(rng, T) - one(T)), Val(D)))
 
-    E_old = zero(T)
-    @inbounds for k in 1:M
-        E_old += _local_pair_energy_no_excl(sys, start_idx + k - 1)
-    end
+    dE = _pair_energy_change(sys, start_idx, M, displacement)
 
-    @inbounds for k in 1:M
-        idx     = start_idx + k - 1
-        new_pos = wrap_position(sys.positions[idx] + displacement, sys.L)
-        sys.positions[idx] = new_pos
-        update_particle!(sys.cell_list, idx, new_pos)
-    end
-
-    E_new = zero(T)
-    @inbounds for k in 1:M
-        E_new += _local_pair_energy_no_excl(sys, start_idx + k - 1)
-    end
-
-    if accept!(alg, E_new, E_old)
-        sys.cache.pair += E_new - E_old
-    else
+    if accept!(alg, dE, zero(T))
         @inbounds for k in 1:M
             idx     = start_idx + k - 1
-            old_pos = wrap_position(sys.positions[idx] - displacement, sys.L)
-            sys.positions[idx] = old_pos
-            update_particle!(sys.cell_list, idx, old_pos)
+            new_pos = wrap_position(sys.positions[idx] + displacement, sys.L)
+            sys.positions[idx] = new_pos
+            update_particle!(sys.cell_list, idx, new_pos)
         end
+        sys.cache.pair += dE
     end
     return nothing
 end

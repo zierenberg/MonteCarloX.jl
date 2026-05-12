@@ -64,21 +64,137 @@ end
     pot = sys.pair_potential
     rc_sq = cl.rc_sq
     L = sys.L
-    own_ci = cl.particle_cell[i]
     E = zero(T)
-    @inbounds for ci in cl.interaction_cells[own_ci]
-        if ci == own_ci
-            for j in cl.cells[ci]
-                j == i && continue
+    @inbounds for ci in cl.interaction_cells[cl.particle_cell[i]]
+        j = cl.head[ci]
+        while j != 0
+            if j != i
                 r_sq = _sq_dist(pos, sys.positions[j], L)
                 r_sq < rc_sq && (E += pot(r_sq))
             end
-        else
-            for j in cl.cells[ci]
-                r_sq = _sq_dist(pos, sys.positions[j], L)
-                r_sq < rc_sq && (E += pot(r_sq))
-            end
+            j = cl.next[j]
         end
     end
     return E
+end
+
+@inline function _pair_energy_change(sys::ParticleSystem{D,T,TPair,TMol,TC,NoCellList},
+                                             i::Int, new_pos::SVector{D,T}) where {D,T,TPair,TMol,TC}
+    old_pos = sys.positions[i]
+    pot = sys.pair_potential
+    L = sys.L
+    dE = zero(T)
+    @inbounds for j in 1:length(sys.positions)
+        j == i && continue
+        pos_j = sys.positions[j]
+        dE += pot(minimum_image_sq(new_pos, pos_j, L)) -
+              pot(minimum_image_sq(old_pos, pos_j, L))
+    end
+    return dE
+end
+
+@inline function _pair_energy_change(sys::ParticleSystem{D,T,TPair,TMol,TC,CellList{D,K}},
+                                             i::Int, new_pos::SVector{D,T}) where {D,T,TPair,TMol,TC,K}
+    cl = sys.cell_list
+    old_pos = sys.positions[i]
+    pot = sys.pair_potential
+    rc_sq = cl.rc_sq
+    L = sys.L
+    old_ci = cl.particle_cell[i]
+    new_ci = cell_index(cl, new_pos)
+    dE = zero(T)
+    if old_ci == new_ci
+        @inbounds for ci in cl.interaction_cells[old_ci]
+            j = cl.head[ci]
+            while j != 0
+                if j != i
+                    pos_j = sys.positions[j]
+                    r_old = _sq_dist(old_pos, pos_j, L)
+                    r_new = _sq_dist(new_pos, pos_j, L)
+                    r_old < rc_sq && (dE -= pot(r_old))
+                    r_new < rc_sq && (dE += pot(r_new))
+                end
+                j = cl.next[j]
+            end
+        end
+    else
+        @inbounds for ci in cl.interaction_cells[old_ci]
+            j = cl.head[ci]
+            while j != 0
+                if j != i
+                    r_sq = _sq_dist(old_pos, sys.positions[j], L)
+                    r_sq < rc_sq && (dE -= pot(r_sq))
+                end
+                j = cl.next[j]
+            end
+        end
+        @inbounds for ci in cl.interaction_cells[new_ci]
+            j = cl.head[ci]
+            while j != 0
+                if j != i
+                    r_sq = _sq_dist(new_pos, sys.positions[j], L)
+                    r_sq < rc_sq && (dE += pot(r_sq))
+                end
+                j = cl.next[j]
+            end
+        end
+    end
+    return dE
+end
+
+# ── Segment pair energy change (external interactions only) ──────────────────
+
+@inline function _pair_energy_change(sys::ParticleSystem{D,T,TPair,TMol,TC,NoCellList},
+                                      start::Int, M::Int,
+                                      displacement::SVector{D,T}) where {D,T,TPair,TMol,TC}
+    pot = sys.pair_potential
+    L = sys.L
+    last = start + M - 1
+    dE = zero(T)
+    @inbounds for j in 1:length(sys.positions)
+        (start <= j <= last) && continue
+        pos_j = sys.positions[j]
+        for idx in start:last
+            old_pos = sys.positions[idx]
+            dE += pot(minimum_image_sq(old_pos + displacement, pos_j, L)) -
+                  pot(minimum_image_sq(old_pos, pos_j, L))
+        end
+    end
+    return dE
+end
+
+@inline function _pair_energy_change(sys::ParticleSystem{D,T,TPair,TMol,TC,CellList{D,K}},
+                                      start::Int, M::Int,
+                                      displacement::SVector{D,T}) where {D,T,TPair,TMol,TC,K}
+    cl = sys.cell_list
+    pot = sys.pair_potential
+    rc_sq = cl.rc_sq
+    L = sys.L
+    last = start + M - 1
+    dE = zero(T)
+    @inbounds for idx in start:last
+        old_pos = sys.positions[idx]
+        new_pos = wrap_position(old_pos + displacement, L)
+        for ci in cl.interaction_cells[cl.particle_cell[idx]]
+            j = cl.head[ci]
+            while j != 0
+                if !(start <= j <= last)
+                    r_sq = _sq_dist(old_pos, sys.positions[j], L)
+                    r_sq < rc_sq && (dE -= pot(r_sq))
+                end
+                j = cl.next[j]
+            end
+        end
+        for ci in cl.interaction_cells[cell_index(cl, new_pos)]
+            j = cl.head[ci]
+            while j != 0
+                if !(start <= j <= last)
+                    r_sq = _sq_dist(new_pos, sys.positions[j], L)
+                    r_sq < rc_sq && (dE += pot(r_sq))
+                end
+                j = cl.next[j]
+            end
+        end
+    end
+    return dE
 end
