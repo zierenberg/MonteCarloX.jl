@@ -1,29 +1,24 @@
 using MonteCarloX: Metropolis, acceptance_rate
 
 """
-    verify_invariants(sys::ParticleGas)
+    verify_invariants(sys::ParticleSystem)
 
-Check energy consistency. Throws on failure.
+Check energy consistency. For polymer systems, also checks finite bond lengths.
 """
-function verify_invariants(sys::ParticleGas)
+function verify_invariants(sys::ParticleSystem)
     @assert energy(sys) ≈ energy(sys; full=true) "Cached energy $(energy(sys)) != full $(energy(sys; full=true))"
 end
 
-"""
-    verify_invariants(sys::BeadSpringPolymer)
-
-Check energy consistency and finite bond lengths. Throws on failure.
-"""
-function verify_invariants(sys::BeadSpringPolymer)
+function verify_invariants(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P}
     @assert energy(sys) ≈ energy(sys; full=true) "Cached energy $(energy(sys)) != full $(energy(sys; full=true))"
     # Bond lengths should be finite (not broken by FENE)
     for m in 1:num_polymers(sys)
-        M = polymer_length(sys)
+        mol = sys.molecules[m]
+        M = mol.length
+        off = mol.offset
         for k in 1:M-1
-            i = (m-1)*M + k
-            j = (m-1)*M + k + 1
-            r_sq = minimum_image_sq(sys.positions[i], sys.positions[j], sys.L)
-            @assert isfinite(sys.bond_potential(r_sq)) "Broken bond in polymer $m between monomers $k and $(k+1)"
+            r_sq = minimum_image_sq(sys.positions[off+k], sys.positions[off+k+1], sys.L)
+            @assert isfinite(mol.bond(r_sq)) "Broken bond in polymer $m between monomers $k and $(k+1)"
         end
     end
 end

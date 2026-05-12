@@ -10,13 +10,13 @@ using StaticArrays: SVector
         @test num_polymers(poly) == 2
         @test polymer_length(poly) == 5
         @test length(poly.positions) == 10
-        @test poly.bending_potential isa NoBendingPotential
+        @test poly.molecules[1].bend isa NoBendingPotential
 
         # With bending
         bend = CosineBendingPotential(5.0)
         poly2 = BeadSpringPolymer(; num_poly=2, length_poly=5, L=20.0,
             pair_potential=lj, bond_potential=fene, bending_potential=bend)
-        @test poly2.bending_potential.kappa == 5.0
+        @test poly2.molecules[1].bend.kappa == 5.0
     end
 
     @testset "Random walk init" begin
@@ -96,8 +96,8 @@ using StaticArrays: SVector
         @test polymer_length(poly, 1) == 4
         @test polymer_length(poly, 2) == 6
         @test polymer_length(poly, 3) == 5
-        @test total_monomers(poly) == 15
-        @test poly.offsets == [0, 4, 10]
+        @test num_particles(poly) == 15
+        @test [m.offset for m in poly.molecules] == [0, 4, 10]
         init!(poly, :random_walk; rng=Xoshiro(99))
         @test energy(poly) ≈ energy(poly; full=true)
     end

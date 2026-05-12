@@ -106,10 +106,11 @@ function run_kernel_microbenchmarks()
 
     gas = setup_particle_gas(; N=256, L=32.0)
     init!(gas, :random; rng=make_rng(4001))
+    N_gas = num_particles(gas)
     t0 = time_ns()
     for rep in 1:loops
-        i = 1 + ((rep - 1) % gas.N)
-        MCXSoftMatter._energy_of_particle(gas, i)
+        i = 1 + ((rep - 1) % N_gas)
+        MCXSoftMatter._local_pair_energy(gas, i)
     end
     t1 = time_ns()
     @printf("%-44s %12.3f\n", "ParticleGas local energy", (t1 - t0) / loops)
@@ -125,14 +126,16 @@ function run_kernel_microbenchmarks()
     t1 = time_ns()
     @printf("%-44s %12.3f\n", "BeadSpring monomer local energy", (t1 - t0) / loops)
 
+    n_poly = num_polymers(poly)
     t0 = time_ns()
     for rep in 1:loops
-        n = 1 + ((rep - 1) % poly.num_poly)
-        start_idx = poly.offsets[n] + 1
-        M   = poly.lengths[n]
+        n = 1 + ((rep - 1) % n_poly)
+        mol = poly.molecules[n]
+        start_idx = mol.offset + 1
+        M   = mol.length
         acc = 0.0
         for k in 0:M-1
-            acc += MCXSoftMatter._pair_energy_of_all(poly, start_idx + k)
+            acc += MCXSoftMatter._local_pair_energy_no_excl(poly, start_idx + k)
         end
         acc
     end

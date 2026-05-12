@@ -1,28 +1,9 @@
-"""
-    MCXSoftMatter
-
-Off-lattice soft matter systems in arbitrary spatial dimension D.
-
-# Systems
-    ParticleGas(; D=3, N, L, pair_potential)
-    BeadSpringPolymer(; D=3, num_poly, length_poly, L, pair_potential, bond_potential, ...)
-
-# Updates
-`translate!(sys, alg, Δ; chain=false)`
-
-# Observables
-`energy`, `energy_pair`, `energy_bond`, `energy_bending`,
-`radius_of_gyration_sq`, `center_of_mass`, `end_to_end_distance_sq`,
-`gyration_tensor`, `clusters`
-"""
 module MCXSoftMatter
 
 using StaticArrays
 using MonteCarloX: AbstractSystem,
                    AbstractImportanceSampling,
                    accept!
-
-# ── Potentials ─────────────────────────────────────────────────────────────
 
 abstract type AbstractSoftMatterSystem <: AbstractSystem end
 
@@ -44,8 +25,6 @@ export  FENEPotential
 include("potentials/bending.jl")
 export  CosineBendingPotential
 
-# ── Geometry ───────────────────────────────────────────────────────────────
-
 include("geometry/periodic.jl")
 export  wrap_coordinate,
         wrap_position,
@@ -56,29 +35,35 @@ include("geometry/cell_list.jl")
 export  CellList,
         NoCellList
 
-# ── Systems ────────────────────────────────────────────────────────────────
+include("molecules/abstract.jl")
+export  AbstractMolecule,
+        CacheMonatomic,
+        CachePolymer,
+        total_energy
 
+include("molecules/monatomic.jl")
+export  Monatomic
+
+include("molecules/polymer.jl")
+export  Polymer
+
+include("systems/particle_system.jl")
 include("systems/particle_gas.jl")
-export  ParticleGas,
-        num_particles,
-        init!,
-        energy,
-        energy_pair
-
 include("systems/bead_spring_polymer.jl")
-export  BeadSpringPolymer,
+export  ParticleSystem,
+        ParticleGas,
+        BeadSpringPolymer,
+        num_particles,
         num_polymers,
         polymer_length,
-        total_monomers,
+        init!,
+        energy,
+        energy_pair,
         energy_bond,
         energy_bending
 
-# ── Updates ────────────────────────────────────────────────────────────────
-
 include("updates/translate.jl")
 export  translate!
-
-# ── Observables ────────────────────────────────────────────────────────────
 
 include("observables/cluster.jl")
 export  clusters,

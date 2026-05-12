@@ -1,60 +1,3 @@
-"""
-    BeadSpringPolymer{D, T, TPair, TBond, TBend, TCell, TIdx} <: AbstractSoftMatterSystem
-
-D-dimensional bead-spring polymer system in a cubic box with PBC.
-Heterogeneous chain lengths are supported.
-
-The interaction is decomposed into composable potentials:
-- `pair_potential` -- non-bonded pair interaction (e.g. LJ)
-- `bond_potential` -- covalent bond along backbone (e.g. FENE)
-- `bending_potential` -- bending stiffness at chain angles (e.g. cosine)
-
-Positions are stored flat. For polymer m, monomer k lives at global index
-`offsets[m] + k`. `polymer_id[i]` and `monomer_k[i]` give O(1) reverse lookup.
-The element type `TIdx` is chosen at construction time (`Int8`/`Int16`/`Int32`)
-based on `max(num_poly, maximum(lengths))`.
-
-When the pair potential has a finite cutoff, a cell list is automatically
-created for O(N) pair energy evaluation.
-
-# Constructor (uniform lengths)
-    BeadSpringPolymer(; D=3, num_poly, length_poly, L, pair_potential, bond_potential,
-                        bending_potential=NoBendingPotential())
-
-# Constructor (heterogeneous lengths)
-    BeadSpringPolymer(; D=3, num_poly, lengths, L, pair_potential, bond_potential,
-                        bending_potential=NoBendingPotential())
-"""
-mutable struct BeadSpringPolymer{D, T<:AbstractFloat,
-                                  TPair<:AbstractPairPotential,
-                                  TBond<:AbstractBondPotential,
-                                  TBend<:AbstractBendingPotential,
-                                  TCell,
-                                  TIdx<:Integer} <: AbstractSoftMatterSystem
-    positions::Vector{SVector{D,T}}
-    num_poly::Int
-    lengths::Vector{Int}      # lengths[m]  = number of monomers in polymer m
-    offsets::Vector{Int}      # offsets[m]  = global index of first monomer of m, minus 1
-    L::T
-    pair_potential::TPair
-    bond_potential::TBond
-    bending_potential::TBend
-    cached_energy::T
-    cell_list::TCell
-    polymer_id::Vector{TIdx}  # polymer_id[i] = polymer index of monomer i
-    monomer_k::Vector{TIdx}   # monomer_k[i]  = position of monomer i within its polymer
-end
-
-# ── Index type selection ──────────────────────────────────────────────────────
-
-@inline function _index_type(maxval::Int)
-    maxval <= typemax(Int8)  && return Int8
-    maxval <= typemax(Int16) && return Int16
-    return Int32
-end
-
-# ── Constructor ──────────────────────────────────────────────────────────────
-
 function BeadSpringPolymer(; D::Int=3,
                              num_poly::Integer,
                              length_poly::Union{Integer,Nothing}=nothing,
@@ -69,6 +12,7 @@ function BeadSpringPolymer(; D::Int=3,
     @assert length(lens) == num_poly_i "lengths must have length num_poly"
 
     T = typeof(float(L))
+
     offs = Vector{Int}(undef, num_poly_i)
     offs[1] = 0
     for m in 2:num_poly_i
@@ -76,54 +20,45 @@ function BeadSpringPolymer(; D::Int=3,
     end
     n_total = offs[end] + lens[end]
 
+    molecules = [Polymer(offs[m], lens[m], bond_potential, bending_potential) for m in 1:num_poly_i]
+
     TIdx = _index_type(max(num_poly_i, maximum(lens)))
-    poly_id = Vector{TIdx}(undef, n_total)
-    mono_k  = Vector{TIdx}(undef, n_total)
+    mol_id = Vector{TIdx}(undef, n_total)
+    mono_k = Vector{TIdx}(undef, n_total)
     for m in 1:num_poly_i
         for k in 1:lens[m]
             i = offs[m] + k
-            poly_id[i] = TIdx(m)
-            mono_k[i]  = TIdx(k)
+            mol_id[i] = TIdx(m)
+            mono_k[i] = TIdx(k)
         end
     end
 
     positions = [zero(SVector{D,T}) for _ in 1:n_total]
     cl = _make_cell_list(Val(D), n_total, T(L), pair_potential)
-    BeadSpringPolymer{D, T, typeof(pair_potential), typeof(bond_potential),
-                      typeof(bending_potential), typeof(cl), TIdx}(
-        positions, num_poly_i, lens, offs, T(L),
-        pair_potential, bond_potential, bending_potential,
-        zero(T), cl, poly_id, mono_k)
+    cache = CachePolymer(zero(T), zero(T), zero(T))
+    ParticleSystem{D, T, typeof(pair_potential), typeof(molecules[1]),
+                   typeof(cache), typeof(cl), TIdx}(
+        positions, molecules, mol_id, mono_k, T(L),
+        pair_potential, cache, cl)
 end
 
-# ── Accessors ────────────────────────────────────────────────────────────────
+num_polymers(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P} = length(sys.molecules)
+polymer_length(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P} = sys.molecules[1].length
+polymer_length(sys::ParticleSystem{D,T,P,<:Polymer}, m::Int) where {D,T,P} = sys.molecules[m].length
 
-num_polymers(sys::BeadSpringPolymer)          = sys.num_poly
-polymer_length(sys::BeadSpringPolymer)        = sys.lengths[1]
-polymer_length(sys::BeadSpringPolymer, m::Int) = sys.lengths[m]
-total_monomers(sys::BeadSpringPolymer)        = length(sys.positions)
-
-# Global index of the k-th monomer (1-based) of polymer m (1-based)
-@inline _monomer_idx(sys::BeadSpringPolymer, m::Int, k::Int) = sys.offsets[m] + k
-
-# ── Initialization ───────────────────────────────────────────────────────────
-
-function init!(sys::BeadSpringPolymer{D,T}, type::Symbol; rng=nothing) where {D,T}
-    if type == :random_walk
-        @assert rng !== nothing "Random walk initialization requires rng"
-        _init_random_walk!(sys, rng)
-    else
-        error("Unknown initialization type: $type")
-    end
+function init!(sys::ParticleSystem{D,T,P,<:Polymer}, type::Symbol; rng=nothing) where {D,T,P}
+    type == :random_walk || error("Unknown initialization type: $type")
+    @assert rng !== nothing "Random walk initialization requires rng"
+    _init_random_walk!(sys, rng)
     build!(sys.cell_list, sys.positions)
     _recompute_energy!(sys)
     return sys
 end
 
-function _init_random_walk!(sys::BeadSpringPolymer{D,T}, rng) where {D,T}
-    for m in 1:sys.num_poly
-        off = sys.offsets[m]
-        M   = sys.lengths[m]
+function _init_random_walk!(sys::ParticleSystem{D,T}, rng) where {D,T}
+    for mol in sys.molecules
+        off = mol.offset
+        M   = mol.length
         pos = SVector{D,T}(ntuple(_ -> rand(rng, T) * sys.L, Val(D)))
         sys.positions[off + 1] = pos
         for k in 2:M
@@ -145,46 +80,39 @@ end
     SVector{3,T}(sin(theta)*cos(phi), sin(theta)*sin(phi), cos(theta))
 end
 
-# ── Energy ───────────────────────────────────────────────────────────────────
-
-function _recompute_energy!(sys::BeadSpringPolymer{D,T}) where {D,T}
-    sys.cached_energy = _compute_pair_energy(sys) +
-                        _compute_bond_energy(sys) +
-                        _compute_bending_energy(sys)
+function _recompute_energy!(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P}
+    sys.cache.pair = _compute_pair_energy(sys)
+    sys.cache.bond = _compute_bond_energy(sys)
+    sys.cache.bend = _compute_bending_energy(sys)
     return nothing
 end
 
-function energy(sys::BeadSpringPolymer; full::Bool=false)
-    full && _recompute_energy!(sys)
-    return sys.cached_energy
-end
+energy_bond(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P} = _compute_bond_energy(sys)
+energy_bending(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P} = _compute_bending_energy(sys)
 
-energy_pair(sys::BeadSpringPolymer) = _compute_pair_energy(sys)
-energy_bond(sys::BeadSpringPolymer) = _compute_bond_energy(sys)
-energy_bending(sys::BeadSpringPolymer) = _compute_bending_energy(sys)
-
-function _compute_pair_energy(sys::BeadSpringPolymer{D,T}) where {D,T}
+function _compute_pair_energy(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P}
     E = zero(T)
-    @inbounds for m in 1:sys.num_poly
-        off = sys.offsets[m]
-        M   = sys.lengths[m]
-        # Intra-polymer: skip covalent neighbors (ki, ki+1)
-        for ki in 1:M-2
-            i = off + ki
-            for kj in ki+2:M
-                j = off + kj
+    nmol = length(sys.molecules)
+    @inbounds for mi in 1:nmol
+        mol_i = sys.molecules[mi]
+        off_i = mol_i.offset
+        M_i   = mol_i.length
+        for ki in 1:M_i-2
+            i = off_i + ki
+            for kj in ki+2:M_i
+                j = off_i + kj
                 r_sq = minimum_image_sq(sys.positions[i], sys.positions[j], sys.L)
                 E += sys.pair_potential(r_sq)
             end
         end
-        # Inter-polymer
-        for m2 in m+1:sys.num_poly
-            off2 = sys.offsets[m2]
-            M2   = sys.lengths[m2]
-            for ki in 1:M
-                i = off + ki
-                for kj in 1:M2
-                    j = off2 + kj
+        for mj in mi+1:nmol
+            mol_j = sys.molecules[mj]
+            off_j = mol_j.offset
+            M_j   = mol_j.length
+            for ki in 1:M_i
+                i = off_i + ki
+                for kj in 1:M_j
+                    j = off_j + kj
                     r_sq = minimum_image_sq(sys.positions[i], sys.positions[j], sys.L)
                     E += sys.pair_potential(r_sq)
                 end
@@ -194,107 +122,68 @@ function _compute_pair_energy(sys::BeadSpringPolymer{D,T}) where {D,T}
     return E
 end
 
-function _compute_bond_energy(sys::BeadSpringPolymer{D,T}) where {D,T}
-    sys.bond_potential isa NoBondPotential && return zero(T)
+function _compute_bond_energy(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P}
     E = zero(T)
-    @inbounds for m in 1:sys.num_poly
-        off = sys.offsets[m]
-        M   = sys.lengths[m]
-        for k in 1:M-1
+    @inbounds for mol in sys.molecules
+        mol.bond isa NoBondPotential && continue
+        off = mol.offset
+        for k in 1:mol.length-1
             r_sq = minimum_image_sq(sys.positions[off+k], sys.positions[off+k+1], sys.L)
-            E += sys.bond_potential(r_sq)
+            E += mol.bond(r_sq)
         end
     end
     return E
 end
 
-"""
-    _cos_angle(a, b, c, L) -> T
-
-Cosine of the angle at b formed by a-b-c, using minimum image convention.
-"""
-@inline function _cos_angle(a::SVector{D,T}, b::SVector{D,T}, c::SVector{D,T}, L) where {D,T}
-    ba = minimum_image_displacement(a, b, L)
-    bc = minimum_image_displacement(c, b, L)
-    return sum(ba .* bc) / (sqrt(sum(abs2, ba)) * sqrt(sum(abs2, bc)))
-end
-
-function _compute_bending_energy(sys::BeadSpringPolymer{D,T}) where {D,T}
-    sys.bending_potential isa NoBendingPotential && return zero(T)
+function _compute_bending_energy(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P}
     E = zero(T)
-    @inbounds for m in 1:sys.num_poly
-        off = sys.offsets[m]
-        M   = sys.lengths[m]
-        for k in 1:M-2
+    @inbounds for mol in sys.molecules
+        mol.bend isa NoBendingPotential && continue
+        off = mol.offset
+        for k in 1:mol.length-2
             cos_theta = _cos_angle(sys.positions[off+k], sys.positions[off+k+1], sys.positions[off+k+2], sys.L)
-            E += sys.bending_potential(cos_theta)
+            E += mol.bend(cos_theta)
         end
     end
     return E
 end
 
-# ── Local energy for a single monomer ────────────────────────────────────────
-
-"""
-    _monomer_energy(sys, idx) -> T
-
-Total energy contribution of monomer at global index `idx`.
-Includes pair, bond, and bending terms involving this monomer.
-"""
-function _monomer_energy(sys::BeadSpringPolymer{D,T}, idx::Int) where {D,T}
-    m   = Int(sys.polymer_id[idx])
-    k   = Int(sys.monomer_k[idx])
-    off = sys.offsets[m]
-    M   = sys.lengths[m]
-
-    E = _pair_energy_of(sys, idx, m, k)
-
-    # Bond terms (max 2)
-    k > 1 && (E += sys.bond_potential(minimum_image_sq(sys.positions[idx], sys.positions[off+k-1], sys.L)))
-    k < M && (E += sys.bond_potential(minimum_image_sq(sys.positions[idx], sys.positions[off+k+1], sys.L)))
-
-    # Bending terms (max 3, centre / left-shifted / right-shifted)
-    if !(sys.bending_potential isa NoBendingPotential)
-        k > 1 && k < M   && (E += sys.bending_potential(_cos_angle(sys.positions[off+k-1], sys.positions[idx],     sys.positions[off+k+1], sys.L)))
-        k > 2             && (E += sys.bending_potential(_cos_angle(sys.positions[off+k-2], sys.positions[off+k-1], sys.positions[idx],     sys.L)))
-        k < M-1           && (E += sys.bending_potential(_cos_angle(sys.positions[idx],     sys.positions[off+k+1], sys.positions[off+k+2], sys.L)))
-    end
-
-    return E
-end
-
-# ── Pair energy of single monomer: NoCellList ──────────────────────────────
-
-@inline function _pair_energy_of(sys::BeadSpringPolymer{D,T,TPair,TBond,TBend,NoCellList},
-                                  idx::Int, m::Int, k::Int) where {D,T,TPair<:AbstractPairPotential,TBond<:AbstractBondPotential,TBend<:AbstractBendingPotential}
+@inline function _local_pair_energy(sys::ParticleSystem{D,T,TPair,<:Polymer,TC,NoCellList},
+                                     i::Int) where {D,T,TPair,TC}
     E = zero(T)
-    pos = sys.positions[idx]
+    pos_i = sys.positions[i]
+    mol_id = sys.molecule_id
+    mono_k = sys.monomer_k
+    m = Int(mol_id[i])
+    k = Int(mono_k[i])
     @inbounds for j in 1:length(sys.positions)
-        j == idx && continue
-        Int(sys.polymer_id[j]) == m && abs(Int(sys.monomer_k[j]) - k) == 1 && continue
-        r_sq = minimum_image_sq(pos, sys.positions[j], sys.L)
+        j == i && continue
+        Int(mol_id[j]) == m && abs(Int(mono_k[j]) - k) == 1 && continue
+        r_sq = minimum_image_sq(pos_i, sys.positions[j], sys.L)
         E += sys.pair_potential(r_sq)
     end
     return E
 end
 
-# ── Pair energy of single monomer: CellList ────────────────────────────────
-
-@inline function _pair_energy_of(sys::BeadSpringPolymer{D,T,TPair,TBond,TBend,CellList{D,K}},
-                                  idx::Int, m::Int, k::Int) where {D,T,TPair<:AbstractPairPotential,TBond<:AbstractBondPotential,TBend<:AbstractBendingPotential,K}
-    cl     = sys.cell_list
-    pos    = sys.positions[idx]
-    pot    = sys.pair_potential
-    rc_sq  = cl.rc_sq
-    L      = sys.L
-    own_ci = cl.particle_cell[idx]
-    E      = zero(T)
+@inline function _local_pair_energy(sys::ParticleSystem{D,T,TPair,<:Polymer,TC,CellList{D,K}},
+                                     i::Int) where {D,T,TPair,TC,K}
+    cl = sys.cell_list
+    pos_i = sys.positions[i]
+    pot = sys.pair_potential
+    rc_sq = cl.rc_sq
+    L = sys.L
+    own_ci = cl.particle_cell[i]
+    mol_id = sys.molecule_id
+    mono_k = sys.monomer_k
+    m = Int(mol_id[i])
+    k = Int(mono_k[i])
+    E = zero(T)
     @inbounds for ci in cl.interaction_cells[own_ci]
         for j in cl.cells[ci]
-            j == idx && continue
-            r_sq = _sq_dist(pos, sys.positions[j], L)
+            j == i && continue
+            r_sq = _sq_dist(pos_i, sys.positions[j], L)
             if r_sq < rc_sq
-                Int(sys.polymer_id[j]) == m && abs(Int(sys.monomer_k[j]) - k) == 1 && continue
+                Int(mol_id[j]) == m && abs(Int(mono_k[j]) - k) == 1 && continue
                 E += pot(r_sq)
             end
         end
@@ -302,41 +191,23 @@ end
     return E
 end
 
-# ── Pair energy for chain translate (no bond exclusion) ────────────────────
+function _monomer_energy(sys::ParticleSystem{D,T,P,<:Polymer}, idx::Int) where {D,T,P}
+    m   = Int(sys.molecule_id[idx])
+    k   = Int(sys.monomer_k[idx])
+    mol = sys.molecules[m]
+    off = mol.offset
+    M   = mol.length
 
-@inline function _pair_energy_of_all(sys::BeadSpringPolymer{D,T,TPair,TBond,TBend,NoCellList},
-                                      idx::Int) where {D,T,TPair<:AbstractPairPotential,TBond<:AbstractBondPotential,TBend<:AbstractBendingPotential}
-    E = zero(T)
-    @inbounds for j in 1:length(sys.positions)
-        j == idx && continue
-        r_sq = minimum_image_sq(sys.positions[idx], sys.positions[j], sys.L)
-        E += sys.pair_potential(r_sq)
-    end
-    return E
-end
+    E = _local_pair_energy(sys, idx)
 
-@inline function _pair_energy_of_all(sys::BeadSpringPolymer{D,T,TPair,TBond,TBend,CellList{D,K}},
-                                      idx::Int) where {D,T,TPair<:AbstractPairPotential,TBond<:AbstractBondPotential,TBend<:AbstractBendingPotential,K}
-    cl = sys.cell_list
-    pos = sys.positions[idx]
-    pot = sys.pair_potential
-    rc_sq = cl.rc_sq
-    L = sys.L
-    own_ci = cl.particle_cell[idx]
-    E = zero(T)
-    @inbounds for ci in cl.interaction_cells[own_ci]
-        if ci == own_ci
-            for j in cl.cells[ci]
-                j == idx && continue
-                r_sq = _sq_dist(pos, sys.positions[j], L)
-                r_sq < rc_sq && (E += pot(r_sq))
-            end
-        else
-            for j in cl.cells[ci]
-                r_sq = _sq_dist(pos, sys.positions[j], L)
-                r_sq < rc_sq && (E += pot(r_sq))
-            end
-        end
+    k > 1 && (E += mol.bond(minimum_image_sq(sys.positions[idx], sys.positions[off+k-1], sys.L)))
+    k < M && (E += mol.bond(minimum_image_sq(sys.positions[idx], sys.positions[off+k+1], sys.L)))
+
+    if !(mol.bend isa NoBendingPotential)
+        k > 1 && k < M && (E += mol.bend(_cos_angle(sys.positions[off+k-1], sys.positions[idx],     sys.positions[off+k+1], sys.L)))
+        k > 2           && (E += mol.bend(_cos_angle(sys.positions[off+k-2], sys.positions[off+k-1], sys.positions[idx],     sys.L)))
+        k < M-1         && (E += mol.bend(_cos_angle(sys.positions[idx],     sys.positions[off+k+1], sys.positions[off+k+2], sys.L)))
     end
+
     return E
 end

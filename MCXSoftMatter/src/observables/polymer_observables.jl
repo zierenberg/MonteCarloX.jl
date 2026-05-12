@@ -1,12 +1,7 @@
-"""
-    center_of_mass(sys::BeadSpringPolymer, n) -> SVector{D,Float64}
-
-Center of mass of polymer `n`, computed with minimum-image unwinding
-relative to the first monomer.
-"""
-function center_of_mass(sys::BeadSpringPolymer{D,T}, n::Int) where {D,T}
-    M   = sys.lengths[n]
-    off = sys.offsets[n]
+function center_of_mass(sys::ParticleSystem{D,T,P,<:Polymer}, n::Int) where {D,T,P}
+    mol = sys.molecules[n]
+    M   = mol.length
+    off = mol.offset
     ref = sys.positions[off + 1]
     cm  = zero(MVector{D,Float64})
     for k in 1:M
@@ -21,14 +16,10 @@ function center_of_mass(sys::BeadSpringPolymer{D,T}, n::Int) where {D,T}
     return SVector{D,Float64}(cm)
 end
 
-"""
-    radius_of_gyration_sq(sys::BeadSpringPolymer, n) -> Float64
-
-Squared radius of gyration of polymer `n`.
-"""
-function radius_of_gyration_sq(sys::BeadSpringPolymer{D,T}, n::Int) where {D,T}
-    M   = sys.lengths[n]
-    off = sys.offsets[n]
+function radius_of_gyration_sq(sys::ParticleSystem{D,T,P,<:Polymer}, n::Int) where {D,T,P}
+    mol = sys.molecules[n]
+    M   = mol.length
+    off = mol.offset
     cm  = center_of_mass(sys, n)
     rg2 = 0.0
     for k in 1:M
@@ -39,27 +30,19 @@ function radius_of_gyration_sq(sys::BeadSpringPolymer{D,T}, n::Int) where {D,T}
     return rg2 / M
 end
 
-"""
-    end_to_end_distance_sq(sys::BeadSpringPolymer, n) -> Float64
-
-Squared end-to-end distance of polymer `n` under minimum image convention.
-"""
-function end_to_end_distance_sq(sys::BeadSpringPolymer{D,T}, n::Int) where {D,T}
-    M   = sys.lengths[n]
-    off = sys.offsets[n]
+function end_to_end_distance_sq(sys::ParticleSystem{D,T,P,<:Polymer}, n::Int) where {D,T,P}
+    mol = sys.molecules[n]
+    M   = mol.length
+    off = mol.offset
     r1  = sys.positions[off + 1]
     rN  = sys.positions[off + M]
     return Float64(minimum_image_sq(r1, rN, sys.L))
 end
 
-"""
-    gyration_tensor(sys::BeadSpringPolymer, n) -> SMatrix{D,D,Float64}
-
-Gyration tensor of polymer `n`. Trace equals radius_of_gyration_sq.
-"""
-function gyration_tensor(sys::BeadSpringPolymer{D,T}, n::Int) where {D,T}
-    M   = sys.lengths[n]
-    off = sys.offsets[n]
+function gyration_tensor(sys::ParticleSystem{D,T,P,<:Polymer}, n::Int) where {D,T,P}
+    mol = sys.molecules[n]
+    M   = mol.length
+    off = mol.offset
     cm  = center_of_mass(sys, n)
     G   = zeros(MMatrix{D,D,Float64})
     for k in 1:M

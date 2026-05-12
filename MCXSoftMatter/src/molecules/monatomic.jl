@@ -1,0 +1,1 @@
+struct Monatomic <: AbstractMolecule end
