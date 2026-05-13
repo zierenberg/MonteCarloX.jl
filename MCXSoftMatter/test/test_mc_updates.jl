@@ -9,7 +9,7 @@ function verify_invariants(sys::ParticleSystem)
     @assert energy(sys) ≈ energy(sys; full=true) "Cached energy $(energy(sys)) != full $(energy(sys; full=true))"
 end
 
-function verify_invariants(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P}
+function verify_invariants(sys::ParticleSystem{D,T,TEnv,P,<:Polymer}) where {D,T,TEnv,P}
     @assert energy(sys) ≈ energy(sys; full=true) "Cached energy $(energy(sys)) != full $(energy(sys; full=true))"
     # Bond lengths should be finite (not broken by FENE)
     for m in 1:num_polymers(sys)
@@ -17,7 +17,7 @@ function verify_invariants(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P}
         M = mol.length
         off = mol.offset
         for k in 1:M-1
-            r_sq = minimum_image_sq(sys.positions[off+k], sys.positions[off+k+1], sys.box)
+            r_sq = distance_sq(sys.env, sys.positions[off+k], sys.positions[off+k+1])
             @assert isfinite(mol.bond(r_sq)) "Broken bond in polymer $m between monomers $k and $(k+1)"
         end
     end

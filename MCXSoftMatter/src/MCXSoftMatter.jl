@@ -25,14 +25,17 @@ export  FENEPotential
 include("potentials/bending.jl")
 export  CosineBendingPotential
 
-include("geometry/periodic.jl")
-export  PeriodicBox,
-        wrap_position,
-        minimum_image_displacement,
-        minimum_image_sq
-
-include("geometry/cell_list.jl")
-export  CellList,
+include("environments/abstract.jl")
+include("environments/periodic_box.jl")
+include("environments/cell_list.jl")
+export  AbstractEnvironment,
+        PeriodicBox,
+        difference,
+        constrain,
+        is_valid,
+        distance_sq,
+        distance,
+        CellList,
         NoCellList
 
 include("molecules/abstract.jl")

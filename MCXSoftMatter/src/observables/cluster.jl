@@ -10,14 +10,14 @@ function clusters(positions::Vector{SVector{D,T}}, L, r_cluster) where {D,T}
     N = length(positions)
     N == 0 && return Int[]
     r_cluster_sq = r_cluster^2
-    box = L isa PeriodicBox ? L : PeriodicBox{D}(L)
+    box = L isa AbstractEnvironment ? L : PeriodicBox{D}(L)
 
     parent = collect(1:N)
     rnk = zeros(Int, N)
 
     @inbounds for i in 1:N-1
         for j in i+1:N
-            r_sq = minimum_image_sq(positions[i], positions[j], box)
+            r_sq = distance_sq(box, positions[i], positions[j])
             r_sq < r_cluster_sq && _union!(parent, rnk, i, j)
         end
     end

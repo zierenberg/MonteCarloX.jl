@@ -11,7 +11,7 @@ function _translate_monomer!(sys::ParticleSystem{D,T}, alg::AbstractImportanceSa
     idx = rand(rng, 1:length(sys.positions))
 
     displacement = SVector{D,T}(ntuple(_ -> Δ * (T(2) * rand(rng, T) - one(T)), Val(D)))
-    new_pos = wrap_position(sys.positions[idx] + displacement, sys.box)
+    new_pos = constrain(sys.env, sys.positions[idx] + displacement)
 
     dE = _monomer_energy_change(sys, idx, new_pos)
 
@@ -23,7 +23,7 @@ function _translate_monomer!(sys::ParticleSystem{D,T}, alg::AbstractImportanceSa
     return nothing
 end
 
-function _translate_chain!(sys::ParticleSystem{D,T,P,<:Polymer}, alg::AbstractImportanceSampling, Δ::T) where {D,T,P}
+function _translate_chain!(sys::ParticleSystem{D,T,TEnv,P,<:Polymer}, alg::AbstractImportanceSampling, Δ::T) where {D,T,TEnv,P}
     rng = alg.rng
     n = rand(rng, 1:length(sys.molecules))
     mol = sys.molecules[n]
@@ -37,7 +37,7 @@ function _translate_chain!(sys::ParticleSystem{D,T,P,<:Polymer}, alg::AbstractIm
     if accept!(alg, dE, zero(T))
         @inbounds for k in 1:M
             idx     = start_idx + k - 1
-            new_pos = wrap_position(sys.positions[idx] + displacement, sys.box)
+            new_pos = constrain(sys.env, sys.positions[idx] + displacement)
             sys.positions[idx] = new_pos
             update_particle!(sys.cell_list, idx, new_pos)
         end
