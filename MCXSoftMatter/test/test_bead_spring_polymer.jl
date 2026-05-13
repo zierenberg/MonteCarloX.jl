@@ -27,13 +27,13 @@ using StaticArrays: SVector
         init!(poly, :random_walk; rng=Xoshiro(42))
 
         # Positions in box
-        @test all(pos -> all(x -> 0.0 <= x < poly.L, pos), poly.positions)
+        @test all(pos -> all(d -> 0.0 <= pos[d] < poly.box.L[d], 1:3), poly.positions)
 
         # Bond lengths = 1.0 (random walk step size)
         for m in 1:3, k in 1:7
             i = (m-1)*8 + k
             j = (m-1)*8 + k + 1
-            r_sq = minimum_image_sq(poly.positions[i], poly.positions[j], poly.L)
+            r_sq = minimum_image_sq(poly.positions[i], poly.positions[j], poly.box)
             @test sqrt(r_sq) ≈ 1.0 atol=1e-10
         end
     end

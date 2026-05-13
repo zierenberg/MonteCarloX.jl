@@ -3,15 +3,17 @@ function center_of_mass(sys::ParticleSystem{D,T,P,<:Polymer}, n::Int) where {D,T
     M   = mol.length
     off = mol.offset
     ref = sys.positions[off + 1]
+    box = sys.box
     cm  = zero(MVector{D,Float64})
     for k in 1:M
         pos = sys.positions[off + k]
-        d = minimum_image_displacement(pos, ref, sys.L)
+        d = minimum_image_displacement(pos, ref, box)
         cm .+= d
     end
     cm ./= M
     for d in 1:D
-        cm[d] = wrap_coordinate(ref[d] + cm[d], sys.L)
+        cm[d] = cm[d] + ref[d]
+        cm[d] = cm[d] - box.L[d] * floor(cm[d] * box.inv_L[d])
     end
     return SVector{D,Float64}(cm)
 end
@@ -21,10 +23,11 @@ function radius_of_gyration_sq(sys::ParticleSystem{D,T,P,<:Polymer}, n::Int) whe
     M   = mol.length
     off = mol.offset
     cm  = center_of_mass(sys, n)
+    box = sys.box
     rg2 = 0.0
     for k in 1:M
         pos = sys.positions[off + k]
-        d = minimum_image_displacement(pos, cm, sys.L)
+        d = minimum_image_displacement(pos, cm, box)
         rg2 += sum(abs2, d)
     end
     return rg2 / M
@@ -36,7 +39,7 @@ function end_to_end_distance_sq(sys::ParticleSystem{D,T,P,<:Polymer}, n::Int) wh
     off = mol.offset
     r1  = sys.positions[off + 1]
     rN  = sys.positions[off + M]
-    return Float64(minimum_image_sq(r1, rN, sys.L))
+    return Float64(minimum_image_sq(r1, rN, sys.box))
 end
 
 function gyration_tensor(sys::ParticleSystem{D,T,P,<:Polymer}, n::Int) where {D,T,P}
@@ -44,10 +47,11 @@ function gyration_tensor(sys::ParticleSystem{D,T,P,<:Polymer}, n::Int) where {D,
     M   = mol.length
     off = mol.offset
     cm  = center_of_mass(sys, n)
+    box = sys.box
     G   = zeros(MMatrix{D,D,Float64})
     for k in 1:M
         pos = sys.positions[off + k]
-        d = minimum_image_displacement(pos, cm, sys.L)
+        d = minimum_image_displacement(pos, cm, box)
         for i in 1:D, j in 1:D
             G[i,j] += d[i] * d[j]
         end

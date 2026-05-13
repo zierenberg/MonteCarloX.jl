@@ -6,18 +6,18 @@ using StaticArrays: SVector
         lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
         gas = ParticleGas(; N=20, L=10.0, pair_potential=lj)
         @test num_particles(gas) == 20
-        @test gas.L ≈ 10.0
+        @test all(gas.box.L .≈ 10.0)
 
         init!(gas, :random; rng=Xoshiro(42))
         for pos in gas.positions
-            @test all(x -> 0.0 <= x < gas.L, pos)
+            @test all(d -> 0.0 <= pos[d] < gas.box.L[d], 1:3)
         end
     end
 
     @testset "Density constructor" begin
         lj = LennardJonesPotential(epsilon=1.0, sigma=1.0)
         gas = ParticleGas(; N=100, rho=0.1, pair_potential=lj)
-        @test gas.L ≈ (100 / 0.1)^(1/3)
+        @test all(gas.box.L .≈ (100 / 0.1)^(1/3))
     end
 
     @testset "2D" begin
@@ -25,7 +25,7 @@ using StaticArrays: SVector
         gas = ParticleGas(; D=2, N=10, L=10.0, pair_potential=lj)
         init!(gas, :random; rng=Xoshiro(42))
         @test length(gas.positions[1]) == 2
-        @test all(pos -> all(x -> 0.0 <= x < gas.L, pos), gas.positions)
+        @test all(pos -> all(d -> 0.0 <= pos[d] < gas.box.L[d], 1:2), gas.positions)
     end
 
     @testset "Energy" begin

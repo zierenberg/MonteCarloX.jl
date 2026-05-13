@@ -26,7 +26,7 @@ include("potentials/bending.jl")
 export  CosineBendingPotential
 
 include("geometry/periodic.jl")
-export  wrap_coordinate,
+export  PeriodicBox,
         wrap_position,
         minimum_image_displacement,
         minimum_image_sq

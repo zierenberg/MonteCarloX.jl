@@ -17,7 +17,7 @@ function verify_invariants(sys::ParticleSystem{D,T,P,<:Polymer}) where {D,T,P}
         M = mol.length
         off = mol.offset
         for k in 1:M-1
-            r_sq = minimum_image_sq(sys.positions[off+k], sys.positions[off+k+1], sys.L)
+            r_sq = minimum_image_sq(sys.positions[off+k], sys.positions[off+k+1], sys.box)
             @assert isfinite(mol.bond(r_sq)) "Broken bond in polymer $m between monomers $k and $(k+1)"
         end
     end

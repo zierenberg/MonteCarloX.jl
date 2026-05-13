@@ -10,31 +10,34 @@ struct NoCellList end
 
 D-dimensional linked-list cell list for O(1) per-particle energy evaluation.
 
-The box is divided into cells of size >= r_cutoff. Each cell knows its
-`K = 3^D` neighbor cells (precomputed once, stored inline as `NTuple{K,Int}`
-— no heap pointer per cell). Particles are assigned to cells via a linked list:
-`head[cell]` gives the first particle, `next[particle]` gives the next particle
-in the same cell (0 = end of list). No per-cell heap allocations.
+The box is divided into cells of size >= r_cutoff per dimension.
+Supports anisotropic boxes (different Lx, Ly, Lz → different cell counts per dimension).
+Each cell knows its `K = 3^D` neighbor cells (precomputed once, stored inline as
+`NTuple{K,Int}` — no heap pointer per cell). Particles are assigned to cells via a
+linked list: `head[cell]` gives the first particle, `next[particle]` gives the next
+particle in the same cell (0 = end of list). No per-cell heap allocations.
 """
 struct CellList{D, K}
-    cell_size::Float64
-    rc_sq::Float64                          # cutoff^2 (for energy evaluation)
-    nc_per_dim::Int                         # cells per dimension (stored for hot path)
-    head::Vector{Int}                       # cell -> first particle index (0 = empty)
-    next::Vector{Int}                       # particle -> next particle in same cell (0 = end)
-    particle_cell::Vector{Int}              # particle -> cell index
+    cell_size::SVector{D,Float64}            # cell size per dimension
+    inv_cell_size::SVector{D,Float64}        # 1 / cell_size per dimension
+    rc_sq::Float64                           # cutoff^2 (for energy evaluation)
+    nc::SVector{D,Int}                       # cells per dimension
+    head::Vector{Int}                        # cell -> first particle index (0 = empty)
+    next::Vector{Int}                        # particle -> next particle in same cell (0 = end)
+    particle_cell::Vector{Int}               # particle -> cell index
     interaction_cells::Vector{NTuple{K,Int}} # cell -> interacting cell indices (self + neighbors)
 end
 
-function CellList{D}(N::Int, L::Real, r_cutoff::Real) where D
-    nc_per_dim = max(3, floor(Int, L / r_cutoff))
-    cs = Float64(L) / nc_per_dim
-    num_total = nc_per_dim^D
+function CellList{D}(N::Int, box::PeriodicBox{D}, r_cutoff::Real) where D
+    nc = SVector{D,Int}(ntuple(d -> max(3, floor(Int, box.L[d] / r_cutoff)), Val(D)))
+    cs = SVector{D,Float64}(ntuple(d -> Float64(box.L[d]) / nc[d], Val(D)))
+    inv_cs = SVector{D,Float64}(ntuple(d -> nc[d] / Float64(box.L[d]), Val(D)))
+    num_total = prod(nc)
     head = zeros(Int, num_total)
     next = zeros(Int, N)
     particle_cell = zeros(Int, N)
-    int_cells = _build_interaction_cells(Val(D), SVector{D,Int}(ntuple(_ -> nc_per_dim, Val(D))))
-    CellList{D, 3^D}(cs, Float64(r_cutoff)^2, nc_per_dim, head, next, particle_cell, int_cells)
+    int_cells = _build_interaction_cells(Val(D), nc)
+    CellList{D, 3^D}(cs, inv_cs, Float64(r_cutoff)^2, nc, head, next, particle_cell, int_cells)
 end
 
 # ── Precompute interaction cell indices ──────────────────────────────────────
@@ -59,12 +62,11 @@ end
 # ── Cell index from position ────────────────────────────────────────────────
 
 @inline function cell_index(cl::CellList{D}, pos::SVector{D}) where D
-    nc = cl.nc_per_dim
     idx = 1; stride = 1
     @inbounds for d in 1:D
-        ci = min(floor(Int, pos[d] / cl.cell_size), nc - 1)
+        ci = min(floor(Int, pos[d] * cl.inv_cell_size[d]), cl.nc[d] - 1)
         idx += ci * stride
-        stride *= nc
+        stride *= cl.nc[d]
     end
     return idx
 end
