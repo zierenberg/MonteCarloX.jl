@@ -10,13 +10,15 @@ determines the parallelism strategy:
 
 using MPI
 
-mutable struct ReplicaExchange{B, A}
+mutable struct ReplicaExchange{B, A} <: AbstractAlgorithm
     replica::ParallelChains{B, A}
     stage::Int
     indices::Vector{Int}
     steps::Vector{Int}
     accepted::Vector{Int}
 end
+
+@inline steps(rx::ReplicaExchange) = sum(rx.steps)
 
 @inline rank(rx::ReplicaExchange) = rank(rx.replica)
 @inline size(rx::ReplicaExchange) = size(rx.replica)

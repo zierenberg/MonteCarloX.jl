@@ -66,7 +66,7 @@ Returns true if the move is accepted based on the Metropolis criterion:
 
 This is the core accept/reject step used by all importance sampling algorithms.
 """
-function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T
+@inline function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T
     ens = ensemble(alg)
     log_ratio = logweight(ens, x_new) - logweight(ens, x_old)
     accepted = _accept!(alg, log_ratio)
@@ -77,7 +77,7 @@ function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T
     return accepted
 end
 # core function to evaluate acceptance and update counters
-function _accept!(alg::AbstractImportanceSampling, log_ratio::Real)
+@inline function _accept!(alg::AbstractImportanceSampling, log_ratio::Real)
     alg.steps += 1
     accepted = (log_ratio > 0) || (rand(alg.rng) < exp(log_ratio))
     alg.accepted += accepted 

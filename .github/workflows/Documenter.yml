@@ -25,7 +25,7 @@
               using Pkg
               Pkg.develop([
                 PackageSpec(path=pwd()),
-                PackageSpec(path="SpinSystems"),
+                PackageSpec(path="MCXSpins"),
               ])
               Pkg.instantiate()
             '

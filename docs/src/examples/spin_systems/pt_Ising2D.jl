@@ -5,7 +5,7 @@ Pkg.instantiate()                                   #src
 include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 
 using Random, Statistics, StatsBase, Plots
-using MonteCarloX, SpinSystems
+using MonteCarloX, MCXSpins
 
 # %%
 # ## Background

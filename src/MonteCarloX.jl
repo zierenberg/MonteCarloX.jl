@@ -14,7 +14,8 @@ include("algorithms/abstract_algorithm.jl")
 export  AbstractAlgorithm,
         AbstractImportanceSampling,
         AbstractHeatBath,
-        AbstractKineticMonteCarlo
+    AbstractKineticMonteCarlo,
+    steps
 
 include("ensembles/abstract_ensemble.jl")
 export  AbstractEnsemble,

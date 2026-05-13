@@ -14,4 +14,8 @@ settings.json
 Manifest.toml
 docs/Manifest.toml
 examples/Manifest.toml
-SpinSystems/Manifest.toml
+MCX*/Manifest.toml
+
+# some specific files
+MCXSpins/references/ising_cpu
+MCXSpins/references/ising_cpu_modes

@@ -12,7 +12,7 @@ Pkg.instantiate()                                   #src
 # 4. remove the checkpoint file after successful completion.
 
 using Random
-using MonteCarloX, SpinSystems
+using MonteCarloX, MCXSpins
 
 const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
 

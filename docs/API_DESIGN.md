@@ -49,7 +49,7 @@ This enables:
 **Critical design decision**: MonteCarloX core contains NO system implementations.
 
 Systems live in:
-- **Submodules**: SpinSystems.jl for spin models
+- **Submodules**: MCXSpins.jl for spin models
 - **External packages**: User packages for custom systems
 - **Examples**: Demonstration systems
 
@@ -197,7 +197,7 @@ M_data = measurements[:magnetization].data
 ```julia
 using Random
 using MonteCarloX
-using MonteCarloX.SpinSystems
+using MCXSpins
 
 # 1. Create system
 rng = MersenneTwister(42)

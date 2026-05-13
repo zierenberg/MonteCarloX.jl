@@ -16,6 +16,7 @@ function check(cond::Bool, message::String)
 end
 
 @testset "MonteCarloX.jl" begin
+    include("test_algorithm_steps.jl")
     include("test_binned_objects.jl")
     include("test_checkpointing.jl")
     include("test_ensembles.jl")
