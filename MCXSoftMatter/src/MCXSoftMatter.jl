@@ -3,6 +3,7 @@ module MCXSoftMatter
 using StaticArrays
 using MonteCarloX: AbstractSystem,
                    AbstractImportanceSampling,
+                   AbstractMetropolis,
                    accept!
 
 abstract type AbstractSoftMatterSystem <: AbstractSystem end

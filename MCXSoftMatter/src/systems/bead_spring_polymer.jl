@@ -296,39 +296,41 @@ function _monomer_energy_change(sys::ParticleSystem{D,T,TEnv,P,<:Polymer}, idx::
     old_pos = sys.positions[idx]
     env = sys.env
 
-    dE = _pair_energy_change_excl(sys, idx, new_pos)
+    dE_pair = _pair_energy_change_excl(sys, idx, new_pos)
 
+    dE_bond = zero(T)
     if k > 1
         nb = sys.positions[off+k-1]
-        dE += mol.bond(distance_sq(env, new_pos, nb)) -
-              mol.bond(distance_sq(env, old_pos, nb))
+        dE_bond += mol.bond(distance_sq(env, new_pos, nb)) -
+                   mol.bond(distance_sq(env, old_pos, nb))
     end
     if k < M
         nb = sys.positions[off+k+1]
-        dE += mol.bond(distance_sq(env, new_pos, nb)) -
-              mol.bond(distance_sq(env, old_pos, nb))
+        dE_bond += mol.bond(distance_sq(env, new_pos, nb)) -
+                   mol.bond(distance_sq(env, old_pos, nb))
     end
 
+    dE_bend = zero(T)
     if !(mol.bend isa NoBendingPotential)
         if k > 1 && k < M
             prev = sys.positions[off+k-1]
             next = sys.positions[off+k+1]
-            dE += mol.bend(_cos_angle(prev, new_pos, next, env)) -
-                  mol.bend(_cos_angle(prev, old_pos, next, env))
+            dE_bend += mol.bend(_cos_angle(prev, new_pos, next, env)) -
+                       mol.bend(_cos_angle(prev, old_pos, next, env))
         end
         if k > 2
             pp = sys.positions[off+k-2]
             prev = sys.positions[off+k-1]
-            dE += mol.bend(_cos_angle(pp, prev, new_pos, env)) -
-                  mol.bend(_cos_angle(pp, prev, old_pos, env))
+            dE_bend += mol.bend(_cos_angle(pp, prev, new_pos, env)) -
+                       mol.bend(_cos_angle(pp, prev, old_pos, env))
         end
         if k < M-1
             next  = sys.positions[off+k+1]
             next2 = sys.positions[off+k+2]
-            dE += mol.bend(_cos_angle(new_pos, next, next2, env)) -
-                  mol.bend(_cos_angle(old_pos, next, next2, env))
+            dE_bend += mol.bend(_cos_angle(new_pos, next, next2, env)) -
+                       mol.bend(_cos_angle(old_pos, next, next2, env))
         end
     end
 
-    return dE
+    return (; pair=dE_pair, bond=dE_bond, bend=dE_bend)
 end
