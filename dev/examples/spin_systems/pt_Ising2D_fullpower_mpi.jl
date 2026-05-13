@@ -22,7 +22,7 @@ Pkg.instantiate()
 include(joinpath(@__DIR__, "..", "defaults.jl"))
 
 using Random, Statistics, StatsBase
-using MonteCarloX, SpinSystems, MPI
+using MonteCarloX, MCXSpins, MPI
 
 function sweep_replica!(sys, alg, L)
     for _ in 1:(L * L)

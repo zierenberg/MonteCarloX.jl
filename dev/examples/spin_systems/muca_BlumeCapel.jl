@@ -17,7 +17,7 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 # a second-order, or a first-order phase transition.
 
 using Random, StatsBase
-using MonteCarloX, SpinSystems
+using MonteCarloX, MCXSpins
 using Plots, ProgressMeter
 
 # ## CI parameters
@@ -78,13 +78,13 @@ ens = CustomEnsemble(
 # it to `accept!` as a tuple — the `CustomEnsemble` routes each component
 # to the correct acceptance weight.
 
-function spin_flip!(sys::SpinSystems.AbstractBlumeCapel, alg::AbstractImportanceSampling)
+function spin_flip!(sys::MCXSpins.AbstractBlumeCapel, alg::AbstractImportanceSampling)
     i     = pick_site(alg.rng, length(sys.spins))
-    s_new = SpinSystems._propose_state(alg.rng, sys.spins[i])
-    Δpair, Δspin, Δspin2 = SpinSystems.propose_changes(sys, i, s_new)
-    H_old = (sys.J * sys.sum_pair_interactions, sys.sum_spins2)
-    H_new = (H_old[1] + sys.J * Δpair, H_old[2] + Δspin2)
-    accept!(alg, H_new, H_old) && modify!(sys, i, s_new, Δpair, Δspin, Δspin2)
+    s_new = propose_state(alg.rng, sys, i)
+    dsys = MCXSpins.delta_sys(sys, i, s_new)
+    H_old = (sys.cached_pair, sys.cached_spin2)
+    H_new = (H_old[1] + dsys.delta_spin * dsys.coupling, H_old[2] + dsys.delta_spin2)
+    accept!(alg, H_new, H_old) && modify!(sys, i, dsys)
     return nothing
 end
 

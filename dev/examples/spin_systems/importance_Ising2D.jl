@@ -12,57 +12,56 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 # (3) validation against the exact solution.
 
 using Random, StatsBase, Plots, BenchmarkTools
-using MonteCarloX, SpinSystems
+using MonteCarloX, MCXSpins
 using Graphs, SparseArrays
 
 # ## CI parameters
 
 const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
 
-therm_sweeps     = CI_MODE ? 10    : 1_000
-prod_sweeps      = CI_MODE ? 100   : 10_000
-measure_interval = 10
+therm_sweeps     = CI_MODE ? 10    : 1_000;
+prod_sweeps      = CI_MODE ? 100   : 10_000;
+measure_interval = 10;
 
 # ## Parameters
 
-L    = 8
-β    = 0.3
-seed = 42
+L    = 8;
+β    = 0.3;
+seed = 42;
 
 # ## System implementations
 #
 # **MonteCarloX.jl** provides several ways to represent the 2D Ising model,
 # trading generality for performance:
 #
-# - `Ising([L,L])`: general lattice, uses **Graphs.jl** under the hood
-# - `Ising(J_matrix)`: general, accepts any sparse coupling matrix
-# - `IsingLatticeOptim`: hard-coded 2D square lattice with periodic boundaries
+# - `Ising([L,L])`: periodic hypercubic lattice with NTuple neighbors (fastest)
+# - `Ising([L,L]; periodic=false)`: arbitrary graph, Vector neighbors
+# - `Ising(J_matrix)`: sparse coupling matrix, arbitrary topology
 #
 # We benchmark a single `spin_flip!` step for each.
 
 alg_bench = Metropolis(Xoshiro(seed); β=β)
 
-sys_graph  = Ising([L, L]; J=1, periodic=true)
+sys_lattice = Ising([L, L])
+init!(sys_lattice, :random, rng=MersenneTwister(seed))
+
+sys_graph  = Ising([L, L]; periodic=false)
 init!(sys_graph,  :random, rng=MersenneTwister(seed))
 
 grid_graph = Graphs.SimpleGraphs.grid([L, L]; periodic=true)
 sys_matrix = Ising(SparseMatrixCSC{Float64,Int}(adjacency_matrix(grid_graph)))
 init!(sys_matrix, :random, rng=MersenneTwister(seed))
 
-sys_optim  = IsingLatticeOptim(L, L)
-init!(sys_optim,  :random, rng=MersenneTwister(seed))
-
+println("Lattice Ising (NTuple neighbors):")
+@btime spin_flip!($sys_lattice, $alg_bench)
 println("Graph-based Ising:")
 @btime spin_flip!($sys_graph,  $alg_bench)
 println("Matrix-coupling Ising:")
 @btime spin_flip!($sys_matrix, $alg_bench)
-println("Optimized 2D Ising:")
-@btime spin_flip!($sys_optim,  $alg_bench)
 
-# The optimized implementation is significantly faster because it exploits the
-# fixed lattice geometry to avoid graph traversal and sparse matrix lookups.
-# The graph-based version is the most flexible — it works for any lattice
-# geometry or connectivity without any code changes.
+# The lattice implementation is fastest because it uses compile-time known
+# NTuple neighbors for the periodic hypercubic lattice. The graph-based version
+# is the most flexible — it works for any lattice geometry or connectivity.
 
 # ## Custom acceptance rule
 #
@@ -91,12 +90,12 @@ TableMetropolis(rng::AbstractRNG; β::Real) =
     return accepted
 end
 
-sys_table = IsingLatticeOptim(L, L)
+sys_table = Ising([L, L])
 init!(sys_table, :random, rng=Xoshiro(seed))
 alg_table = TableMetropolis(Xoshiro(seed); β=β)
 
 println("Standard Metropolis + Xoshiro:")
-@btime spin_flip!($sys_optim, $alg_bench)
+@btime spin_flip!($sys_lattice, $alg_bench)
 println("TableMetropolis + Xoshiro:")
 @btime spin_flip!($sys_table, $alg_table)
 
@@ -163,7 +162,7 @@ end
 # probability ``\min(1, e^{-\beta\Delta E})``. It is the standard workhorse
 # for spin systems: simple, general, and efficient.
 
-sys_meta = IsingLatticeOptim(L, L)
+sys_meta = Ising([L, L])
 init!(sys_meta, :random, rng=MersenneTwister(seed))
 res_meta = run_chain!(sys_meta, Metropolis(MersenneTwister(seed); β=β))
 
@@ -176,7 +175,7 @@ plot_importance_sampling([res_meta], ["Metropolis"])
 # single spin given its neighbours. It tends to have shorter autocorrelation
 # times than Metropolis at low temperatures.
 
-sys_hb = IsingLatticeOptim(L, L)
+sys_hb = Ising([L, L])
 init!(sys_hb, :random, rng=MersenneTwister(seed))
 res_hb = run_chain!(sys_hb, HeatBath(MersenneTwister(seed); β=β))
 
@@ -189,7 +188,7 @@ plot_importance_sampling([res_hb], ["HeatBath"])
 # with more than two spin states, where Glauber uses a linearised transition
 # rate rather than the exact conditional distribution.
 
-sys_gla = IsingLatticeOptim(L, L)
+sys_gla = Ising([L, L])
 init!(sys_gla, :random, rng=MersenneTwister(seed))
 res_gla = run_chain!(sys_gla, Glauber(MersenneTwister(seed); β=β))
 
