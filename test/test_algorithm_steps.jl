@@ -5,6 +5,11 @@ using Test
 function test_algorithm_steps_interface()
     pass = true
 
+    @eval begin
+        struct _DummyAlg <: AbstractAlgorithm end
+        @test_throws ArgumentError steps(_DummyAlg())
+    end
+
     alg_metro = Metropolis(Xoshiro(1); β=1.0)
     pass &= check(steps(alg_metro) == 0, "Metropolis steps starts at 0\n")
     accept!(alg_metro, 0.0, 1.0)
