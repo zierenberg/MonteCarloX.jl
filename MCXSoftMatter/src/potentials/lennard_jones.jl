@@ -27,7 +27,7 @@ function LennardJonesPotential(; epsilon=1.0, sigma=1.0, r_cutoff=2.5*sigma)
     LennardJonesPotential{T}(eps, sigma6, epsilon4, r_cutoff_sq, v_cutoff)
 end
 
-@inline function (pot::LennardJonesPotential{T})(r_sq) where T
+@inline function (pot::LennardJonesPotential{T})(r_sq::T) where T
     r_sq > pot.r_cutoff_sq && return zero(T)
     sixterm = pot.sigma6 / (r_sq * r_sq * r_sq)
     return pot.epsilon4 * (sixterm * sixterm - sixterm) - pot.v_cutoff
