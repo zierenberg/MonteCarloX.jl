@@ -64,6 +64,13 @@ export  CheckpointSession,
         checkpoint!,
         restore_checkpoint
 
+include("infrastructure/monitoring.jl")
+export  Roundtrips,
+        flatness,
+        extrapolate!,
+        interpolate_gaps!,
+        smooth!
+
 # ── Measurements ────────────────────────────────────────────────────────────
 
 include("measurements/measurements.jl")

@@ -31,4 +31,3 @@ function reset!(alg::ImportanceSampling{<:MulticanonicalEnsemble})
     _reset!(alg) # reset acceptance stats
     return nothing
 end
-
