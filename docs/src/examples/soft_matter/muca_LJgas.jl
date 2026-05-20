@@ -158,7 +158,7 @@ function plot_histograms_and_logweights(xlabel, hist_vec, lw_vec; title_prefix="
     return plot(p1, p2; layout=(@layout([a b])), size=(960, 320), margin=4Plots.mm)
 end
 
-plot_histograms_and_logweights("E/N", histograms, logweights; title_prefix="LJ gas MUCA (N=$(N)) N=$(N_ref) init")
+plot_histograms_and_logweights("E/N", histograms, logweights; title_prefix="LJ gas MUCA (N=$(N))")
 
 # ## Larger system test
 logweight_ref = deepcopy(ensemble(alg).logweight);
@@ -212,7 +212,7 @@ roundtrip_log = Int[]
 end
 
 # ## Plots for larger system
-plot_histograms_and_logweights("E/N", histograms, logweights; title_prefix="LJ gas MUCA (N=$(N))")
+plot_histograms_and_logweights("E/N", histograms, logweights; title_prefix="LJ gas MUCA (N=$(N)) N=$(N_ref) init")
 
 
 # ## Naive version
@@ -234,6 +234,8 @@ acceptrate   = Float64[]
 flatness_log = Float64[]
 roundtrip_log = Int[]
 
+snapshot_low = deepcopy(sys)
+
 @showprogress 1 "Iterating MUCA..." for iter in 1:num_iter
     ## thermalization
     for _ in 1:sweeps_equil; sweep!(sys,alg); end
@@ -243,6 +245,9 @@ roundtrip_log = Int[]
     for _ in 1:sweeps_measure/num_iter * iter
         sweep!(sys, alg)
         update!(rt, energy(sys))
+        if energy(sys) < energy(snapshot_low)
+            snapshot_low = deepcopy(sys)
+        end
     end
     # update weights
     update!(ens; mode=:recursive)
