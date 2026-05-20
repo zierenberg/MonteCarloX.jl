@@ -97,7 +97,7 @@ end
 # `W -= log(H)` rule. We also monitor flatness and track round trips.
 
 rng = Xoshiro(42)
-alg = Metropolis(rng, ens)
+alg = ImportanceSampling(rng, ens)
 
 N_sites  = length(sys.spins)
 s2_min   = 0

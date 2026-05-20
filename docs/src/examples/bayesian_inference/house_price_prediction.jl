@@ -72,7 +72,7 @@ logposterior(θ) = logprior(θ) + loglikelihood(θ)
 
 function run_metropolis(logposterior; seed=2026, Δ=0.05)
     rng     = MersenneTwister(seed)
-    alg     = Metropolis(rng, logposterior)
+    alg     = ImportanceSampling(rng, logposterior)
     θ       = [rand(rng, prior_β0), rand(rng, prior_β1), rand(rng, prior_logσ)]
     samples = [Float64[] for _ in 1:3]
     for _ in 1:burn_in

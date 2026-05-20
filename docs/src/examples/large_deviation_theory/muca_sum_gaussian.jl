@@ -264,8 +264,9 @@ plot_muca_convergence(iter_hists, iter_lws)
 
 β_rw    = 0.5
 hist_rw = deepcopy(ensemble(alg_iter).histogram)
+centers_rw = get_centers(hist_rw.bins[1])
 for i in eachindex(hist_rw.values)
-    c = hist_rw.bins[1].centers[i]
+    c = centers_rw[i]
     hist_rw.values[i] *= exp(-β_rw * c - iter_lws[end].values[i])
 end
 norm_rw = sum(hist_rw.values) * step(bins_sum)
