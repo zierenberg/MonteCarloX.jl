@@ -20,6 +20,7 @@ using StaticArrays
 using MonteCarloX: AbstractSystem,
                    AbstractImportanceSampling,
                    accept!
+import MonteCarloX: init!
 
 # ── Systems ─────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,6 @@ include("systems/lattice_polymer.jl")
 export  LatticePolymer,
         num_polymers,
         polymer_length,
-        init!,
         energy,
         site_contacts,
         site_energy

@@ -8,17 +8,19 @@ using StaticArrays
 
 # Core abstractions (shared by all algorithms)
 include("abstract_system.jl")
-export  AbstractSystem
+export  AbstractSystem,
+        init!
 
 include("algorithms/abstract_algorithm.jl")
 export  AbstractAlgorithm,
         AbstractImportanceSampling,
         AbstractHeatBath,
-    AbstractKineticMonteCarlo,
-    steps
+        AbstractKineticMonteCarlo,
+        steps
 
 include("ensembles/abstract_ensemble.jl")
 export  AbstractEnsemble,
+        linear_logweight,
         update!
 
 # ── Infrastructure ──────────────────────────────────────────────────────────
@@ -27,6 +29,11 @@ include("infrastructure/binned_object.jl")
 export  BinnedObject,
         DiscreteBinning,
         ContinuousBinning,
+        ArbitraryContinuousBinning,
+        AbstractBoundary,
+        ErrorBoundary,
+        NegInfBoundary,
+        ZeroBoundary,
         get_centers,
         get_edges,
         get_values,
@@ -67,8 +74,7 @@ export  CheckpointSession,
 include("infrastructure/monitoring.jl")
 export  Roundtrips,
         flatness,
-        extrapolate!,
-        interpolate_gaps!,
+        extend!,
         smooth!
 
 # ── Measurements ────────────────────────────────────────────────────────────
@@ -98,7 +104,8 @@ include("ensembles/boltzmann.jl")
 export  BoltzmannEnsemble
 
 include("ensembles/multicanonical.jl")
-export  MulticanonicalEnsemble
+export  MulticanonicalEnsemble,
+        visited_range
 
 include("ensembles/wang_landau.jl")
 export  WangLandauEnsemble

@@ -49,11 +49,19 @@ makedocs(;
             "Importance sampling: Ising Model"        => "generated/importance_Ising2D.md",
             "Birth-Death Process (Gillespie)"         => "generated/gillespie_birth_death.md",
             ],
-            "Spin Systems" => [
+            "Spins" => [
             "Importance sampling: Ising 2D"           => "generated/importance_Ising2D.md",
             "Parallel tempering: Ising 2D"            => "generated/pt_Ising2D.md",
             "Multicanonical sampling: Ising 2D"       => "generated/muca_Ising2D.md",
             "Multicanonical sampling: Blume-Capel"    => "generated/muca_BlumeCapel.md",
+            ],
+
+            "Soft Matter" => [
+            "Multicanonical sampling: LJ gas"         => "generated/muca_LJgas.md",
+            ],
+
+            "Lattice Matter" => [
+            "Multicanonical sampling: Lattice polymer" => "generated/muca_LatticePolymer.md",
             ],
 
             "Bayesian Inference" => [

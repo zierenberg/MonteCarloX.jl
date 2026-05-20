@@ -16,9 +16,13 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 MCXSpins = "8a5c3c8d-1234-5678-9abc-def012345678"
+MCXSoftMatter = "b82f78d4-0170-4332-a38c-35e6832ae2e9"
+MCXLatticeMatter = "460288b9-9ed3-483d-96fc-2a1b1c25ab26"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [sources]
 MonteCarloX = {path = ".."}
 MCXSpins = {path = "../MCXSpins"}
+MCXSoftMatter = {path = "../MCXSoftMatter"}
+MCXLatticeMatter = {path = "../MCXLatticeMatter"}
