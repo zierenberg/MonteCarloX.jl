@@ -95,7 +95,7 @@ end
 
 function run_metropolis(logposterior, s0; seed=42)
     rng     = Xoshiro(seed)
-    alg     = Metropolis(rng, logposterior)
+    alg     = ImportanceSampling(rng, logposterior)
     s       = copy(s0)
     Δ       = vcat([2.0, 2.0], fill(5.0, length(s)-2))
     samples = zeros(length(s), n_samples)
