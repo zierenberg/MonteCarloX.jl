@@ -60,10 +60,6 @@ makedocs(;
             "Multicanonical sampling: LJ gas"         => "generated/muca_LJgas.md",
             ],
 
-            "Lattice Matter" => [
-            "Multicanonical sampling: Lattice polymer" => "generated/muca_LatticePolymer.md",
-            ],
-
             "Bayesian Inference" => [
             "Importance sampling: Coin Flip"          => "generated/coin_flip.md",
             "Importance sampling: House Price Prediction" => "generated/house_price_prediction.md",
