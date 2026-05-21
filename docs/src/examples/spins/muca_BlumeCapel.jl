@@ -19,6 +19,7 @@ include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 using Random, StatsBase
 using MonteCarloX, MCXSpins
 using Plots, ProgressMeter
+import MonteCarloX: update!
 
 # ## CI parameters
 
@@ -90,33 +91,62 @@ end
 
 # ## Multicanonical iteration
 #
-# Each iteration thermalizes the system, resets the histogram, accumulates
-# statistics, and updates the multicanonical weights via the Wang-Landau rule.
+# Each iteration thermalizes, records histogram, and updates weights.
+# We use the recursive update (Berg, 1996; Janke, 1998) which accumulates
+# statistics across iterations for more stable convergence than the trivial
+# `W -= log(H)` rule. We also monitor flatness and track round trips.
 
 rng = Xoshiro(42)
-alg = Metropolis(rng, ens)
+alg = ImportanceSampling(rng, ens)
 
-histograms = Vector{typeof(ensemble(alg).spin2.histogram)}()
-logweights = Vector{typeof(ensemble(alg).spin2.logweight)}()
-acceptrate = Float64[]
+N_sites  = length(sys.spins)
+s2_min   = 0
+s2_max   = N_sites
+rt       = Roundtrips(s2_min + 0.01 * N_sites, s2_max - 0.01 * N_sites)
 
-@showprogress 1 "Iterating MUCA..." for _ in 1:num_iter
+histograms   = Vector{typeof(ensemble(alg).spin2.histogram)}()
+logweights   = Vector{typeof(ensemble(alg).spin2.logweight)}()
+acceptrate   = Float64[]
+flatness_log = Float64[]
+roundtrip_log = Int[]
+
+@showprogress 1 "Iterating MUCA..." for iter in 1:num_iter
+    ## thermalization
     for _ in 1:thermalization_steps; spin_flip!(sys, alg); end
+    ## recording
     reset!(alg)
     reset_histogram!(alg)
-    for _ in 1:recording_steps;     spin_flip!(sys, alg); end
-    MonteCarloX.update!(ensemble(alg).spin2)
-    push!(histograms, deepcopy(ensemble(alg).spin2.histogram))
-    push!(logweights, deepcopy(ensemble(alg).spin2.logweight))
+    reset!(rt)
+    for _ in 1:recording_steps
+        spin_flip!(sys, alg)
+        update!(rt, sys.cached_spin2)
+    end
+    ## update weights with recursive scheme
+    muca_ens = ensemble(alg).spin2
+    update!(muca_ens; mode=:recursive)
+    ## smooth weights to reduce noise
+    smooth!(muca_ens, (s2_min, s2_max); window=3)
+    ## log diagnostics
+    push!(histograms, deepcopy(muca_ens.histogram))
+    push!(logweights, deepcopy(muca_ens.logweight))
     push!(acceptrate, acceptance_rate(alg))
+    push!(flatness_log, flatness(muca_ens.histogram, s2_min, s2_max))
+    push!(roundtrip_log, rt.count)
 end
 
 # ## Convergence
 #
-# The acceptance rate should stabilise as the weights converge to flat.
+# We track acceptance rate, histogram flatness (1.0 = perfect), and
+# round trips through the observable range.
 
-plot(acceptrate; xlabel="Iteration", ylabel="Acceptance rate",
-     label=nothing, size=(600, 220), margin=5Plots.mm, ylims=(0,1))
+p1 = plot(acceptrate; xlabel="Iteration", ylabel="Acceptance rate",
+          label=nothing, ylims=(0,1))
+p2 = plot(flatness_log; xlabel="Iteration", ylabel="Flatness (max/mean)",
+          label=nothing, yscale=:log10)
+hline!(p2, [2.0]; ls=:dash, color=:gray, label="threshold")
+p3 = plot(roundtrip_log; xlabel="Iteration", ylabel="Round trips",
+          label=nothing)
+plot(p1, p2, p3; layout=(1,3), size=(980, 260), margin=4Plots.mm)
 
 # ## Histograms and log-weights
 #

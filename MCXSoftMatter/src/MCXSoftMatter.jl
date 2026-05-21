@@ -5,6 +5,7 @@ using MonteCarloX: AbstractSystem,
                    AbstractImportanceSampling,
                    AbstractMetropolis,
                    accept!
+import MonteCarloX: init!
 
 abstract type AbstractSoftMatterSystem <: AbstractSystem end
 
@@ -60,7 +61,6 @@ export  ParticleSystem,
         num_particles,
         num_polymers,
         polymer_length,
-        init!,
         energy,
         energy_pair,
         energy_bond,

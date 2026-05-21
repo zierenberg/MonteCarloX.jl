@@ -25,6 +25,8 @@ struct BoltzmannEnsemble{T<:Real} <: AbstractEnsemble
     end
 end
 
+linear_logweight(::BoltzmannEnsemble) = true
+
 @inline logweight(e::BoltzmannEnsemble, E::Real) = -e.beta * E
 @inline logweight(e::BoltzmannEnsemble, E::AbstractArray) = -e.beta * sum(E)
 @inline logweight(e::BoltzmannEnsemble) = x -> logweight(e, x)

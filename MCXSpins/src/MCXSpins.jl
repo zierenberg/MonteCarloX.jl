@@ -41,7 +41,7 @@ using MonteCarloX: AbstractSystem,
                    logistic
 
 import MonteCarloX
-import MonteCarloX: modify!
+import MonteCarloX: modify!, init!
 
 # -- Abstractions ------------------------------------------------------------
 
@@ -60,7 +60,6 @@ export  Ising,
         IsingLattice,
         IsingGraph,
         IsingMatrix,
-        init!,
         energy,
         magnetization,
         delta_energy

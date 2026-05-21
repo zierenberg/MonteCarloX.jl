@@ -1,6 +1,7 @@
 using Test
 using Random
 using StaticArrays: SVector
+using MonteCarloX
 using MCXSoftMatter
 
 @testset "MCXSoftMatter" begin

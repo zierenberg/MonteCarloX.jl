@@ -3,8 +3,13 @@
 
 Base type for Metropolis-family samplers where acceptance is naturally
 computed from a local state difference (e.g. ΔE).
+
+Requires a linear logweight: `logweight(ens, dE) == logweight(ens, E+dE) - logweight(ens, E)`.
+Non-linear ensembles (e.g. `MulticanonicalEnsemble`, `WangLandauEnsemble`) must use
+`ImportanceSampling` instead.
 """
 abstract type AbstractMetropolis <: AbstractImportanceSampling end
+
 
 """
     accept!(alg::AbstractMetropolis, delta_state)
@@ -42,21 +47,12 @@ In other words, the algorithm `ensemble` defines the operative logweight.
 # Create with Boltzmann weight
 alg = Metropolis(Random.default_rng(), β=2.0)
 
-# Create with Bayesian log-posterior
-logposterior(theta) = loglikelihood(theta) + logprior(theta)
-alg = Metropolis(Random.default_rng(), logposterior)
-
-# Create with custom callable score
-alg = Metropolis(Random.default_rng(), x -> -0.5 * x^2)
-
-# Create with a weight object
+# Create with a Boltzmann ensemble object
 ens = BoltzmannEnsemble(β=1.5)
 alg = Metropolis(Random.default_rng(), ens)
-```
 
-```julia
-# Create with a tabulated or custom ensemble
-ens = FunctionEnsemble(x -> -0.5 * x^2)
+# Create with a linear callable (caller asserts linearity)
+ens = FunctionEnsemble(x -> -0.5 * x, linear=true)
 alg = Metropolis(Random.default_rng(), ens)
 ```
 """
@@ -76,8 +72,13 @@ Create a Metropolis sampler with a general callable ensemble score.
 - `rng::AbstractRNG`: Random number generator
 - `ensemble`: A callable object or function returning log weight / log density
 """
-Metropolis(rng::AbstractRNG, ensemble) = 
-    Metropolis(rng, _as_ensemble(ensemble), 0, 0)
+function Metropolis(rng::AbstractRNG, ensemble)
+    ens = _as_ensemble(ensemble)
+    linear_logweight(ens) || throw(ArgumentError(
+        "$(typeof(ens)) does not have a linear logweight and cannot be used with Metropolis. " *
+        "Use ImportanceSampling or a dedicated algorithm instead."))
+    Metropolis(rng, ens, 0, 0)
+end
 
 """
     Metropolis(rng::AbstractRNG; β::Real)
@@ -112,8 +113,13 @@ mutable struct Glauber{LW, RNG<:AbstractRNG} <: AbstractMetropolis
     accepted::Int
 end
 
-Glauber(rng::AbstractRNG, ensemble) =
-    Glauber(rng, _as_ensemble(ensemble), 0, 0)
+function Glauber(rng::AbstractRNG, ensemble)
+    ens = _as_ensemble(ensemble)
+    linear_logweight(ens) || throw(ArgumentError(
+        "$(typeof(ens)) does not have a linear logweight and cannot be used with Glauber. " *
+        "Use ImportanceSampling or a dedicated algorithm instead."))
+    Glauber(rng, ens, 0, 0)
+end
 
 Glauber(rng::AbstractRNG; β::Real) =
     Glauber(rng, BoltzmannEnsemble(β=β))

@@ -13,6 +13,17 @@ end
 @inline _as_ensemble(e) = FunctionEnsemble(e)
 
 """
+    linear_logweight(ens::AbstractEnsemble) -> Bool
+
+Whether `logweight(ens, Δx) == logweight(ens, x + Δx) - logweight(ens, x)` holds,
+i.e. the logweight is linear so that Metropolis-family algorithms can work with
+state differences alone.
+
+Defaults to `false`. Ensembles that satisfy linearity must opt in.
+"""
+linear_logweight(::AbstractEnsemble) = false
+
+"""
     logweight(ens::AbstractEnsemble)
 
 Return a callable logweight object/function for an ensemble.

@@ -1,17 +1,18 @@
 """
-    Multicanonical([rng,] bins; init=0.0)
+    Multicanonical([rng,] bins; init=0.0, kwargs...)
 
 Create a generic `ImportanceSampling` algorithm with a
 `MulticanonicalEnsemble` built from `bins`.
 
+Extra keyword arguments (`warn_overwrite`, `smooth_window`, etc.) are
+forwarded to the `MulticanonicalEnsemble` constructor.
+
 If `rng` is not provided, the global RNG will be used.
 """
-function Multicanonical(rng::AbstractRNG, bins; init::Real=0.0)
-    ens = bins isa BinnedObject ? MulticanonicalEnsemble(bins) : MulticanonicalEnsemble(bins; init=init)
-    return ImportanceSampling(rng, ens)
+function Multicanonical(rng::AbstractRNG, bins; kwargs...)
+    return ImportanceSampling(rng, MulticanonicalEnsemble(bins; kwargs...))
 end
-Multicanonical(bins; init::Real=0.0) =
-    Multicanonical(Random.GLOBAL_RNG, bins; init=init)
+Multicanonical(bins; kwargs...) = Multicanonical(Random.GLOBAL_RNG, bins; kwargs...)
 
 """
     Multicanonical([rng,] ens::MulticanonicalEnsemble)
@@ -31,4 +32,3 @@ function reset!(alg::ImportanceSampling{<:MulticanonicalEnsemble})
     _reset!(alg) # reset acceptance stats
     return nothing
 end
-
