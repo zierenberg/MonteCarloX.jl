@@ -1,4 +1,4 @@
-<img src="docs/logo/banner.png" alt="MonteCarloX.jl" width="800" />
+<img src="logo/banner.png" alt="MonteCarloX.jl" width="800" />
 
 [![Docs: dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://zierenberg.github.io/MonteCarloX.jl/dev)
 [![CI: core](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_core.yml/badge.svg)](https://github.com/zierenberg/MonteCarloX.jl/actions/workflows/CI_core.yml)
