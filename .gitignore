@@ -6,6 +6,9 @@
 /docs/build/
 /docs/site/
 docs/src/generated/
+/sandbox/
+/checkpoints/
+docs/src/assets/logo.png
 
 settings.json
 .vscode/

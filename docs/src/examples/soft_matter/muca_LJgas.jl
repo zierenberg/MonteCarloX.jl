@@ -103,16 +103,16 @@ roundtrip_log = Int[]
         sweep!(sys, alg)
         update!(rt, energy(sys))
     end
-    # update weights
+    ## update weights
     update!(ens; mode=:recursive)
-    # help the walker move into low-energy regions by extrapolating from the first non-empty bins at the boundaries
-    # E_low, E_high = visited_range(ens)
-    # extend!(ensemble(alg), :low; anchor=E_low, slope=-1/T_min)
-    # manual suppression at boundaries by applying temperature ramp outside desired range
+    ## help the walker move into low-energy regions by extrapolating from the first non-empty bins at the boundaries
+    ## E_low, E_high = visited_range(ens)
+    ## extend!(ensemble(alg), :low; anchor=E_low, slope=-1/T_min)
+    ## manual suppression at boundaries by applying temperature ramp outside desired range
     extend!(ensemble(alg), :high; anchor=E_max, slope=-1/T_max)
     extend!(ensemble(alg), :low;  anchor=E_min, slope=-1/T_min)
-    # smooth!(ens, (E_min, E_max); window=3)
-    # log diagnostics
+    ## smooth!(ens, (E_min, E_max); window=3)
+    ## log diagnostics
     push!(histograms, deepcopy(ens.histogram))
     push!(logweights, deepcopy(ens.logweight))
     push!(acceptrate, acceptance_rate(alg))

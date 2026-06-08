@@ -1,6 +1,13 @@
 push!(LOAD_PATH,"../src/")
 using Documenter, Literate, MonteCarloX
 
+# --- Logo: copy from top-level /logo into Documenter's assets folder ---
+let
+    src = joinpath(@__DIR__, "..", "logo", "logo.png")
+    dst = joinpath(@__DIR__, "src", "assets", "logo.png")
+    isfile(src) && cp(src, dst; force=true)
+end
+
 # --- Literate: process examples ---
 example_dir   = joinpath(@__DIR__, "src", "examples")
 generated_dir = joinpath(@__DIR__, "src", "generated")
@@ -11,9 +18,10 @@ for (root, dirs, files) in walkdir(example_dir)
     filter!(d -> d != "todos", dirs)
     if !contains(rel_path, "todos")
         for file in files
-            if endswith(file, ".jl")        &&
-               !endswith(file, "_mpi.jl")   &&
-               file != "runtests.jl"        &&
+            if endswith(file, ".jl")            &&
+               !endswith(file, "_mpi.jl")       &&
+               !endswith(file, "_threads.jl")   &&
+               file != "runtests.jl"            &&
                file != "defaults.jl"
                 filepath = joinpath(root, file)
                 Literate.markdown(filepath, generated_dir; documenter=true)
