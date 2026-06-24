@@ -32,12 +32,14 @@ end
 
 # --- Documenter ---
 strict_docs = get(ENV, "DOCS_STRICT", "false") == "true"
+draft_docs  = get(ENV, "DOCS_DRAFT",  "false") == "true"
 
 makedocs(;
     modules = [MonteCarloX],
     format = Documenter.HTML(;
         assets = ["assets/custom.css", "assets/custom.js"],
     ),
+    draft = draft_docs,
     doctest = strict_docs,
     checkdocs = strict_docs ? :exports : :none,
     warnonly = !strict_docs,

@@ -3,32 +3,53 @@
 MonteCarloX.jl is a modular Monte Carlo framework in Julia.
 It separates the sampling algorithm from the system under study:
 the user defines the system state and proposes changes; MonteCarloX provides the acceptance criterion.
-Because the algorithm is independent of the model, every simulation becomes a template — replacing the system yields a new application without modifying the algorithmic loop.
+By explicitly separating the algorithm from the system, every simulation becomes a template — replacing the system yields a new application without modifying the algorithmic loop.
 
 ## Separation of concerns
 
 A Monte Carlo simulation in this framework consists of two parts:
 
-1. **Problem-specific** (provided by the user): the system state and a rule for proposing changes.
+1. **Problem-specific** (provided by the user/community): the system state and a rule for proposing changes.
 2. **Algorithms** (provided by MonteCarloX): the development of the Markov Chain that can vary from simple to complex.
 
-For discrete-state sampling, the central interface is `accept!(algorithm, x_new, x_old)`.
-For continuous-time dynamics, the equivalent is `advance!(algorithm, system, T)`, which selects event times and events from user-defined rates.
-
 This separation keeps algorithm code model-agnostic:
-the same `Metropolis` algorithm samples a posterior distribution in Bayesian inference, an Ising model at thermal equilibrium, or any other system for which a log-weight function can be defined.
+We can use the same MCMC algorithm to sample the posterior distribution in Bayesian inference, the Boltzmann distribution of an Ising model, or any other system/ for that a weight function can be defined.
 
 Because the user retains full control over the system definition and update rule, it is straightforward to build companion packages that provide these for entire model families.
 For example, `MCXSpins` implements states, updates, and observables for Ising and Blume-Capel models, so that a simulation reduces to choosing an algorithm and running the loop.
 
+## Scope
+
+MonteCarloX provides the algorithmic core.
+Concrete model families (e.g., `MCXSpins`) are maintained as separate companion packages.
+This keeps the framework compact and allows independent development of new models.
+
 ## Algorithms
 
-MonteCarloX provides the following sampling algorithms, each usable with any system that implements the required interface:
+So far, we distinguish three main classes of Monte-Carlo sampling schemes that bring different types of algorithms:
+- **Markov-Chain Monte Carlo**: discrete-step dynamics based on proposing new state `x_new` and accepting/rejecting with `accept!(alg, x_new, x_old)`.
+	- `Metropolis` — established accept or reject proposed changes based on a log-weight ratio. Specializations: `Glauber`, `HeatBath`, `MetropolisHastings` (TODO)
+	- `ReplicaExchange` - run multiple replicas at different parameters and exchange configurations to bypass free-energy barriers. Specializations:  `ParallelTempering`
+	- `Multicanonical` - flat-histogram algorithm where weights are iteratively adapted to achieve uniform sampling of a reaction coordinate to sample rare events across barriers. (TODO: Merge Muca and WL plus SAMC into a master flat-histogram method class)
+	- `WangLandau` - flat-histogram algorithm where weights are adapted on-the-fly with the same purpose of `Multicanonical`. Specialization: `SAMC` (TODO)
+- **Kinetic Monte Carlo**: continuous-time dynamics based on event sources `es` (e.g. list of rates) to draw (time, event) via `step!(alg, es)` or advance the full system via `advance!(alg, sys)` if `event_source(sys)` is specified.
+	- `Gillespie` - exact stochastic simulation via event rates
+	- `Poisson` - sample (inhomogneous) poisson processes 
+	- `Langevin` - sample Langevin dynamics (TODO, potentially by API to DifferentialEquations)
+- **Population Monte Carlo (sequential MC | particle filter)**: population of states (sometimes called particles) that evolve according to some rule and are resampled by `resample!(algorithm, population)`.
+	- **Population Annealing**: TODO.
 
-- **Importance sampling**: `Metropolis`, `Glauber`, `HeatBath` — accept or reject proposed changes based on a log-weight ratio.
-- **Flat-histogram methods**: `Multicanonical`, `WangLandau` — iteratively adapt weights to achieve uniform sampling over an order parameter, enabling access to rare configurations.
-- **Extended-ensemble methods**: `ParallelTempering`, `ReplicaExchange` — run multiple replicas at different parameters and exchange configurations to overcome free-energy barriers.
-- **Continuous-time sampling**: `Gillespie` — exact stochastic simulation via event rates.
+The different sampling schemes can be combined. For example, population resampling schemes are often combined with local MCMC equilibration. Similarly, we can also perform MCMC on the random numbers underlying kineticMC to sample rare events.
+
+## Infrastructure
+
+The package comes with helpful infrastructure for advanced Monte Carlo algorithms including
+- `BinnedObjects` - object for storing binned weight functions or histograms, both for discrete and continous binning.
+- `ParallelBackends` - backends for parallel computing, includes `ThreadsBackend` and `MPIBackend`.
+- `ParallelChains` - handles parallel algorithms for MCMC (TODO: may need refactor if we do not consider PopMC Markov Chain).
+- `CheckpointSession` - uses Serialization to checkpoint and recover simulations
+- `Monitoring` - monitoring tools, inlcluding `RoundTrips`, and histogram flatness criteria
+- `MutableRandomNumbers` - useful to update random numbers themselves for rare-event sampling. (TODO: needs to be included into actual examples, so far we just did that manually, so not sure if this is really helping or confusing)
 
 ## Examples as templates
 
@@ -41,12 +62,6 @@ the algorithmic structure remains unchanged when the system is replaced.
 - **Stochastic processes**: Poisson processes, birth-death dynamics, reversible dimerization via the Gillespie algorithm.
 - **Large deviation theory**: multicanonical sampling of rare fluctuations in sums of random variables and the Ornstein-Uhlenbeck process.
 - **Infrastructure**: checkpointing and parallel chains (MPI, threads).
-
-## Scope
-
-MonteCarloX provides the algorithmic core.
-Concrete model families (e.g., `MCXSpins`) are maintained as separate companion packages.
-This keeps the framework compact and allows independent development of new models.
 
 ## Related Julia packages
 
