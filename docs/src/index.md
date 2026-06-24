@@ -26,10 +26,6 @@ This keeps the framework compact and allows independent development of new model
 
 ## Algorithms
 
-Here's the trimmed version:
-
----
-
 So far, we distinguish four main classes of Monte-Carlo sampling schemes that bring different types of algorithms:
 
 - **Markov-Chain Monte Carlo**: discrete-step dynamics based on proposing a new state `x_new` and accepting/rejecting with `accept!(alg, x_new, x_old)`.
