@@ -26,18 +26,29 @@ This keeps the framework compact and allows independent development of new model
 
 ## Algorithms
 
-So far, we distinguish three main classes of Monte-Carlo sampling schemes that bring different types of algorithms:
-- **Markov-Chain Monte Carlo**: discrete-step dynamics based on proposing new state `x_new` and accepting/rejecting with `accept!(alg, x_new, x_old)`.
-	- `Metropolis` — established accept or reject proposed changes based on a log-weight ratio. Specializations: `Glauber`, `HeatBath`, `MetropolisHastings` (TODO)
-	- `ReplicaExchange` - run multiple replicas at different parameters and exchange configurations to bypass free-energy barriers. Specializations:  `ParallelTempering`
-	- `Multicanonical` - flat-histogram algorithm where weights are iteratively adapted to achieve uniform sampling of a reaction coordinate to sample rare events across barriers. (TODO: Merge Muca and WL plus SAMC into a master flat-histogram method class)
-	- `WangLandau` - flat-histogram algorithm where weights are adapted on-the-fly with the same purpose of `Multicanonical`. Specialization: `SAMC` (TODO)
-- **Kinetic Monte Carlo**: continuous-time dynamics based on event sources `es` (e.g. list of rates) to draw (time, event) via `step!(alg, es)` or advance the full system via `advance!(alg, sys)` if `event_source(sys)` is specified.
-	- `Gillespie` - exact stochastic simulation via event rates
-	- `Poisson` - sample (inhomogneous) poisson processes 
-	- `Langevin` - sample Langevin dynamics (TODO, potentially by API to DifferentialEquations)
-- **Population Monte Carlo (sequential MC | particle filter)**: population of states (sometimes called particles) that evolve according to some rule and are resampled by `resample!(algorithm, population)`.
-	- **Population Annealing**: TODO.
+Here's the trimmed version:
+
+---
+
+So far, we distinguish four main classes of Monte-Carlo sampling schemes that bring different types of algorithms:
+
+- **Markov-Chain Monte Carlo**: discrete-step dynamics based on proposing a new state `x_new` and accepting/rejecting with `accept!(alg, x_new, x_old)`.
+  - `Metropolis` — accept or reject proposed changes based on a log-weight ratio. Specializations: `Glauber`, `HeatBath`, `MetropolisHastings` (TODO)
+  - `ReplicaExchange` — run multiple replicas at different parameters and exchange configurations to bypass free-energy barriers. Specializations: `ParallelTempering`
+  - `Multicanonical` — flat-histogram algorithm where weights are iteratively adapted to achieve uniform sampling of a reaction coordinate across barriers. (TODO: merge `Muca`, `WangLandau`, and `SAMC` into a unified flat-histogram class)
+  - `WangLandau` — flat-histogram algorithm where weights are adapted on-the-fly with the same purpose as `Multicanonical`. Specialization: `stochastic approximation Monte Carlo (SAMC)` (TODO)
+  - `HMC(TODO)` — gradient-informed Hamiltonian proposals with Metropolis-Hastings correction (needs information about the gradient, not trivial)
+
+- **Kinetic Monte Carlo**: continuous-time dynamics on a discrete state space, governed by a master equation. Based on event sources `es` (e.g. list of rates) to draw `(time, event)` via `step!(alg, es)` or advance the full system via `advance!(alg, sys)` if `event_source(sys)` is specified.
+  - `Gillespie` — exact stochastic simulation via event rates
+  - `Poisson` — sample (inhomogeneous) Poisson processes
+
+- **Stochastic Dynamics**: continuous-time dynamics on a continuous state space, governed by a Langevin SDE / Fokker-Planck equation. 
+  - TODO: Implement as a thin wrapper around [`StochasticDiffEq.jl`](https://github.com/SciML/StochasticDiffEq.jl), defining drift `f(u,p,t)` and diffusion `g(u,p,t)` coefficients.
+
+- **Population Monte Carlo** (sequential MC | particle filter): a population of states (sometimes called particles) that evolve according to some propagation rule and are resampled via `resample!(alg, population)`. Sits orthogonally to the other three classes — any of the above can serve as the within-population propagation kernel.
+  - `PopulationAnnealing` — (TODO)
+  - `PERM` — (TODO)
 
 The different sampling schemes can be combined. For example, population resampling schemes are often combined with local MCMC equilibration. Similarly, we can also perform MCMC on the random numbers underlying kineticMC to sample rare events.
 
@@ -75,19 +86,19 @@ If your use case is better served by a domain-specific implementation, these are
 Other related packages (grouped by common use cases):
 
 - Bayesian inference and MCMC:
-	- [Turing.jl](https://github.com/TuringLang/Turing.jl)
-	- [AbstractMCMC.jl](https://github.com/TuringLang/AbstractMCMC.jl)
-	- [AdvancedMH.jl](https://github.com/TuringLang/AdvancedMH.jl)
-	- [AdvancedHMC.jl](https://github.com/TuringLang/AdvancedHMC.jl)
-	- [DynamicHMC.jl](https://github.com/tpapp/DynamicHMC.jl)
-	- [BAT.jl](https://github.com/bat/BAT.jl)
-	- [Gen.jl](https://github.com/probcomp/Gen.jl)
+  - [Turing.jl](https://github.com/TuringLang/Turing.jl)
+  - [AbstractMCMC.jl](https://github.com/TuringLang/AbstractMCMC.jl)
+  - [AdvancedMH.jl](https://github.com/TuringLang/AdvancedMH.jl)
+  - [AdvancedHMC.jl](https://github.com/TuringLang/AdvancedHMC.jl)
+  - [DynamicHMC.jl](https://github.com/tpapp/DynamicHMC.jl)
+  - [BAT.jl](https://github.com/bat/BAT.jl)
+  - [Gen.jl](https://github.com/probcomp/Gen.jl)
 - Monte Carlo integration and low-discrepancy sampling:
-	- [Cuba.jl](https://github.com/giordano/Cuba.jl)
-	- [QuasiMonteCarlo.jl](https://github.com/SciML/QuasiMonteCarlo.jl)
-	- [SpinMC](https://github.com/fbuessen/SpinMC.jl)
+  - [Cuba.jl](https://github.com/giordano/Cuba.jl)
+  - [QuasiMonteCarlo.jl](https://github.com/SciML/QuasiMonteCarlo.jl)
+  - [SpinMC](https://github.com/fbuessen/SpinMC.jl)
 - Uncertainty propagation with particle arithmetic:
-	- [MonteCarloMeasurements.jl](https://github.com/baggepinnen/MonteCarloMeasurements.jl)
+  - [MonteCarloMeasurements.jl](https://github.com/baggepinnen/MonteCarloMeasurements.jl)
 
 MonteCarloX stays focused on compact, model-agnostic algorithmic building blocks, while these packages offer specialized ecosystems for their target domains.
 
