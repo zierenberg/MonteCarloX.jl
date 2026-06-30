@@ -73,7 +73,7 @@ end
 Exchange segments between two equal-length polymers at a randomly chosen cut.
 Requires at least 2 polymers of length >= 4.
 """
-function double_bridge!(sys::LatticePolymer{D}, alg::AbstractImportanceSampling) where {D}
+function double_bridge!(sys::LatticePolymer{D}, alg::AbstractMarkovChainMonteCarlo) where {D}
     N = num_polymers(sys)
     N < 2 && return nothing
 

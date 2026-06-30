@@ -91,7 +91,7 @@ end
 
 x_T(sys::OUTrajectory) = sys.xs[end]
 
-function update!(sys::OUTrajectory, alg::AbstractImportanceSampling; δ=0.5)
+function update!(sys::OUTrajectory, alg::AbstractMarkovChainMonteCarlo; δ=0.5)
     idx    = rand(alg.rng, 1:length(sys.dWs))
     dW_old = sys.dWs[idx]
     dW_new = dW_old + δ * (2*rand(alg.rng) - 1)

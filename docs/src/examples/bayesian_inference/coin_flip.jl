@@ -49,7 +49,7 @@ println("Exact posterior : Beta($(α_prior + n_heads), $(β_prior + n_tails))")
 # The `accept!` interface of **MonteCarloX.jl** evaluates the log-posterior
 # ratio and handles the acceptance decision, tracking statistics automatically.
 
-function update!(alg::AbstractImportanceSampling, θ, Δ)
+function update!(alg::AbstractMarkovChainMonteCarlo, θ, Δ)
     θ_new = θ + Δ * randn(alg.rng)
     if 0.0 < θ_new < 1.0
         accept!(alg, θ_new, θ) && (θ = θ_new)
@@ -59,7 +59,7 @@ end
 
 function run_metropolis(logposterior, prior; seed=2026, Δ=0.03)
     rng     = MersenneTwister(seed)
-    alg     = ImportanceSampling(rng, logposterior)
+    alg     = MarkovChainMonteCarlo(rng, logposterior)
     θ       = rand(rng, prior)
     samples = Float64[]
     for _ in 1:burn_in

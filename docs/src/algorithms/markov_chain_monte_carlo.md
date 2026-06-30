@@ -8,7 +8,7 @@ This page sets up the vocabulary and API shared by every MCMC algorithm in Monte
 Concrete algorithms — [Metropolis-Hastings](metropolis.md), [Heat bath](heat_bath.md), [Multicanonical](multicanonical.md), [Wang-Landau](wang_landau.md), [Replica exchange](replica_exchange.md) — are documented as subpages.
 
 !!! note "Naming"
-    The current code calls the abstract supertype `AbstractImportanceSampling` and the generic algorithm `ImportanceSampling`; both will be renamed to `AbstractMarkovChainMonteCarlo` and `MarkovChainMonteCarlo` in a future release to match the literature. `HeatBath` will also move under this supertype. Page-level vocabulary already follows the new naming.
+    The abstract supertype is `AbstractMarkovChainMonteCarlo`; the generic algorithm is `MarkovChainMonteCarlo` with the short alias `const MCMC = MarkovChainMonteCarlo`. The old names `AbstractImportanceSampling` and `MarkovChainMonteCarlo` are kept as deprecated bindings and resolve with a warning. `HeatBath` is conceptually MCMC but currently a sibling type (`AbstractHeatBath <: AbstractAlgorithm`) pending a follow-up refactor of the conditional-vs-accept-reject split.
 
 !!! note "Direct & importance sampling"
     Pure i.i.d. sampling from a tractable proposal and standard importance sampling (reweighting i.i.d. draws to a target) are not provided as dedicated algorithm types — they reduce to one-line idioms over two `AbstractEnsemble` objects. Genuinely scalable importance-sampling methods (annealed IS, SMC samplers, population MC, nested sampling, cross-entropy) all live under [Population Monte Carlo](population_monte_carlo.md).
@@ -21,7 +21,7 @@ A simulation is built from three independent pieces:
 |-----------|------|-------------|
 | **System** (`AbstractSystem`) | Holds the state and proposes local changes | User / companion package |
 | **Ensemble** (`AbstractEnsemble`) | Defines the target distribution via `logweight(x)` | MonteCarloX or user |
-| **Algorithm** (`AbstractImportanceSampling`) | Consumes an ensemble; decides which proposals to accept | MonteCarloX |
+| **Algorithm** (`AbstractMarkovChainMonteCarlo`) | Consumes an ensemble; decides which proposals to accept | MonteCarloX |
 
 In the textbook presentation, an MCMC algorithm is parameterized directly by the physical quantity it samples (e.g. Metropolis with inverse temperature ``\beta``).
 MonteCarloX inverts this: the ensemble is the first-class object that defines the target, and algorithms are *consumers* of an ensemble.
@@ -29,7 +29,7 @@ The consequences are concrete:
 
 - **Bayesian inference and statistical mechanics share an interface.** `Metropolis(rng, BoltzmannEnsemble(β=1.0))` and `Metropolis(rng, FunctionEnsemble(logposterior, linear=true))` differ only in the ensemble.
 - **Replica exchange is an ensemble swap.** Two algorithms hold two ensembles; a successful exchange moves the ensembles, not the configurations.
-- **Adaptive methods are ensembles that learn.** Multicanonical and Wang-Landau are not new algorithms; they are `ImportanceSampling` with an adaptive ensemble whose `update!` reshapes `logweight` from accumulated histograms.
+- **Adaptive methods are ensembles that learn.** Multicanonical and Wang-Landau are not new algorithms; they are `MarkovChainMonteCarlo` with an adaptive ensemble whose `update!` reshapes `logweight` from accumulated histograms.
 
 ## Targets, chains, and the acceptance rule
 
@@ -85,14 +85,14 @@ Delta-based algorithms ([`Metropolis`](metropolis.md), `Glauber`) require `linea
 ```julia
 Metropolis(rng, MulticanonicalEnsemble(bins))
 # ArgumentError: MulticanonicalEnsemble does not have a linear logweight and
-# cannot be used with Metropolis. Use ImportanceSampling or a dedicated algorithm instead.
+# cannot be used with Metropolis. Use MarkovChainMonteCarlo or a dedicated algorithm instead.
 ```
 
-For non-linear ensembles use the generic `ImportanceSampling` algorithm — which always evaluates the full-state log-weight difference — or one of the dedicated constructors (`Multicanonical`, `WangLandau`) that wrap it.
+For non-linear ensembles use the generic `MarkovChainMonteCarlo` algorithm — which always evaluates the full-state log-weight difference — or one of the dedicated constructors (`Multicanonical`, `WangLandau`) that wrap it.
 
 ## Algorithms
 
-Every accept/reject MCMC algorithm subtypes `AbstractImportanceSampling` (to be renamed `AbstractMarkovChainMonteCarlo`) and carries:
+Every accept/reject MCMC algorithm subtypes `AbstractMarkovChainMonteCarlo` (to be renamed `AbstractMarkovChainMonteCarlo`) and carries:
 
 | Field | Meaning |
 |-------|---------|
@@ -150,14 +150,14 @@ Swap `Metropolis` for `Multicanonical` or `WangLandau`, and the loop body needs 
 
 ### Bayesian variant: same loop, different ensemble
 
-A general log-posterior is non-linear in the parameter vector ``\theta``, so we use the generic `ImportanceSampling` algorithm (which always computes the full-state log-ratio) and the corresponding form of `accept!`:
+A general log-posterior is non-linear in the parameter vector ``\theta``, so we use the generic `MarkovChainMonteCarlo` algorithm (which always computes the full-state log-ratio) and the corresponding form of `accept!`:
 
 ```julia
 using MonteCarloX, Random
 
 rng  = Xoshiro(1)
 θ    = zeros(D)
-alg  = ImportanceSampling(rng, FunctionEnsemble(logposterior))   # linear=false (default)
+alg  = MCMC(rng, FunctionEnsemble(logposterior))   # linear=false (default)
 
 measurements = Measurements(
     [:logp => logposterior => Float64[]],
@@ -205,16 +205,16 @@ For correlation diagnostics, the [measurements](../measurements.md) infrastructu
 ## API reference
 
 ```@docs
-AbstractImportanceSampling
-ImportanceSampling
+AbstractMarkovChainMonteCarlo
+MarkovChainMonteCarlo
 AbstractEnsemble
 linear_logweight
 logweight(ens::AbstractEnsemble)
-logweight(ens::AbstractEnsemble, x)
-ensemble(alg::AbstractImportanceSampling)
+logweight(ens::AbstractEnsemble, arg)
+ensemble(alg::AbstractMarkovChainMonteCarlo)
 accept!
 acceptance_rate
-reset!(alg::AbstractImportanceSampling)
+reset!(alg::AbstractMarkovChainMonteCarlo)
 steps
 update!(ens::AbstractEnsemble, args...)
 ```

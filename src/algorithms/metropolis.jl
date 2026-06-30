@@ -1,5 +1,5 @@
 """
-    AbstractMetropolis <: AbstractImportanceSampling
+    AbstractMetropolis <: AbstractMarkovChainMonteCarlo
 
 Base type for Metropolis-family samplers where acceptance is naturally
 computed from a local difference of the ensemble's logweight argument
@@ -7,9 +7,9 @@ computed from a local difference of the ensemble's logweight argument
 
 Requires a linear logweight: `logweight(ens, Δarg) == logweight(ens, arg+Δarg) - logweight(ens, arg)`.
 Non-linear ensembles (e.g. `MulticanonicalEnsemble`, `WangLandauEnsemble`) must use
-`ImportanceSampling` instead.
+`MarkovChainMonteCarlo` instead.
 """
-abstract type AbstractMetropolis <: AbstractImportanceSampling end
+abstract type AbstractMetropolis <: AbstractMarkovChainMonteCarlo end
 
 
 """
@@ -79,7 +79,7 @@ function Metropolis(rng::AbstractRNG, ensemble)
     ens = _as_ensemble(ensemble)
     linear_logweight(ens) || throw(ArgumentError(
         "$(typeof(ens)) does not have a linear logweight and cannot be used with Metropolis. " *
-        "Use ImportanceSampling or a dedicated algorithm instead."))
+        "Use MarkovChainMonteCarlo or a dedicated algorithm instead."))
     Metropolis(rng, ens, 0, 0)
 end
 
@@ -120,7 +120,7 @@ function Glauber(rng::AbstractRNG, ensemble)
     ens = _as_ensemble(ensemble)
     linear_logweight(ens) || throw(ArgumentError(
         "$(typeof(ens)) does not have a linear logweight and cannot be used with Glauber. " *
-        "Use ImportanceSampling or a dedicated algorithm instead."))
+        "Use MarkovChainMonteCarlo or a dedicated algorithm instead."))
     Glauber(rng, ens, 0, 0)
 end
 

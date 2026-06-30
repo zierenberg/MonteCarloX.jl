@@ -72,7 +72,7 @@ sum_rvs(sys::SumGaussianRVs) = sys.sum_rvs
 # is first filtered by the Gaussian prior (Metropolis-within-Gibbs), then
 # accepted by the sampling algorithm based on the sum.
 
-function update!(sys::SumGaussianRVs, alg::AbstractImportanceSampling; δ=0.5)
+function update!(sys::SumGaussianRVs, alg::AbstractMarkovChainMonteCarlo; δ=0.5)
     idx    = rand(alg.rng, 1:length(sys.rvs))
     rv_old = sys.rvs[idx]
     rv_new = rv_old + δ * (2*rand(alg.rng) - 1)

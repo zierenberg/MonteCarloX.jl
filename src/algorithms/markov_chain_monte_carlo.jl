@@ -1,7 +1,7 @@
 # Importance Sampling - Core functionality
 # Shared by all importance sampling algorithms (Metropolis, Heat Bath, etc.)
 """
-    ImportanceSampling <: AbstractImportanceSampling
+    MarkovChainMonteCarlo <: AbstractMarkovChainMonteCarlo
 
 Generic importance-sampling algorithm that operates on full
 acceptance arguments `(arg_new, arg_old)` using a callable `ensemble`.
@@ -20,34 +20,34 @@ Unified view:
 
 Both are represented identically as ensemble-provided logweight callables.
 """
-mutable struct ImportanceSampling{LW,RNG<:AbstractRNG} <: AbstractImportanceSampling
+mutable struct MarkovChainMonteCarlo{LW,RNG<:AbstractRNG} <: AbstractMarkovChainMonteCarlo
     rng::RNG
     ensemble::LW
     steps::Int
     accepted::Int
 end
 
-ImportanceSampling(rng::AbstractRNG, ensemble) = ImportanceSampling(rng, _as_ensemble(ensemble), 0, 0)
+MarkovChainMonteCarlo(rng::AbstractRNG, ensemble) = MarkovChainMonteCarlo(rng, _as_ensemble(ensemble), 0, 0)
 
 """
-    ensemble(alg::AbstractImportanceSampling)
+    ensemble(alg::AbstractMarkovChainMonteCarlo)
 
 Return the ensemble object carried by an importance-sampling algorithm.
 
 This is the canonical accessor in the ensemble-first API.
 Operationally, this object defines the logweight used in acceptance.
 """
-@inline ensemble(alg::AbstractImportanceSampling) = getfield(alg, :ensemble)
+@inline ensemble(alg::AbstractMarkovChainMonteCarlo) = getfield(alg, :ensemble)
 
 """
-    logweight(alg::AbstractImportanceSampling)
+    logweight(alg::AbstractMarkovChainMonteCarlo)
 
 Return the algorithm ensemble via a logweight-oriented alias.
 Equivalent to `ensemble(alg)`.
 
 Use this accessor when reasoning about acceptance formulas.
 """
-@inline logweight(alg::AbstractImportanceSampling) = logweight(ensemble(alg))
+@inline logweight(alg::AbstractMarkovChainMonteCarlo) = logweight(ensemble(alg))
 
 # Optional ensemble-level visit hooks used by generic accept!.
 # Ensembles that need histogram/visit bookkeeping can specialize these.
@@ -55,7 +55,7 @@ Use this accessor when reasoning about acceptance formulas.
 @inline record_visit!(_ens, _arg_vis) = nothing
 
 """
-    accept!(alg::AbstractImportanceSampling, arg_new, arg_old) -> Bool
+    accept!(alg::AbstractMarkovChainMonteCarlo, arg_new, arg_old) -> Bool
 
 Evaluate the Metropolis acceptance criterion for the proposed move.
 
@@ -74,7 +74,7 @@ Updates step and acceptance counters. Returns `true` if the move is accepted:
 - accept if `log_ratio > 0` (proposed argument has higher weight),
 - otherwise accept with probability `exp(log_ratio)`.
 """
-@inline function accept!(alg::AbstractImportanceSampling, arg_new::T, arg_old::T) where T
+@inline function accept!(alg::AbstractMarkovChainMonteCarlo, arg_new::T, arg_old::T) where T
     ens = ensemble(alg)
     log_ratio = logweight(ens, arg_new) - logweight(ens, arg_old)
     accepted = _accept!(alg, log_ratio)
@@ -85,7 +85,7 @@ Updates step and acceptance counters. Returns `true` if the move is accepted:
     return accepted
 end
 # core function to evaluate acceptance and update counters
-@inline function _accept!(alg::AbstractImportanceSampling, log_ratio::Real)
+@inline function _accept!(alg::AbstractMarkovChainMonteCarlo, log_ratio::Real)
     alg.steps += 1
     accepted = (log_ratio > 0) || (rand(alg.rng) < exp(log_ratio))
     alg.accepted += accepted 
@@ -93,26 +93,26 @@ end
 end
 
 """
-    acceptance_rate(alg::AbstractImportanceSampling)
+    acceptance_rate(alg::AbstractMarkovChainMonteCarlo)
 
 Calculate the acceptance rate of the algorithm.
 
 Returns the fraction of accepted moves: accepted/steps.
 Returns 0.0 if no steps have been attempted yet.
 """
-acceptance_rate(alg::AbstractImportanceSampling) = 
+acceptance_rate(alg::AbstractMarkovChainMonteCarlo) = 
     alg.steps > 0 ? alg.accepted / alg.steps : 0.0
 
 """
-    reset!(alg::AbstractImportanceSampling)
+    reset!(alg::AbstractMarkovChainMonteCarlo)
 
 Reset step and acceptance counters to zero.
 
 Useful when you want to measure acceptance rate for a specific
 run phase without previous history.
 """
-@inline reset!(alg::AbstractImportanceSampling) = _reset!(alg)
-function _reset!(alg::AbstractImportanceSampling)
+@inline reset!(alg::AbstractMarkovChainMonteCarlo) = _reset!(alg)
+function _reset!(alg::AbstractMarkovChainMonteCarlo)
     alg.steps = 0
     alg.accepted = 0
 end

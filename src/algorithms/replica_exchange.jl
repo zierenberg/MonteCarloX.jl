@@ -51,7 +51,7 @@ end
 @inline index(rx::ReplicaExchange{<:ThreadsBackend}) = rx.indices
 @inline index(rx::ReplicaExchange{<:MPIBackend}) = rx.indices[rank(rx) + 1]
 
-function ReplicaExchange(backend::ThreadsBackend, alg::AbstractVector{<:AbstractImportanceSampling})
+function ReplicaExchange(backend::ThreadsBackend, alg::AbstractVector{<:AbstractMarkovChainMonteCarlo})
     n = length(alg)
     n >= 2 || throw(ArgumentError("need at least 2 algorithms for replica exchange"))
     pc = ParallelChains(backend, alg)
@@ -59,7 +59,7 @@ function ReplicaExchange(backend::ThreadsBackend, alg::AbstractVector{<:Abstract
     return ReplicaExchange(pc, 0, collect(1:n), zeros(Int, nedges), zeros(Int, nedges))
 end
 
-function ReplicaExchange(backend::MPIBackend, alg::AbstractImportanceSampling)
+function ReplicaExchange(backend::MPIBackend, alg::AbstractMarkovChainMonteCarlo)
     pc = ParallelChains(backend, alg)
     n = size(backend)
     nedges = max(0, n - 1)
@@ -123,8 +123,8 @@ Attempt one pair exchange using shared random number `u`.
 If accepted, ensembles are swapped between `alg_i` and `alg_j`.
 Returns `true` if accepted.
 """
-function attempt_exchange_pair!(alg_i::AbstractImportanceSampling,
-                                alg_j::AbstractImportanceSampling,
+function attempt_exchange_pair!(alg_i::AbstractMarkovChainMonteCarlo,
+                                alg_j::AbstractMarkovChainMonteCarlo,
                                 arg_i::Real,
                                 arg_j::Real,
                                 u::Real)
@@ -193,7 +193,7 @@ function _exchange_packet_mpi(comm, packet, partner_rank::Int, tag::Integer, is_
 end
 
 function _update_pair!(rx::ReplicaExchange{<:MPIBackend},
-                       alg::AbstractImportanceSampling,
+                       alg::AbstractMarkovChainMonteCarlo,
                        x::Real,
                        pair_id::Int,
                        partner_index::Int)

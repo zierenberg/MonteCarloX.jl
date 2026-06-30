@@ -18,7 +18,7 @@ module MCXLatticeMatter
 
 using StaticArrays
 using MonteCarloX: AbstractSystem,
-                   AbstractImportanceSampling,
+                   AbstractMarkovChainMonteCarlo,
                    accept!
 import MonteCarloX: init!
 

@@ -17,7 +17,7 @@
     return nothing
 end
 
-@inline function spin_flip!(sys::AbstractSpinSystem, alg::AbstractImportanceSampling)
+@inline function spin_flip!(sys::AbstractSpinSystem, alg::AbstractMarkovChainMonteCarlo)
     i = pick_site(alg.rng, length(sys.spins))
     s_new = propose_state(alg.rng, sys, i)
     dsys = delta_sys(sys, i, s_new)
@@ -37,7 +37,7 @@ end
     return nothing
 end
 
-@inline function spin_flip!(sys::AbstractIsing, alg::AbstractImportanceSampling)
+@inline function spin_flip!(sys::AbstractIsing, alg::AbstractMarkovChainMonteCarlo)
     i = pick_site(alg.rng, length(sys.spins))
     dsys = local_pair_interactions(sys, i)
     ΔE = delta_energy(sys, i, dsys)

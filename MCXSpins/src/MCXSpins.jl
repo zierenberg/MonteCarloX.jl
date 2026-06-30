@@ -33,7 +33,7 @@ using Random
 using Graphs
 using SparseArrays: SparseMatrixCSC, sparse
 using MonteCarloX: AbstractSystem,
-                   AbstractImportanceSampling,
+                   AbstractMarkovChainMonteCarlo,
                    AbstractMetropolis,
                    AbstractHeatBath,
                    BinnedObject,

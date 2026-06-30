@@ -4,7 +4,7 @@
 Translate an entire polymer by a random displacement where each
 component is drawn uniformly from `{-Δ, …, Δ}`.
 """
-function translate!(sys::LatticePolymer{D}, alg::AbstractImportanceSampling; Δ::Int=1) where {D}
+function translate!(sys::LatticePolymer{D}, alg::AbstractMarkovChainMonteCarlo; Δ::Int=1) where {D}
     n = rand(alg.rng, 1:num_polymers(sys))
     M = polymer_length(sys, n)
     poly = sys.polymers[n]

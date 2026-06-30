@@ -20,7 +20,7 @@ end
 
 Reptation move: remove one end monomer and grow at the other end.
 """
-function slither!(sys::LatticePolymer{D}, alg::AbstractImportanceSampling) where {D}
+function slither!(sys::LatticePolymer{D}, alg::AbstractMarkovChainMonteCarlo) where {D}
     n = rand(alg.rng, 1:num_polymers(sys))
     M = polymer_length(sys, n)
     M < 2 && return nothing

@@ -8,10 +8,10 @@ using Test
 function test_algorithm_constructors()
     pass = true
 
-    # ImportanceSampling with FunctionEnsemble
+    # MarkovChainMonteCarlo with FunctionEnsemble
     rng = MersenneTwister(42)
     logdensity(x) = -0.5 * x^2
-    alg = ImportanceSampling(rng, logdensity)
+    alg = MarkovChainMonteCarlo(rng, logdensity)
     pass &= check(alg.rng === rng, "rng stored\n")
     pass &= check(alg.ensemble === FunctionEnsemble(logdensity), "ensemble stored\n")
     pass &= check(ensemble(alg) isa FunctionEnsemble, "ensemble accessor\n")
@@ -65,7 +65,7 @@ function test_importance_sampling_1d_gaussian()
     mu = 1.0; sigma = 1.0
     logweight(x) = -0.5 * ((x - mu) / sigma)^2
 
-    alg = ImportanceSampling(rng, logweight)
+    alg = MarkovChainMonteCarlo(rng, logweight)
 
     bins = -10.0:0.1:10.0
     measurements = Measurements([
@@ -74,7 +74,7 @@ function test_importance_sampling_1d_gaussian()
     ], interval=10)
 
     step = sigma
-    function update(x::Float64, alg::ImportanceSampling)::Float64
+    function update(x::Float64, alg::MarkovChainMonteCarlo)::Float64
         x_new = x + randn(alg.rng) * step
         if accept!(alg, x_new, x)
             return x_new
@@ -132,14 +132,14 @@ function test_importance_sampling_2d_gaussian()
     mu = [1.0, 2.0]
     logweight(x) = -0.5 * ((x[1] - mu[1])^2 + (x[2] - mu[2])^2)
 
-    alg = ImportanceSampling(rng, logweight)
+    alg = MarkovChainMonteCarlo(rng, logweight)
 
     measurements = Measurements([
         :x => (s -> s[1]) => Float64[],
         :y => (s -> s[2]) => Float64[]
     ], interval=1)
 
-    function update(x::Vector{Float64}, alg::ImportanceSampling)::Vector{Float64}
+    function update(x::Vector{Float64}, alg::MarkovChainMonteCarlo)::Vector{Float64}
         x_new = x + randn(alg.rng, length(x))
         if accept!(alg, x_new, x)
             return x_new
@@ -228,10 +228,10 @@ function test_importance_sampling_proposal_invariance()
 
     # narrow proposal
     rng_a = MersenneTwister(400)
-    alg_a = ImportanceSampling(rng_a, logweight)
+    alg_a = MarkovChainMonteCarlo(rng_a, logweight)
     measurements_a = Measurements([:timeseries => (x -> x) => Float64[]], interval=1)
 
-    function update_a(x::Float64, alg::ImportanceSampling)::Float64
+    function update_a(x::Float64, alg::MarkovChainMonteCarlo)::Float64
         x_new = x + randn(alg.rng) * 0.5
         accept!(alg, x_new, x) ? x_new : x
     end
@@ -244,10 +244,10 @@ function test_importance_sampling_proposal_invariance()
 
     # wide proposal
     rng_b = MersenneTwister(400)
-    alg_b = ImportanceSampling(rng_b, logweight)
+    alg_b = MarkovChainMonteCarlo(rng_b, logweight)
     measurements_b = Measurements([:timeseries => (x -> x) => Float64[]], interval=1)
 
-    function update_b(x::Float64, alg::ImportanceSampling)::Float64
+    function update_b(x::Float64, alg::MarkovChainMonteCarlo)::Float64
         x_new = x + randn(alg.rng) * 2.0
         accept!(alg, x_new, x) ? x_new : x
     end

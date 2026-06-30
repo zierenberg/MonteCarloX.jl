@@ -12,7 +12,7 @@ function test_checkpoint_restore_importance_sampling()
     pass = true
 
     for (name, alg) in [
-        ("ImportanceSampling", ImportanceSampling(MersenneTwister(1), x -> -0.5x^2)),
+        ("MarkovChainMonteCarlo", MarkovChainMonteCarlo(MersenneTwister(1), x -> -0.5x^2)),
         ("Metropolis",         Metropolis(MersenneTwister(2); β=0.5)),
         ("HeatBath",   HeatBath(MersenneTwister(3); β=0.5)),
     ]
@@ -82,7 +82,7 @@ end
 
 function test_checkpoint_override()
     rng = MersenneTwister(7)
-    alg = ImportanceSampling(rng, x -> -x^2)
+    alg = MarkovChainMonteCarlo(rng, x -> -x^2)
 
     file = _tmp_checkpoint_file("override")
     ckpt = init_checkpoint(file, (alg=alg, sweep=0))
@@ -100,7 +100,7 @@ end
 function test_deterministic_restart()
     # Reference: single uninterrupted run of 2000 steps
     rng_ref = MersenneTwister(42)
-    alg_ref = ImportanceSampling(rng_ref, x -> -0.5x^2)
+    alg_ref = MarkovChainMonteCarlo(rng_ref, x -> -0.5x^2)
     x_ref   = 0.0
     step    = 1.0
     samples_ref = Float64[]
@@ -112,7 +112,7 @@ function test_deterministic_restart()
 
     # Checkpointed run: 1000 steps -> checkpoint -> restore -> 1000 more
     rng_chk = MersenneTwister(42)
-    alg_chk = ImportanceSampling(rng_chk, x -> -0.5x^2)
+    alg_chk = MarkovChainMonteCarlo(rng_chk, x -> -0.5x^2)
     x_chk   = 0.0
     for _ in 1:1000
         x_new = x_chk + randn(alg_chk.rng) * step
@@ -127,7 +127,7 @@ function test_deterministic_restart()
                                    steps=alg_chk.steps, accepted=alg_chk.accepted, sweep=1000))
 
     ckpt2 = restore_checkpoint(file)
-    alg_chk = ImportanceSampling(ckpt2.rng, x -> -0.5x^2)
+    alg_chk = MarkovChainMonteCarlo(ckpt2.rng, x -> -0.5x^2)
     alg_chk.steps    = ckpt2.steps
     alg_chk.accepted = ckpt2.accepted
     x_chk   = ckpt2.x

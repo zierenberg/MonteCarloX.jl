@@ -42,7 +42,7 @@ Always use the full-state form:
 accept!(alg, arg_new, arg_old)
 ```
 
-The `Multicanonical(rng, bins)` constructor wraps a `MulticanonicalEnsemble` in a generic `ImportanceSampling` algorithm and enforces this at construction time.
+The `Multicanonical(rng, bins)` constructor wraps a `MulticanonicalEnsemble` in a generic `MarkovChainMonteCarlo` algorithm and enforces this at construction time.
 
 ## Weight refinement
 
@@ -182,7 +182,7 @@ Everything outside `accept!` and `update!` is system-layer code: picking a site,
 
 ## Full Ising example with `MCXSpins`
 
-For a real system, `MCXSpins.spin_flip!(sys, alg)` dispatches on `alg::AbstractImportanceSampling` to use the full-state form of `accept!`, so the loop body collapses to one call:
+For a real system, `MCXSpins.spin_flip!(sys, alg)` dispatches on `alg::AbstractMarkovChainMonteCarlo` to use the full-state form of `accept!`, so the loop body collapses to one call:
 
 ```julia
 using MonteCarloX, MCXSpins, Random
@@ -233,7 +233,7 @@ ens = CustomEnsemble(
     BoltzmannEnsemble(β = 0.3),
     MulticanonicalEnsemble(0:1:length(sys.spins)),
 )
-alg = ImportanceSampling(rng, ens)
+alg = MarkovChainMonteCarlo(rng, ens)
 
 # accept! receives a tuple of sub-energies; only the muca piece is refined later
 accept!(alg, (H_pair_new, H_spin2_new), (H_pair_old, H_spin2_old))
