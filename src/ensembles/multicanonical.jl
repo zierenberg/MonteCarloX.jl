@@ -31,7 +31,7 @@ function MulticanonicalEnsemble(bins; init::Real=0.0, kwargs...)
 end
 
 @inline logweight(e::MulticanonicalEnsemble) = e.logweight # this is already a callable BinnedObject, so we can just return it
-@inline logweight(e::MulticanonicalEnsemble, x) = e.logweight(x)
+@inline logweight(e::MulticanonicalEnsemble, arg) = e.logweight(arg)
 
 @inline should_record_visit(ens::MulticanonicalEnsemble) = ens.record_visits
 

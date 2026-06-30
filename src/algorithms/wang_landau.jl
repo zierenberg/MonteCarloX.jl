@@ -21,17 +21,20 @@ WangLandau(bins_or_logweight; init::Real=0.0, logf::Real=1.0) =
     logweight(ensemble(alg))
 
 """
-    accept!(alg::ImportanceSampling{<:WangLandauEnsemble}, x_new, x_old)
+    accept!(alg::ImportanceSampling{<:WangLandauEnsemble}, arg_new, arg_old) -> Bool
 
 Perform Metropolis acceptance and apply Wang-Landau local adaptation at the
-visited state by updating the tabulated logweight.
+visited argument by decrementing the tabulated logweight by `ens.logf`.
+See [`accept!`](@ref) on `AbstractImportanceSampling` for the meaning of
+`arg_new`/`arg_old` (the ensemble's `logweight` argument, typically the
+reaction coordinate, not the full state).
 """
-function accept!(alg::ImportanceSampling{<:WangLandauEnsemble}, x_new::Real, x_old::Real)
+function accept!(alg::ImportanceSampling{<:WangLandauEnsemble}, arg_new::Real, arg_old::Real)
     ens = ensemble(alg)
     lw = logweight(alg)
-    log_ratio = lw(x_new) - lw(x_old)
+    log_ratio = lw(arg_new) - lw(arg_old)
     accepted = _accept!(alg, log_ratio)
-    x_vis = accepted ? x_new : x_old
-    lw[x_vis] -= ens.logf
+    arg_vis = accepted ? arg_new : arg_old
+    lw[arg_vis] -= ens.logf
     return accepted
 end

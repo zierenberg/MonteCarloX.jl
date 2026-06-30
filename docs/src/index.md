@@ -26,36 +26,37 @@ This keeps the framework compact and allows independent development of new model
 
 ## Algorithms
 
-So far, we distinguish four main classes of Monte-Carlo sampling schemes that bring different types of algorithms:
+Sorted by the standard literature partition, MonteCarloX organizes algorithms into three method classes:
 
-- **Markov-Chain Monte Carlo**: discrete-step dynamics based on proposing a new state `x_new` and accepting/rejecting with `accept!(alg, x_new, x_old)`.
-  - `Metropolis` — accept or reject proposed changes based on a log-weight ratio. Specializations: `Glauber`, `HeatBath`, `MetropolisHastings` (TODO)
-  - `ReplicaExchange` — run multiple replicas at different parameters and exchange configurations to bypass free-energy barriers. Specializations: `ParallelTempering`
-  - `Multicanonical` — flat-histogram algorithm where weights are iteratively adapted to achieve uniform sampling of a reaction coordinate across barriers. (TODO: merge `Muca`, `WangLandau`, and `SAMC` into a unified flat-histogram class)
-  - `WangLandau` — flat-histogram algorithm where weights are adapted on-the-fly with the same purpose as `Multicanonical`. Specialization: `stochastic approximation Monte Carlo (SAMC)` (TODO)
-  - `HMC(TODO)` — gradient-informed Hamiltonian proposals with Metropolis-Hastings correction (needs information about the gradient, not trivial)
+- **[Markov Chain Monte Carlo](algorithms/markov_chain_monte_carlo.md)** — discrete-step chains whose stationary distribution is a target ``\pi(x) \propto \exp(\text{logweight}(x))``. Algorithms differ in *how* the chain transitions: accept/reject from a log-weight ratio, or draw one coordinate at a time from its conditional.
+  - [`Metropolis`](algorithms/metropolis.md), `Glauber` — accept/reject with symmetric proposals.
+  - `MetropolisHastings` (TODO) — asymmetric-proposal correction.
+  - `HeatBath` — Gibbs-style sampling of one coordinate from its conditional (Bayesian "Gibbs sampling"). Subpage TODO.
+  - [`Multicanonical`](algorithms/multicanonical.md), `WangLandau` (subpage TODO), `SAMC` (TODO) — flat-histogram methods with iteratively adapted weights.
+  - `ReplicaExchange`, `ParallelTempering` — parallel chains coupled by ensemble swaps. Subpage TODO.
+  - `HMC` (TODO) — gradient-informed Hamiltonian proposals.
 
-- **Kinetic Monte Carlo**: continuous-time dynamics on a discrete state space, governed by a master equation. Based on event sources `es` (e.g. list of rates) to draw `(time, event)` via `step!(alg, es)` or advance the full system via `advance!(alg, sys)` if `event_source(sys)` is specified.
-  - `Gillespie` — exact stochastic simulation via event rates
-  - `Poisson` — sample (inhomogeneous) Poisson processes
+- **[Kinetic Monte Carlo](algorithms/kinetic_monte_carlo.md)** — continuous-time dynamics on a discrete state space, governed by a master equation. Draws `(time, event)` from a rate-based event source.
+  - `Gillespie` — exact stochastic simulation via event rates.
+  - `Poisson` — primitives for (inhomogeneous) Poisson processes.
+  - `BKL` / `n-fold way` (TODO) — discrete-time projection of `Gillespie`.
 
-- **Stochastic Dynamics**: continuous-time dynamics on a continuous state space, governed by a Langevin SDE / Fokker-Planck equation. 
-  - TODO: Implement as a thin wrapper around [`StochasticDiffEq.jl`](https://github.com/SciML/StochasticDiffEq.jl), defining drift `f(u,p,t)` and diffusion `g(u,p,t)` coefficients.
+- **[Population Monte Carlo](algorithms/population_monte_carlo.md)** (planned class, stub) — a weighted particle ensemble evolved through a sequence of intermediate targets. Sits orthogonally to MCMC and KMC, with any of them serving as the per-particle mutation kernel. Future home of all advanced importance-sampling methods (annealed IS, SMC samplers, population annealing, PERM, nested sampling, cross-entropy).
 
-- **Population Monte Carlo** (sequential MC | particle filter): a population of states (sometimes called particles) that evolve according to some propagation rule and are resampled via `resample!(alg, population)`. Sits orthogonally to the other three classes — any of the above can serve as the within-population propagation kernel.
-  - `PopulationAnnealing` — (TODO)
-  - `PERM` — (TODO)
+**Not a separate class.** Direct (i.i.d.) sampling and standard importance sampling reduce to one-line idioms over `AbstractEnsemble` objects; no dedicated algorithm type is provided. The genuinely scalable IS methods are all population-based and live under Population Monte Carlo.
 
-The different sampling schemes can be combined. For example, population resampling schemes are often combined with local MCMC equilibration. Similarly, we can also perform MCMC on the random numbers underlying kineticMC to sample rare events.
+**Continuous-state stochastic dynamics** (Langevin SDE / Fokker-Planck) are out of scope for the core package and can be handled by [`StochasticDiffEq.jl`](https://github.com/SciML/StochasticDiffEq.jl); we may add a thin wrapper later if motivated by a concrete use case.
+
+The classes can be combined. Population MC uses MCMC as a per-particle kernel; MCMC on the random numbers underlying a KMC trajectory enables rare-event sampling of stochastic dynamics.
 
 ## Infrastructure
 
 The package comes with helpful infrastructure for advanced Monte Carlo algorithms including
-- `BinnedObjects` - object for storing binned weight functions or histograms, both for discrete and continous binning.
+- `BinnedObjects` - object for storing binned weight functions or histograms, both for discrete and continuous binning.
 - `ParallelBackends` - backends for parallel computing, includes `ThreadsBackend` and `MPIBackend`.
 - `ParallelChains` - handles parallel algorithms for MCMC (TODO: may need refactor if we do not consider PopMC Markov Chain).
 - `CheckpointSession` - uses Serialization to checkpoint and recover simulations
-- `Monitoring` - monitoring tools, inlcluding `RoundTrips`, and histogram flatness criteria
+- `Monitoring` - monitoring tools, including `RoundTrips`, and histogram flatness criteria
 - `MutableRandomNumbers` - useful to update random numbers themselves for rare-event sampling. (TODO: needs to be included into actual examples, so far we just did that manually, so not sure if this is really helping or confusing)
 
 ## Examples as templates

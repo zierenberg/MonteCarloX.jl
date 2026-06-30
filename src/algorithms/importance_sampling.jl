@@ -3,8 +3,8 @@
 """
     ImportanceSampling <: AbstractImportanceSampling
 
-Generic importance-sampling algorithm that operates on full-state
-acceptance arguments `(x_new, x_old)` using a callable `ensemble`.
+Generic importance-sampling algorithm that operates on full
+acceptance arguments `(arg_new, arg_old)` using a callable `ensemble`.
 
 The callable may be a function or a log-weight object and should return a
 scalar score such as a log density / log weight.
@@ -52,27 +52,35 @@ Use this accessor when reasoning about acceptance formulas.
 # Optional ensemble-level visit hooks used by generic accept!.
 # Ensembles that need histogram/visit bookkeeping can specialize these.
 @inline should_record_visit(ens) = false
-@inline record_visit!(ens, x_vis) = nothing
+@inline record_visit!(_ens, _arg_vis) = nothing
 
 """
-    accept!(alg::AbstractImportanceSampling, x_new, x_old)
+    accept!(alg::AbstractImportanceSampling, arg_new, arg_old) -> Bool
 
-Evaluate acceptance criterion for importance sampling with differences.
+Evaluate the Metropolis acceptance criterion for the proposed move.
 
-Updates step and acceptance counters in the algorithm.
-Returns true if the move is accepted based on the Metropolis criterion:
-- Accept if log_ratio > 0 (new state has higher weight)
-- Accept with probability exp(log_ratio) otherwise
+`arg_new` and `arg_old` are the arguments at which the ensemble's `logweight`
+is evaluated for the proposed and current state — *not* necessarily the
+system's full configuration:
 
-This is the core accept/reject step used by all importance sampling algorithms.
+  - `BoltzmannEnsemble(β)`            → energies (scalars)
+  - `FunctionEnsemble(logposterior)`  → parameter vectors θ
+  - `MulticanonicalEnsemble(bins)`    → values of the binned reaction coordinate
+
+This decoupling lets adaptive ensembles operate on projected coordinates
+without materializing or comparing full states.
+
+Updates step and acceptance counters. Returns `true` if the move is accepted:
+- accept if `log_ratio > 0` (proposed argument has higher weight),
+- otherwise accept with probability `exp(log_ratio)`.
 """
-@inline function accept!(alg::AbstractImportanceSampling, x_new::T, x_old::T) where T
+@inline function accept!(alg::AbstractImportanceSampling, arg_new::T, arg_old::T) where T
     ens = ensemble(alg)
-    log_ratio = logweight(ens, x_new) - logweight(ens, x_old)
+    log_ratio = logweight(ens, arg_new) - logweight(ens, arg_old)
     accepted = _accept!(alg, log_ratio)
     if should_record_visit(ens)
-        x_vis = accepted ? x_new : x_old
-        record_visit!(ens, x_vis)
+        arg_vis = accepted ? arg_new : arg_old
+        record_visit!(ens, arg_vis)
     end
     return accepted
 end

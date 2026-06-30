@@ -5,3 +5,11 @@
 .docs-package-name .docs-autofit {
     display: block;
 }
+
+/* Hide the in-page table of contents (H2/H3 headings of the active page)
+   from the sidebar. Documenter has no flag for this; CSS is the only knob. */
+#documenter .docs-sidebar .docs-menu .internal,
+#documenter .docs-sidebar ul.internal,
+#documenter .docs-sidebar .tocitem-children {
+    display: none !important;
+}

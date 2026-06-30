@@ -105,19 +105,19 @@ end
 ################ exchange logic ################
 
 """
-    exchange_log_ratio(ens_i, ens_j, x_i, x_j)
+    exchange_log_ratio(ens_i, ens_j, arg_i, arg_j)
 
 Replica-exchange swap log-ratio for two ensembles and their local observables.
 """
-@inline function exchange_log_ratio(ens_i, ens_j, x_i::Real, x_j::Real)
-    return (logweight(ens_i, x_j) - logweight(ens_i, x_i)) +
-           (logweight(ens_j, x_i) - logweight(ens_j, x_j))
+@inline function exchange_log_ratio(ens_i, ens_j, arg_i::Real, arg_j::Real)
+    return (logweight(ens_i, arg_j) - logweight(ens_i, arg_i)) +
+           (logweight(ens_j, arg_i) - logweight(ens_j, arg_j))
 end
 
 @inline _accept_exchange(log_ratio::Real, u::Real) = (log_ratio > 0) || (u < exp(log_ratio))
 
 """
-    attempt_exchange_pair!(alg_i, alg_j, x_i, x_j, u)
+    attempt_exchange_pair!(alg_i, alg_j, arg_i, arg_j, u)
 
 Attempt one pair exchange using shared random number `u`.
 If accepted, ensembles are swapped between `alg_i` and `alg_j`.
@@ -125,11 +125,11 @@ Returns `true` if accepted.
 """
 function attempt_exchange_pair!(alg_i::AbstractImportanceSampling,
                                 alg_j::AbstractImportanceSampling,
-                                x_i::Real,
-                                x_j::Real,
+                                arg_i::Real,
+                                arg_j::Real,
                                 u::Real)
     isfinite(u) || throw(ArgumentError("shared random number `u` must be finite"))
-    log_ratio = exchange_log_ratio(alg_i.ensemble, alg_j.ensemble, x_i, x_j)
+    log_ratio = exchange_log_ratio(alg_i.ensemble, alg_j.ensemble, arg_i, arg_j)
     accepted = _accept_exchange(log_ratio, u)
     if accepted
         alg_i.ensemble, alg_j.ensemble = alg_j.ensemble, alg_i.ensemble
