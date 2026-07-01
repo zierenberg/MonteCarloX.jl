@@ -5,7 +5,7 @@ using StatsBase: normalize, kldivergence
 using Distributions
 using Test
 
-function test_algorithm_constructors()
+function test_mcmc_constructors()
     pass = true
 
     # MarkovChainMonteCarlo with FunctionEnsemble
@@ -59,7 +59,7 @@ function test_glauber_acceptance()
     return pass
 end
 
-function test_importance_sampling_1d_gaussian()
+function test_mcmc_1d_gaussian()
     rng = MersenneTwister(42)
 
     mu = 1.0; sigma = 1.0
@@ -126,7 +126,7 @@ function test_importance_sampling_1d_gaussian()
     return pass
 end
 
-function test_importance_sampling_2d_gaussian()
+function test_mcmc_2d_gaussian()
     rng = MersenneTwister(100)
 
     mu = [1.0, 2.0]
@@ -221,7 +221,7 @@ function test_metropolis_temperature()
     return pass
 end
 
-function test_importance_sampling_proposal_invariance()
+function test_mcmc_proposal_invariance()
     logweight(x) = -0.5 * (x - 0.5)^2
 
     samples = 20000
@@ -278,18 +278,18 @@ function test_importance_sampling_proposal_invariance()
     return pass
 end
 
-@testset "Importance Sampling" begin
-    @testset "algorithm constructors" begin
-        @test test_algorithm_constructors()
+@testset "Markov Chain Monte Carlo" begin
+    @testset "MCMC constructors" begin
+        @test test_mcmc_constructors()
     end
     @testset "1D Gaussian" begin
-        @test test_importance_sampling_1d_gaussian()
+        @test test_mcmc_1d_gaussian()
     end
     @testset "2D Gaussian" begin
-        @test test_importance_sampling_2d_gaussian()
+        @test test_mcmc_2d_gaussian()
     end
     @testset "proposal invariance" begin
-        @test test_importance_sampling_proposal_invariance()
+        @test test_mcmc_proposal_invariance()
     end
 end
 
