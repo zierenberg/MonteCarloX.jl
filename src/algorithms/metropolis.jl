@@ -1,23 +1,26 @@
 """
-    AbstractMetropolis <: AbstractImportanceSampling
+    AbstractMetropolis <: AbstractMarkovChainMonteCarlo
 
 Base type for Metropolis-family samplers where acceptance is naturally
-computed from a local state difference (e.g. ΔE).
+computed from a local difference of the ensemble's logweight argument
+(e.g. ΔE for `BoltzmannEnsemble`).
 
-Requires a linear logweight: `logweight(ens, dE) == logweight(ens, E+dE) - logweight(ens, E)`.
+Requires a linear logweight: `logweight(ens, Δarg) == logweight(ens, arg+Δarg) - logweight(ens, arg)`.
 Non-linear ensembles (e.g. `MulticanonicalEnsemble`, `WangLandauEnsemble`) must use
-`ImportanceSampling` instead.
+`MarkovChainMonteCarlo` instead.
 """
-abstract type AbstractMetropolis <: AbstractImportanceSampling end
+abstract type AbstractMetropolis <: AbstractMarkovChainMonteCarlo end
 
 
 """
-    accept!(alg::AbstractMetropolis, delta_state)
+    accept!(alg::AbstractMetropolis, delta_arg) -> Bool
 
-Metropolis-family acceptance using a local state difference.
+Metropolis-family acceptance using a local difference `delta_arg` of the
+ensemble's logweight argument (e.g. `ΔE` for `BoltzmannEnsemble`). Only
+valid for linear ensembles; see [`AbstractMetropolis`](@ref).
 """
-@inline function accept!(alg::AbstractMetropolis, delta_state)
-    log_ratio = logweight(ensemble(alg), delta_state)
+@inline function accept!(alg::AbstractMetropolis, delta_arg)
+    log_ratio = logweight(ensemble(alg), delta_arg)
     return _accept!(alg, log_ratio)
 end
 
@@ -76,7 +79,7 @@ function Metropolis(rng::AbstractRNG, ensemble)
     ens = _as_ensemble(ensemble)
     linear_logweight(ens) || throw(ArgumentError(
         "$(typeof(ens)) does not have a linear logweight and cannot be used with Metropolis. " *
-        "Use ImportanceSampling or a dedicated algorithm instead."))
+        "Use MarkovChainMonteCarlo or a dedicated algorithm instead."))
     Metropolis(rng, ens, 0, 0)
 end
 
@@ -117,15 +120,15 @@ function Glauber(rng::AbstractRNG, ensemble)
     ens = _as_ensemble(ensemble)
     linear_logweight(ens) || throw(ArgumentError(
         "$(typeof(ens)) does not have a linear logweight and cannot be used with Glauber. " *
-        "Use ImportanceSampling or a dedicated algorithm instead."))
+        "Use MarkovChainMonteCarlo or a dedicated algorithm instead."))
     Glauber(rng, ens, 0, 0)
 end
 
 Glauber(rng::AbstractRNG; β::Real) =
     Glauber(rng, BoltzmannEnsemble(β=β))
 
-function accept!(alg::Glauber, delta_state::Real)
-    log_ratio = logweight(ensemble(alg), delta_state)
+function accept!(alg::Glauber, delta_arg::Real)
+    log_ratio = logweight(ensemble(alg), delta_arg)
     alg.steps += 1
     accepted = rand(alg.rng) < logistic(log_ratio)
     alg.accepted += accepted

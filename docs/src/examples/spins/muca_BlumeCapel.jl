@@ -63,7 +63,7 @@ end
     return nothing
 end
 
-@inline reset_histogram!(alg::AbstractImportanceSampling) =
+@inline reset_histogram!(alg::AbstractMarkovChainMonteCarlo) =
     reset_histogram!(MonteCarloX.ensemble(alg))
 
 ens = CustomEnsemble(
@@ -79,7 +79,7 @@ ens = CustomEnsemble(
 # it to `accept!` as a tuple — the `CustomEnsemble` routes each component
 # to the correct acceptance weight.
 
-function spin_flip!(sys::MCXSpins.AbstractBlumeCapel, alg::AbstractImportanceSampling)
+function spin_flip!(sys::MCXSpins.AbstractBlumeCapel, alg::AbstractMarkovChainMonteCarlo)
     i     = pick_site(alg.rng, length(sys.spins))
     s_new = propose_state(alg.rng, sys, i)
     dsys = MCXSpins.delta_sys(sys, i, s_new)
@@ -97,7 +97,7 @@ end
 # `W -= log(H)` rule. We also monitor flatness and track round trips.
 
 rng = Xoshiro(42)
-alg = ImportanceSampling(rng, ens)
+alg = MarkovChainMonteCarlo(rng, ens)
 
 N_sites  = length(sys.spins)
 s2_min   = 0

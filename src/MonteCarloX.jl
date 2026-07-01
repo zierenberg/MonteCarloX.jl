@@ -13,7 +13,7 @@ export  AbstractSystem,
 
 include("algorithms/abstract_algorithm.jl")
 export  AbstractAlgorithm,
-        AbstractImportanceSampling,
+        AbstractMarkovChainMonteCarlo,
         AbstractHeatBath,
         AbstractKineticMonteCarlo,
         steps
@@ -130,10 +130,21 @@ export  EventQueue,
 
 # ── Algorithms (equilibrium) ────────────────────────────────────────────────
 
-include("algorithms/importance_sampling.jl")
-export  AbstractImportanceSampling,
+include("algorithms/markov_chain_monte_carlo.jl")
+
+# Short user-facing alias for the constructor.
+const MCMC = MarkovChainMonteCarlo
+
+# Deprecated bindings — old names still resolve with a deprecation warning.
+Base.@deprecate_binding AbstractImportanceSampling AbstractMarkovChainMonteCarlo
+Base.@deprecate_binding ImportanceSampling MarkovChainMonteCarlo
+
+export  AbstractMarkovChainMonteCarlo,
         AbstractHeatBath,
-        ImportanceSampling,
+        MarkovChainMonteCarlo,
+        MCMC,
+        AbstractImportanceSampling,   # deprecated alias
+        ImportanceSampling,           # deprecated alias
         ensemble,
         logweight,
         accept!,

@@ -12,7 +12,7 @@ function WangLandauEnsemble(bins; init::Real=0.0, logf::Real=1.0)
 end
 
 @inline logweight(e::WangLandauEnsemble) = e.logweight
-@inline logweight(e::WangLandauEnsemble, x) = e.logweight(x)
+@inline logweight(e::WangLandauEnsemble, arg) = e.logweight(arg)
 
 """
     update!(e::WangLandauEnsemble; power=0.5)

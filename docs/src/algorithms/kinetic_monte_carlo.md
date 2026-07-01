@@ -1,17 +1,17 @@
-# Continuous-Time Sampling Algorithms
-Continuous-time Monte Carlo in MonteCarloX is event-driven.
-You sample **when** the next event happens and **which** event happens.
+# Kinetic Monte Carlo
 
-## Why this differs from Metropolis-style sampling
-- Importance sampling focuses on stationary distributions.
-- Continuous-time sampling focuses on trajectories in real/simulation time.
+Kinetic Monte Carlo (KMC) simulates continuous-time Markov processes on a discrete state space by sampling **when** the next event happens and **which** event happens.
+The chain advances in real (or simulation) time according to event rates rather than in discrete attempt-and-accept steps.
 
-Conceptually, trajectories can be viewed as states in path space.
-The continuous-time interface is a computational specialization for explicit event-time dynamics.
+This page sets up the vocabulary and API shared by every KMC algorithm in MonteCarloX.
+Concrete algorithms — currently [Gillespie](#gillespie-workflow), with `BKL` / `n-fold way` planned — are documented as sections below until they grow into their own subpages.
 
-Path-space notation:
-- trajectory ``\omega = (x_t)_{t \in [0,T]}``
-- target path distribution ``\pi(\omega) = p(\omega \mid \lambda)``
+## How this differs from MCMC
+
+- [MCMC](markov_chain_monte_carlo.md) targets a stationary distribution via discrete propose-and-accept steps; time is fictitious.
+- KMC simulates a continuous-time Markov chain whose marginals follow the master equation; time is physical.
+
+Conceptually, KMC trajectories can be viewed as samples from a distribution on path space ``\pi(\omega) = p(\omega \mid \lambda)`` with ``\omega = (x_t)_{t \in [0,T]}``. The KMC interface is a computational specialization for this path-space sampling when the dynamics is a CTMC with known rates.
 
 ## Gillespie workflow
 At each step:

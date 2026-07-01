@@ -15,9 +15,9 @@ end
 """
     linear_logweight(ens::AbstractEnsemble) -> Bool
 
-Whether `logweight(ens, Δx) == logweight(ens, x + Δx) - logweight(ens, x)` holds,
-i.e. the logweight is linear so that Metropolis-family algorithms can work with
-state differences alone.
+Whether `logweight(ens, Δarg) == logweight(ens, arg + Δarg) - logweight(ens, arg)`
+holds, i.e. the logweight is linear in its argument so that Metropolis-family
+algorithms can work with argument differences alone.
 
 Defaults to `false`. Ensembles that satisfy linearity must opt in.
 """
@@ -34,14 +34,16 @@ function logweight(ens::AbstractEnsemble)
 end
 
 """
-    logweight(ens::AbstractEnsemble, x)
+    logweight(ens::AbstractEnsemble, arg)
 
-Evaluate logweight on state/value `x`.
-Concrete ensembles should provide this directly or rely on a callable from
-`logweight(ens)`.
+Evaluate the ensemble's logweight on `arg` — the quantity the ensemble's
+weight is parameterized by (e.g. energy for `BoltzmannEnsemble`, parameter
+vector for a Bayesian `FunctionEnsemble`, reaction coordinate for a
+`MulticanonicalEnsemble`). Concrete ensembles should provide this directly
+or rely on a callable from `logweight(ens)`.
 """
-function logweight(ens::AbstractEnsemble, x)
-    return logweight(ens)(x)
+function logweight(ens::AbstractEnsemble, arg)
+    return logweight(ens)(arg)
 end
 
 # """

@@ -2,7 +2,7 @@ module MCXSoftMatter
 
 using StaticArrays
 using MonteCarloX: AbstractSystem,
-                   AbstractImportanceSampling,
+                   AbstractMarkovChainMonteCarlo,
                    AbstractMetropolis,
                    accept!
 import MonteCarloX: init!

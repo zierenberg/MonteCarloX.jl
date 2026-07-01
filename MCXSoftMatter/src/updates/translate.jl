@@ -1,4 +1,4 @@
-function translate!(sys::ParticleSystem{D,T}, alg::AbstractImportanceSampling, Δ::T; chain::Bool=false) where {D,T}
+function translate!(sys::ParticleSystem{D,T}, alg::AbstractMarkovChainMonteCarlo, Δ::T; chain::Bool=false) where {D,T}
     if chain
         _translate_chain!(sys, alg, Δ)
     else
@@ -12,14 +12,14 @@ end
     accept!(alg, dE)
 end
 # General IS: needs full energies for non-linear logweights + record_visit!
-@inline function _accept_energy_change!(alg::AbstractImportanceSampling, sys, dE)
+@inline function _accept_energy_change!(alg::AbstractMarkovChainMonteCarlo, sys, dE)
     E_old = energy(sys)
     accept!(alg, E_old + dE, E_old)
 end
 
 #### Monomer translate ####
 
-function _translate_monomer!(sys::ParticleSystem{D,T}, alg::AbstractImportanceSampling, Δ::T) where {D,T}
+function _translate_monomer!(sys::ParticleSystem{D,T}, alg::AbstractMarkovChainMonteCarlo, Δ::T) where {D,T}
     rng = alg.rng
     idx = rand(rng, 1:length(sys.positions))
 
@@ -37,7 +37,7 @@ end
 
 #### Chain translate ####
 
-function _translate_chain!(sys::ParticleSystem{D,T,TEnv,P,<:Polymer}, alg::AbstractImportanceSampling, Δ::T) where {D,T,TEnv,P}
+function _translate_chain!(sys::ParticleSystem{D,T,TEnv,P,<:Polymer}, alg::AbstractMarkovChainMonteCarlo, Δ::T) where {D,T,TEnv,P}
     rng = alg.rng
     n = rand(rng, 1:length(sys.molecules))
     mol = sys.molecules[n]

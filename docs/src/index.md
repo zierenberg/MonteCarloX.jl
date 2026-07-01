@@ -3,32 +3,61 @@
 MonteCarloX.jl is a modular Monte Carlo framework in Julia.
 It separates the sampling algorithm from the system under study:
 the user defines the system state and proposes changes; MonteCarloX provides the acceptance criterion.
-Because the algorithm is independent of the model, every simulation becomes a template — replacing the system yields a new application without modifying the algorithmic loop.
+By explicitly separating the algorithm from the system, every simulation becomes a template — replacing the system yields a new application without modifying the algorithmic loop.
 
 ## Separation of concerns
 
 A Monte Carlo simulation in this framework consists of two parts:
 
-1. **Problem-specific** (provided by the user): the system state and a rule for proposing changes.
+1. **Problem-specific** (provided by the user/community): the system state and a rule for proposing changes.
 2. **Algorithms** (provided by MonteCarloX): the development of the Markov Chain that can vary from simple to complex.
 
-For discrete-state sampling, the central interface is `accept!(algorithm, x_new, x_old)`.
-For continuous-time dynamics, the equivalent is `advance!(algorithm, system, T)`, which selects event times and events from user-defined rates.
-
 This separation keeps algorithm code model-agnostic:
-the same `Metropolis` algorithm samples a posterior distribution in Bayesian inference, an Ising model at thermal equilibrium, or any other system for which a log-weight function can be defined.
+We can use the same MCMC algorithm to sample the posterior distribution in Bayesian inference, the Boltzmann distribution of an Ising model, or any other system/ for that a weight function can be defined.
 
 Because the user retains full control over the system definition and update rule, it is straightforward to build companion packages that provide these for entire model families.
 For example, `MCXSpins` implements states, updates, and observables for Ising and Blume-Capel models, so that a simulation reduces to choosing an algorithm and running the loop.
 
+## Scope
+
+MonteCarloX provides the algorithmic core.
+Concrete model families (e.g., `MCXSpins`) are maintained as separate companion packages.
+This keeps the framework compact and allows independent development of new models.
+
 ## Algorithms
 
-MonteCarloX provides the following sampling algorithms, each usable with any system that implements the required interface:
+Sorted by the standard literature partition, MonteCarloX organizes algorithms into three method classes:
 
-- **Importance sampling**: `Metropolis`, `Glauber`, `HeatBath` — accept or reject proposed changes based on a log-weight ratio.
-- **Flat-histogram methods**: `Multicanonical`, `WangLandau` — iteratively adapt weights to achieve uniform sampling over an order parameter, enabling access to rare configurations.
-- **Extended-ensemble methods**: `ParallelTempering`, `ReplicaExchange` — run multiple replicas at different parameters and exchange configurations to overcome free-energy barriers.
-- **Continuous-time sampling**: `Gillespie` — exact stochastic simulation via event rates.
+- **[Markov Chain Monte Carlo](algorithms/markov_chain_monte_carlo.md)** — discrete-step chains whose stationary distribution is a target ``\pi(x) \propto \exp(\text{logweight}(x))``. Algorithms differ in *how* the chain transitions: accept/reject from a log-weight ratio, or draw one coordinate at a time from its conditional.
+  - [`Metropolis`](algorithms/metropolis.md), `Glauber` — accept/reject with symmetric proposals.
+  - `MetropolisHastings` (TODO) — asymmetric-proposal correction.
+  - `HeatBath` — Gibbs-style sampling of one coordinate from its conditional (Bayesian "Gibbs sampling"). Subpage TODO.
+  - [`Multicanonical`](algorithms/multicanonical.md), `WangLandau` (subpage TODO), `SAMC` (TODO) — flat-histogram methods with iteratively adapted weights.
+  - `ReplicaExchange`, `ParallelTempering` — parallel chains coupled by ensemble swaps. Subpage TODO.
+  - `HMC` (TODO) — gradient-informed Hamiltonian proposals.
+
+- **[Kinetic Monte Carlo](algorithms/kinetic_monte_carlo.md)** — continuous-time dynamics on a discrete state space, governed by a master equation. Draws `(time, event)` from a rate-based event source.
+  - `Gillespie` — exact stochastic simulation via event rates.
+  - `Poisson` — primitives for (inhomogeneous) Poisson processes.
+  - `BKL` / `n-fold way` (TODO) — discrete-time projection of `Gillespie`.
+
+- **[Population Monte Carlo](algorithms/population_monte_carlo.md)** (planned class, stub) — a weighted particle ensemble evolved through a sequence of intermediate targets. Sits orthogonally to MCMC and KMC, with any of them serving as the per-particle mutation kernel. Future home of all advanced importance-sampling methods (annealed IS, SMC samplers, population annealing, PERM, nested sampling, cross-entropy).
+
+**Not a separate class.** Direct (i.i.d.) sampling and standard importance sampling reduce to one-line idioms over `AbstractEnsemble` objects; no dedicated algorithm type is provided. The genuinely scalable IS methods are all population-based and live under Population Monte Carlo.
+
+**Continuous-state stochastic dynamics** (Langevin SDE / Fokker-Planck) are out of scope for the core package and can be handled by [`StochasticDiffEq.jl`](https://github.com/SciML/StochasticDiffEq.jl); we may add a thin wrapper later if motivated by a concrete use case.
+
+The classes can be combined. Population MC uses MCMC as a per-particle kernel; MCMC on the random numbers underlying a KMC trajectory enables rare-event sampling of stochastic dynamics.
+
+## Infrastructure
+
+The package comes with helpful infrastructure for advanced Monte Carlo algorithms including
+- `BinnedObjects` - object for storing binned weight functions or histograms, both for discrete and continuous binning.
+- `ParallelBackends` - backends for parallel computing, includes `ThreadsBackend` and `MPIBackend`.
+- `ParallelChains` - handles parallel algorithms for MCMC (TODO: may need refactor if we do not consider PopMC Markov Chain).
+- `CheckpointSession` - uses Serialization to checkpoint and recover simulations
+- `Monitoring` - monitoring tools, including `RoundTrips`, and histogram flatness criteria
+- `MutableRandomNumbers` - useful to update random numbers themselves for rare-event sampling. (TODO: needs to be included into actual examples, so far we just did that manually, so not sure if this is really helping or confusing)
 
 ## Examples as templates
 
@@ -42,12 +71,6 @@ the algorithmic structure remains unchanged when the system is replaced.
 - **Large deviation theory**: multicanonical sampling of rare fluctuations in sums of random variables and the Ornstein-Uhlenbeck process.
 - **Infrastructure**: checkpointing and parallel chains (MPI, threads).
 
-## Scope
-
-MonteCarloX provides the algorithmic core.
-Concrete model families (e.g., `MCXSpins`) are maintained as separate companion packages.
-This keeps the framework compact and allows independent development of new models.
-
 ## Related Julia packages
 
 The Julia ecosystem already has several Monte Carlo packages with different goals and interfaces.
@@ -60,19 +83,19 @@ If your use case is better served by a domain-specific implementation, these are
 Other related packages (grouped by common use cases):
 
 - Bayesian inference and MCMC:
-	- [Turing.jl](https://github.com/TuringLang/Turing.jl)
-	- [AbstractMCMC.jl](https://github.com/TuringLang/AbstractMCMC.jl)
-	- [AdvancedMH.jl](https://github.com/TuringLang/AdvancedMH.jl)
-	- [AdvancedHMC.jl](https://github.com/TuringLang/AdvancedHMC.jl)
-	- [DynamicHMC.jl](https://github.com/tpapp/DynamicHMC.jl)
-	- [BAT.jl](https://github.com/bat/BAT.jl)
-	- [Gen.jl](https://github.com/probcomp/Gen.jl)
+  - [Turing.jl](https://github.com/TuringLang/Turing.jl)
+  - [AbstractMCMC.jl](https://github.com/TuringLang/AbstractMCMC.jl)
+  - [AdvancedMH.jl](https://github.com/TuringLang/AdvancedMH.jl)
+  - [AdvancedHMC.jl](https://github.com/TuringLang/AdvancedHMC.jl)
+  - [DynamicHMC.jl](https://github.com/tpapp/DynamicHMC.jl)
+  - [BAT.jl](https://github.com/bat/BAT.jl)
+  - [Gen.jl](https://github.com/probcomp/Gen.jl)
 - Monte Carlo integration and low-discrepancy sampling:
-	- [Cuba.jl](https://github.com/giordano/Cuba.jl)
-	- [QuasiMonteCarlo.jl](https://github.com/SciML/QuasiMonteCarlo.jl)
-	- [SpinMC](https://github.com/fbuessen/SpinMC.jl)
+  - [Cuba.jl](https://github.com/giordano/Cuba.jl)
+  - [QuasiMonteCarlo.jl](https://github.com/SciML/QuasiMonteCarlo.jl)
+  - [SpinMC](https://github.com/fbuessen/SpinMC.jl)
 - Uncertainty propagation with particle arithmetic:
-	- [MonteCarloMeasurements.jl](https://github.com/baggepinnen/MonteCarloMeasurements.jl)
+  - [MonteCarloMeasurements.jl](https://github.com/baggepinnen/MonteCarloMeasurements.jl)
 
 MonteCarloX stays focused on compact, model-agnostic algorithmic building blocks, while these packages offer specialized ecosystems for their target domains.
 

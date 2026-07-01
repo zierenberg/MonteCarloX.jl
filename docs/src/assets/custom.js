@@ -1,5 +1,5 @@
 (() => {
-  const iconHref = "assets/montecarlox_logo.png";
+  const iconHref = "assets/logo.png";
   let link = document.querySelector("link[rel='icon']");
   if (!link) {
     link = document.createElement("link");

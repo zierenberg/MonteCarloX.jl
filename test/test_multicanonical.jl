@@ -18,7 +18,7 @@ function test_multicanonical_accept_and_reset()
     alg = Multicanonical(rng, lw)
 
     step = 0.1
-    function update!(x::Float64, alg::AbstractImportanceSampling)::Float64
+    function update!(x::Float64, alg::AbstractMarkovChainMonteCarlo)::Float64
         x_new = x + randn(alg.rng) * step
         if accept!(alg, x_new, x)
             return x_new

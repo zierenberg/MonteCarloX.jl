@@ -6,9 +6,9 @@ It provides beta-ladder construction helpers and convenience constructors.
 """
 
 # Constructors dispatching on backend
-ParallelTempering(backend::ThreadsBackend, alg::AbstractVector{<:AbstractImportanceSampling}) =
+ParallelTempering(backend::ThreadsBackend, alg::AbstractVector{<:AbstractMarkovChainMonteCarlo}) =
     ReplicaExchange(backend, alg)
-ParallelTempering(backend::MPIBackend, alg::AbstractImportanceSampling) =
+ParallelTempering(backend::MPIBackend, alg::AbstractMarkovChainMonteCarlo) =
     ReplicaExchange(backend, alg)
 
 """

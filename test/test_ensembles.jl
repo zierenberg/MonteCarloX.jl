@@ -16,6 +16,10 @@ function test_abstract_ensemble_constructor()
     threw = try; update!(ens); false; catch err; err isa ArgumentError; end
     pass &= check(threw, "update!(BadEnsemble) throws\n")
 
+    # check default implementations of should_record_visit and record_visit!
+    pass &= check(MonteCarloX.should_record_visit(ens) == false, "should_record_visit(BadEnsemble) returns false\n")
+    pass &= check(MonteCarloX.record_visit!(ens, 1.0) === nothing, "record_visit!(BadEnsemble, x) is no-op\n")
+
     return pass
 end
 

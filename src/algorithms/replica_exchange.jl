@@ -51,7 +51,7 @@ end
 @inline index(rx::ReplicaExchange{<:ThreadsBackend}) = rx.indices
 @inline index(rx::ReplicaExchange{<:MPIBackend}) = rx.indices[rank(rx) + 1]
 
-function ReplicaExchange(backend::ThreadsBackend, alg::AbstractVector{<:AbstractImportanceSampling})
+function ReplicaExchange(backend::ThreadsBackend, alg::AbstractVector{<:AbstractMarkovChainMonteCarlo})
     n = length(alg)
     n >= 2 || throw(ArgumentError("need at least 2 algorithms for replica exchange"))
     pc = ParallelChains(backend, alg)
@@ -59,7 +59,7 @@ function ReplicaExchange(backend::ThreadsBackend, alg::AbstractVector{<:Abstract
     return ReplicaExchange(pc, 0, collect(1:n), zeros(Int, nedges), zeros(Int, nedges))
 end
 
-function ReplicaExchange(backend::MPIBackend, alg::AbstractImportanceSampling)
+function ReplicaExchange(backend::MPIBackend, alg::AbstractMarkovChainMonteCarlo)
     pc = ParallelChains(backend, alg)
     n = size(backend)
     nedges = max(0, n - 1)
@@ -105,31 +105,31 @@ end
 ################ exchange logic ################
 
 """
-    exchange_log_ratio(ens_i, ens_j, x_i, x_j)
+    exchange_log_ratio(ens_i, ens_j, arg_i, arg_j)
 
 Replica-exchange swap log-ratio for two ensembles and their local observables.
 """
-@inline function exchange_log_ratio(ens_i, ens_j, x_i::Real, x_j::Real)
-    return (logweight(ens_i, x_j) - logweight(ens_i, x_i)) +
-           (logweight(ens_j, x_i) - logweight(ens_j, x_j))
+@inline function exchange_log_ratio(ens_i, ens_j, arg_i::Real, arg_j::Real)
+    return (logweight(ens_i, arg_j) - logweight(ens_i, arg_i)) +
+           (logweight(ens_j, arg_i) - logweight(ens_j, arg_j))
 end
 
 @inline _accept_exchange(log_ratio::Real, u::Real) = (log_ratio > 0) || (u < exp(log_ratio))
 
 """
-    attempt_exchange_pair!(alg_i, alg_j, x_i, x_j, u)
+    attempt_exchange_pair!(alg_i, alg_j, arg_i, arg_j, u)
 
 Attempt one pair exchange using shared random number `u`.
 If accepted, ensembles are swapped between `alg_i` and `alg_j`.
 Returns `true` if accepted.
 """
-function attempt_exchange_pair!(alg_i::AbstractImportanceSampling,
-                                alg_j::AbstractImportanceSampling,
-                                x_i::Real,
-                                x_j::Real,
+function attempt_exchange_pair!(alg_i::AbstractMarkovChainMonteCarlo,
+                                alg_j::AbstractMarkovChainMonteCarlo,
+                                arg_i::Real,
+                                arg_j::Real,
                                 u::Real)
     isfinite(u) || throw(ArgumentError("shared random number `u` must be finite"))
-    log_ratio = exchange_log_ratio(alg_i.ensemble, alg_j.ensemble, x_i, x_j)
+    log_ratio = exchange_log_ratio(alg_i.ensemble, alg_j.ensemble, arg_i, arg_j)
     accepted = _accept_exchange(log_ratio, u)
     if accepted
         alg_i.ensemble, alg_j.ensemble = alg_j.ensemble, alg_i.ensemble
@@ -193,7 +193,7 @@ function _exchange_packet_mpi(comm, packet, partner_rank::Int, tag::Integer, is_
 end
 
 function _update_pair!(rx::ReplicaExchange{<:MPIBackend},
-                       alg::AbstractImportanceSampling,
+                       alg::AbstractMarkovChainMonteCarlo,
                        x::Real,
                        pair_id::Int,
                        partner_index::Int)
