@@ -26,6 +26,7 @@ end
     include("test_message_backend.jl")
     include("test_markov_chain_monte_carlo.jl")
     include("test_multicanonical.jl")
+    include("test_reweighting.jl")
     include("test_parallel_ensembles.jl")
     include("test_rng.jl")
     include("test_utils.jl")

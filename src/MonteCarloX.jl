@@ -110,6 +110,15 @@ export  MulticanonicalEnsemble,
 include("ensembles/wang_landau.jl")
 export  WangLandauEnsemble
 
+# ── Reweighting ─────────────────────────────────────────────────────────────
+
+include("infrastructure/reweighting.jl")
+export  ImportanceWeights,
+        reweight,
+        weights,
+        log_normalization,
+        ess
+
 # ── Event handlers (non-equilibrium) ────────────────────────────────────────
 
 include("event_handler/abstractions.jl")
