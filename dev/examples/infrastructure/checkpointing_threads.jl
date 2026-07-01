@@ -30,7 +30,7 @@ end
 
 E(sys::System) = 1/4*(sys.x^2 - 2)^2
 
-function update!(sys::System, alg::AbstractImportanceSampling; delta=0.1)
+function update!(sys::System, alg::AbstractMarkovChainMonteCarlo; delta=0.1)
     x_new = sys.x + delta * randn(alg.rng)
     accept!(alg, E(System(x_new)), E(sys)) && (sys.x = x_new)
 end
