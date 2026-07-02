@@ -30,11 +30,15 @@ end
 Base.length(iw::ImportanceWeights) = length(iw.logw)
 
 """
-    reweight(args, source, target) -> ImportanceWeights
+    reweight(args, source, target=ConstantEnsemble()) -> ImportanceWeights
 
 Log importance weights that reweight samples drawn under `source` to expectations under
 `target`, evaluated on the recorded `args` — the coordinate each ensemble's `logweight`
 consumes (e.g. energies for a `BoltzmannEnsemble`, or the multicanonical coordinate).
+
+`target` defaults to a flat [`ConstantEnsemble`](@ref), so `reweight(args, source)` simply
+strips the `source` weighting (`wᵢ ∝ exp(-logweight(source, argᵢ))`) — recovering the
+unbiased density, e.g. the density of states from a multicanonical run.
 
 `source` and `target` may be `AbstractEnsemble`s or bare callables (wrapped as a
 `FunctionEnsemble`). The unified log-weight view means the same call serves statistical
@@ -48,7 +52,7 @@ logZ   = log_normalization(w)          # log(Z_target / Z_source)
 neff   = ess(w)
 ```
 """
-function reweight(args, source, target)
+function reweight(args, source, target=ConstantEnsemble())
     s = _as_ensemble(source)
     t = _as_ensemble(target)
     logw = [logweight(t, a) - logweight(s, a) for a in args]

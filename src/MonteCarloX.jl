@@ -103,6 +103,9 @@ export  FunctionEnsemble
 include("ensembles/boltzmann.jl")
 export  BoltzmannEnsemble
 
+include("ensembles/constant.jl")
+export  ConstantEnsemble
+
 include("ensembles/multicanonical.jl")
 export  MulticanonicalEnsemble,
         visited_range
@@ -164,6 +167,9 @@ include("algorithms/metropolis.jl")
 export  AbstractMetropolis,
         Metropolis,
         Glauber
+
+include("algorithms/rejection_sampling.jl")
+export  RejectionSampling
 
 include("algorithms/heat_bath.jl")
 export  HeatBath

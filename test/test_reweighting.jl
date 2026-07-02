@@ -81,6 +81,41 @@ function test_reweight_boltzmann_enumeration()
     return pass
 end
 
+# ConstantEnsemble: constant log-weight, linear only at c == 0.
+function test_constant_ensemble()
+    pass = true
+    pass &= check(logweight(ConstantEnsemble(2.0), 999.0) == 2.0, "constant: logweight is c\n")
+    pass &= check(logweight(ConstantEnsemble(), 3.0) == 0.0, "constant: default c == 0\n")
+    pass &= check(linear_logweight(ConstantEnsemble(0.0)) == true, "constant: c=0 is linear\n")
+    pass &= check(linear_logweight(ConstantEnsemble(1.5)) == false, "constant: c≠0 not linear\n")
+    return pass
+end
+
+# Default (flat) target strips the source weighting: wᵢ ∝ exp(-logweight(source, argᵢ)).
+function test_reweight_flat_default()
+    pass = true
+    args = Float64[0.3, 1.1, -2.0, 5.0, 0.0]
+    source(x) = -0.4x
+
+    iw_default  = reweight(args, source)
+    iw_constant = reweight(args, source, ConstantEnsemble())
+    iw_explicit = reweight(args, source, x -> 0.0)
+
+    pass &= check(isapprox(collect(weights(iw_default)), collect(weights(iw_constant))), "flat: default == ConstantEnsemble\n")
+    pass &= check(isapprox(collect(weights(iw_default)), collect(weights(iw_explicit))), "flat: default == explicit flat\n")
+
+    g = [-source(a) for a in args]
+    wn = exp.(g) ./ sum(exp.(g))
+    pass &= check(isapprox(collect(weights(iw_default)), wn), "flat: weights strip source bias\n")
+
+    # A nonzero constant leaves the (self-normalized) weights untouched and shifts
+    # log_normalization by exactly the constant.
+    iwc = reweight(args, source, ConstantEnsemble(5.0))
+    pass &= check(isapprox(collect(weights(iwc)), collect(weights(iw_default))), "flat: constant offset leaves weights unchanged\n")
+    pass &= check(isapprox(log_normalization(iwc), log_normalization(iw_default) + 5.0), "flat: offset shifts log_normalization\n")
+    return pass
+end
+
 @testset "Reweighting" begin
     @testset "identity (source == target)" begin
         @test test_reweight_identity()
@@ -93,5 +128,11 @@ end
     end
     @testset "boltzmann enumeration" begin
         @test test_reweight_boltzmann_enumeration()
+    end
+    @testset "constant ensemble" begin
+        @test test_constant_ensemble()
+    end
+    @testset "flat default target" begin
+        @test test_reweight_flat_default()
     end
 end
