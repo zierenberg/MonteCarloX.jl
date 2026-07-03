@@ -14,12 +14,15 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [weakdeps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
 
 [extensions]
 DistributionsExt = "Distributions"
+LogDensityProblemsExt = "LogDensityProblems"
 
 [compat]
 Distributions = "0.25"
+LogDensityProblems = "2"
 MPI = "0.20"
 RecipesBase = "1"
 StaticArrays = "1"

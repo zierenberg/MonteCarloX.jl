@@ -12,7 +12,11 @@ end
 example_dir   = joinpath(@__DIR__, "src", "examples")
 generated_dir = joinpath(@__DIR__, "src", "generated")
 
+# Top-level examples/ write/read their cached simulation outcomes here.
+ENV["MCX_EXAMPLE_DATA"] = abspath(joinpath(@__DIR__, "src", "data"))
+
 include(joinpath(@__DIR__, "src", "examples", "defaults.jl"))
+
 for (root, dirs, files) in walkdir(example_dir)
     rel_path = relpath(root, example_dir)
     filter!(d -> d != "todos", dirs)
@@ -27,6 +31,21 @@ for (root, dirs, files) in walkdir(example_dir)
                 Literate.markdown(filepath, generated_dir; documenter=true)
             end
         end
+    end
+end
+
+# Top-level examples/ (Tier A run at build; Tier B load their cached TSV outcome).
+toplevel_example_dir = joinpath(@__DIR__, "..", "examples")
+skip_examples = ("reweighting.jl",)     # not yet migrated to the cached pattern
+draft_dirs    = ("inference",)          # design-by-usage drafts (unbuilt API) — not executed yet
+for (root, dirs, files) in walkdir(toplevel_example_dir)
+    basename(root) in draft_dirs && continue
+    for file in files
+        endswith(file, ".jl")           || continue
+        endswith(file, "_mpi.jl")       && continue
+        endswith(file, "_threads.jl")   && continue
+        file in skip_examples           && continue
+        Literate.markdown(joinpath(root, file), generated_dir; documenter=true)
     end
 end
 
@@ -72,6 +91,7 @@ makedocs(;
         ],
         "Examples" => [
             "Getting Started" => [
+                "Basic Sampling"                     => "generated/basic_sampling.md",
                 "Coin Flip (Bayesian inference)"     => "generated/coin_flip.md",
                 "Ising Model (importance sampling)"  => "generated/importance_Ising2D.md",
                 "Birth-Death (Gillespie)"            => "generated/gillespie_birth_death.md",
@@ -87,6 +107,7 @@ makedocs(;
             ],
             "Bayesian Inference" => [
                 "Coin Flip"                          => "generated/coin_flip.md",
+                "Evidence (importance sampling)"     => "generated/reweighting_evidence.md",
                 "House Price Prediction"             => "generated/house_price_prediction.md",
                 "Eight Schools (hierarchical)"       => "generated/eight_schools.md",
             ],
@@ -100,6 +121,7 @@ makedocs(;
                 "Ornstein-Uhlenbeck (multicanonical)" => "generated/muca_OU.md",
             ],
             "Infrastructure" => [
+                "Reweighting"                        => "generated/reweighting.md",
                 "Checkpointing"                      => "generated/checkpointing.md",
             ],
         ],
