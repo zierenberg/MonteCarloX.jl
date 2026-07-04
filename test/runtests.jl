@@ -26,7 +26,7 @@ end
     include("test_message_backend.jl")
     include("test_markov_chain_monte_carlo.jl")
     include("test_step_size.jl")
-    include("test_log_density_target.jl")
+    include("test_log_density_problems.jl")
     include("test_diagnostics.jl")
     include("test_hmc.jl")
     include("test_multicanonical.jl")

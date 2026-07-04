@@ -9,9 +9,10 @@ using Random
 using Test
 
 # Educational: a minimal fixed-path Hamiltonian Monte Carlo, driven by the gradient
-# that the LogDensityProblems bridge exposes for a MonteCarloX `LogDensityTarget`.
-# It both shows *how* HMC uses ∇log p (the leapfrog integrator + a Metropolis accept on
-# the Hamiltonian) and verifies the bridge end to end: LogDensityTarget → AD gradient.
+# that the LogDensityProblems bridge exposes for a MonteCarloX `FunctionEnsemble` with
+# `dimension` set. It both shows *how* HMC uses ∇log p (the leapfrog integrator + a
+# Metropolis accept on the Hamiltonian) and verifies the bridge end to end:
+# FunctionEnsemble → AD gradient.
 #
 # HMC augments the parameters θ with a momentum p ~ N(0, I) and treats
 #   H(θ, p) = -logdensity(θ) + ½‖p‖²
@@ -40,7 +41,7 @@ end
 function test_hmc_recovers_gaussian()
     pass = true
     Σinv   = [2.0 0.8; 0.8 1.0]
-    target = LogDensityTarget(θ -> -0.5 * LinearAlgebra.dot(θ, Σinv, θ), 2)   # MCX target
+    target = FunctionEnsemble(θ -> -0.5 * LinearAlgebra.dot(θ, Σinv, θ); dimension = 2)   # MCX target
     ℓ      = ADgradient(:ForwardDiff, target)                                  # bridge → AD gradient
 
     rng = Xoshiro(1)
