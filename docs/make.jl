@@ -8,11 +8,11 @@ let
     isfile(src) && cp(src, dst; force=true)
 end
 
-# --- Literate: process examples ---
+# --- Literate: process examples (executed at build) ---
 example_dir   = joinpath(@__DIR__, "src", "examples")
 generated_dir = joinpath(@__DIR__, "src", "generated")
 
-# Top-level examples/ write/read their cached simulation outcomes here.
+# Top-level examples/ read (and, when run standalone, write) their cached data here.
 ENV["MCX_EXAMPLE_DATA"] = abspath(joinpath(@__DIR__, "src", "data"))
 
 include(joinpath(@__DIR__, "src", "examples", "defaults.jl"))
@@ -34,10 +34,11 @@ for (root, dirs, files) in walkdir(example_dir)
     end
 end
 
-# Top-level examples/ (Tier A run at build; Tier B load their cached TSV outcome).
+# Top-level examples/ — each generates its outcome into docs/src/data/ and the build
+# loads it (heavy simulations run once, standalone, not on every docs build).
 toplevel_example_dir = joinpath(@__DIR__, "..", "examples")
-skip_examples = ("reweighting.jl",)     # not yet migrated to the cached pattern
-draft_dirs    = ("inference",)          # design-by-usage drafts (unbuilt API) — not executed yet
+skip_examples = ("reweighting.jl",)     # kept as a runnable script; no docs page yet
+draft_dirs    = ("inference",)          # design-by-usage drafts — not executed at build
 for (root, dirs, files) in walkdir(toplevel_example_dir)
     basename(root) in draft_dirs && continue
     for file in files
@@ -72,6 +73,7 @@ makedocs(;
             "Weights and Ensembles"      => "weights.md",
         ],
         "Algorithm Classes" => [
+            "Basic Sampling"    => "algorithms/basic_sampling.md",
             "Markov Chain Monte Carlo" => [
                 "Overview"        => "algorithms/markov_chain_monte_carlo.md",
                 "Metropolis"      => "algorithms/metropolis.md",
@@ -91,7 +93,6 @@ makedocs(;
         ],
         "Examples" => [
             "Getting Started" => [
-                "Basic Sampling"                     => "generated/basic_sampling.md",
                 "Coin Flip (Bayesian inference)"     => "generated/coin_flip.md",
                 "Ising Model (importance sampling)"  => "generated/importance_Ising2D.md",
                 "Birth-Death (Gillespie)"            => "generated/gillespie_birth_death.md",
@@ -107,7 +108,6 @@ makedocs(;
             ],
             "Bayesian Inference" => [
                 "Coin Flip"                          => "generated/coin_flip.md",
-                "Evidence (importance sampling)"     => "generated/reweighting_evidence.md",
                 "House Price Prediction"             => "generated/house_price_prediction.md",
                 "Eight Schools (hierarchical)"       => "generated/eight_schools.md",
             ],
@@ -121,7 +121,6 @@ makedocs(;
                 "Ornstein-Uhlenbeck (multicanonical)" => "generated/muca_OU.md",
             ],
             "Infrastructure" => [
-                "Reweighting"                        => "generated/reweighting.md",
                 "Checkpointing"                      => "generated/checkpointing.md",
             ],
         ],
