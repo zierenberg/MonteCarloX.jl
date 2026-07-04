@@ -5,7 +5,7 @@
 # hand-tune the step size for a target acceptance rate.
 
 """
-    StepSizeAdaptor(base; target=0.234, rate=1.0, decay=0.7, t0=10)
+    AdaptiveStep(base; target=0.234, rate=1.0, decay=0.7, t0=10)
 
 Warm-up adaptor for a random-walk Metropolis proposal step size.
 
@@ -27,7 +27,7 @@ Stop calling `adapt!` once warm-up ends to freeze the step — the sampling phas
 uses a fixed proposal and is exactly reversible.
 
 ```julia
-step = StepSizeAdaptor(0.1; target=0.234)
+step = AdaptiveStep(0.1; target=0.234)
 for i in 1:(warmup + n)
     θ′  = θ .+ step_size(step) .* randn(rng, length(θ))
     acc = accept!(alg, θ′, θ)
@@ -37,7 +37,7 @@ for i in 1:(warmup + n)
 end
 ```
 """
-mutable struct StepSizeAdaptor{T}
+mutable struct AdaptiveStep{T}
     base::T
     logscale::Float64
     target::Float64
@@ -47,34 +47,34 @@ mutable struct StepSizeAdaptor{T}
     t::Int
 end
 
-StepSizeAdaptor(base; target::Real = 0.234, rate::Real = 1.0, decay::Real = 0.7, t0::Integer = 10) =
-    StepSizeAdaptor(base, 0.0, Float64(target), Float64(rate), Float64(decay), Int(t0), 0)
+AdaptiveStep(base; target::Real = 0.234, rate::Real = 1.0, decay::Real = 0.7, t0::Integer = 10) =
+    AdaptiveStep(base, 0.0, Float64(target), Float64(rate), Float64(decay), Int(t0), 0)
 
 """
-    step_size(a::StepSizeAdaptor)
+    step_size(a::AdaptiveStep)
 
 Current proposal step size: the initial `base` scaled by the adapted magnitude.
 """
-@inline step_size(a::StepSizeAdaptor) = a.base .* exp(a.logscale)
+@inline step_size(a::AdaptiveStep) = a.base .* exp(a.logscale)
 
 """
-    adapt!(a::StepSizeAdaptor, accepted::Bool) -> step
+    adapt!(a::AdaptiveStep, accepted::Bool) -> step
 
 Update the step magnitude from one accept/reject decision (Robbins–Monro) and return
 the new [`step_size`](@ref). Call only during warm-up.
 """
-@inline function adapt!(a::StepSizeAdaptor, accepted::Bool)
+@inline function adapt!(a::AdaptiveStep, accepted::Bool)
     a.t += 1
     a.logscale += a.rate * (accepted - a.target) / (a.t + a.t0)^a.decay
     return step_size(a)
 end
 
 """
-    reset!(a::StepSizeAdaptor)
+    reset!(a::AdaptiveStep)
 
 Reset the adaptation state (magnitude back to `base`, counter to zero).
 """
-function reset!(a::StepSizeAdaptor)
+function reset!(a::AdaptiveStep)
     a.logscale = 0.0
     a.t = 0
     return a

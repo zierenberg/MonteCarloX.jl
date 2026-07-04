@@ -61,20 +61,31 @@ iw = reweight(θs, logprior, logposterior)
 
 # ## Metropolis
 #
-# The random walk now moves in the plane: propose ``\theta' = \theta + \Delta\,\xi``
-# with ``\xi`` a 2-D Gaussian step, and accept on the posterior ratio. A proposal
-# with ``\sigma' \le 0`` has ``\log p = -\infty``, so it is rejected automatically —
-# the constraint needs no special handling. Only the unnormalized posterior is used.
+# One move is a random-walk Metropolis update — propose ``\theta' = \theta + \Delta\,\xi``,
+# accept on the posterior ratio, move if accepted — packaged as [`update!`](@ref), the
+# continuous-parameter analogue of a spin flip (a proposal with ``\sigma' \le 0`` is
+# auto-rejected). The run splits into two phases, like thermalization then production:
+# a **warm-up** loop that adapts the step size — [`adapt!`](@ref) consumes each
+# `update!`'s accept/reject to drive the acceptance toward 0.234 — followed by a
+# **sampling** loop with the step frozen.
 
-function metropolis(logposterior; n = 100_000, burnin = 10_000, Δ = [0.12, 0.09], seed = 1)
-    rng     = Xoshiro(seed)
-    alg     = MarkovChainMonteCarlo(rng, logposterior)
-    θ       = [mean(y), std(y)]
+function metropolis(logposterior; n = 100_000, warmup = 10_000, Δ0 = 1.0, seed = 1)
+    rng  = Xoshiro(seed)
+    alg  = MarkovChainMonteCarlo(rng, logposterior)
+    step = AdaptiveStep(Δ0; target = 0.234)             # rough guess; self-corrects
+    θ    = [mean(y), std(y)]
+
+    for _ in 1:warmup                                   # warm-up: adapt the step size
+        accepted = update!(θ, alg, step_size(step))
+        adapt!(step, accepted)
+    end
+    reset!(alg)                                         # forget warm-up statistics
+
+    Δ = step_size(step)                                 # freeze the step
     samples = zeros(2, n)
-    for i in 1:(burnin + n)
-        θ′ = θ .+ Δ .* randn(rng, 2)
-        accept!(alg, θ′, θ) && (θ = θ′)
-        i > burnin && (samples[:, i - burnin] = θ)
+    for i in 1:n                                        # sampling
+        update!(θ, alg, Δ)
+        samples[:, i] = θ
     end
     return samples, alg
 end

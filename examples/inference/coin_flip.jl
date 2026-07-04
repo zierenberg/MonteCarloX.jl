@@ -98,15 +98,31 @@ evidence = sum(pdf.(Beta(2, 2), θgrid) .* exp.(loglik.(θgrid))) * step(θgrid)
 # unnormalized posterior (prior × likelihood), which is exactly what we can write
 # down. `accept!` evaluates the log-ratio and tracks the acceptance statistics.
 
-function metropolis(logposterior; n = 100_000, burnin = 10_000, Δ = 0.05, seed = 1)
-    rng     = Xoshiro(seed)
-    alg     = MarkovChainMonteCarlo(rng, logposterior)
-    θ       = 0.5
+# The same two-phase shape as the other examples — a warm-up loop that adapts the step
+# size, then a frozen sampling loop. Here ``\theta`` is a single scalar bounded to
+# ``(0,1)`` (so the move is written out rather than using the vector `update!`), and the
+# 1-D acceptance target is the higher `0.44`.
+
+function metropolis(logposterior; n = 100_000, warmup = 10_000, Δ0 = 0.2, seed = 1)
+    rng  = Xoshiro(seed)
+    alg  = MarkovChainMonteCarlo(rng, logposterior)
+    step = AdaptiveStep(Δ0; target = 0.44)
+    θ    = 0.5
+
+    for _ in 1:warmup                                       # warm-up: adapt the step size
+        θ′       = θ + step_size(step) * randn(rng)
+        accepted = 0.0 < θ′ < 1.0 && accept!(alg, θ′, θ)
+        accepted && (θ = θ′)
+        adapt!(step, accepted)
+    end
+    reset!(alg)
+
+    Δ = step_size(step)                                     # freeze the step
     samples = Float64[]
-    for i in 1:(burnin + n)
+    for _ in 1:n                                            # sampling
         θ′ = θ + Δ * randn(rng)
-        0.0 < θ′ < 1.0 && accept!(alg, θ′, θ) && (θ = θ′)   # stay inside (0,1)
-        i > burnin && push!(samples, θ)
+        0.0 < θ′ < 1.0 && accept!(alg, θ′, θ) && (θ = θ′)
+        push!(samples, θ)
     end
     return samples, alg
 end

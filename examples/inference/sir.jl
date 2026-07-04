@@ -59,28 +59,28 @@ logposterior(θ) = all(θ .> 0) ? logprior(θ) + loglik(θ) : -Inf
 
 # ## Metropolis
 #
-# The step per iteration is an ODE solve, but the sampler is unchanged: propose,
-# evaluate the log-posterior ratio, accept. Rather than hand-tune the proposal size,
-# we let a [`StepSizeAdaptor`](@ref) tune it during a warm-up phase — starting from a
-# deliberately-too-large guess, it rescales toward a 0.234 acceptance rate from the
-# accept/reject decisions, then freezes so the sampling phase stays reversible.
+# The step per iteration is an ODE solve, but the sampler is unchanged — the same
+# two-phase [`update!`](@ref) structure as the [Gaussian](gaussian.md): a warm-up loop
+# that adapts the proposal size ([`AdaptiveStep`](@ref) + [`adapt!`](@ref), starting
+# from a deliberately-too-large guess), then a sampling loop with the step frozen.
 
 function metropolis(logposterior; n = 10_000, warmup = 2_000, Δ0 = [0.1, 0.04], seed = 1)
-    rng     = Xoshiro(seed)
-    alg     = MarkovChainMonteCarlo(rng, logposterior)
-    step    = StepSizeAdaptor(Δ0; target = 0.234)
-    θ       = [1.5, 0.5]
+    rng  = Xoshiro(seed)
+    alg  = MarkovChainMonteCarlo(rng, logposterior)
+    step = AdaptiveStep(Δ0; target = 0.234)
+    θ    = [1.5, 0.5]
+
+    for _ in 1:warmup                                   # warm-up: adapt the step size
+        accepted = update!(θ, alg, step_size(step))
+        adapt!(step, accepted)
+    end
+    reset!(alg)
+
+    Δ = step_size(step)                                 # freeze the step
     samples = zeros(2, n)
-    for i in 1:(warmup + n)
-        θ′  = θ .+ step_size(step) .* randn(rng, 2)
-        acc = accept!(alg, θ′, θ)
-        acc && (θ = θ′)
-        if i <= warmup
-            adapt!(step, acc)
-            i == warmup && reset!(alg)          # measure acceptance on the frozen phase
-        else
-            samples[:, i - warmup] = θ
-        end
+    for i in 1:n                                        # sampling
+        update!(θ, alg, Δ)
+        samples[:, i] = θ
     end
     return samples, alg
 end

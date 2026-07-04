@@ -10,7 +10,7 @@ function test_step_size_targets_acceptance()
     rng  = Xoshiro(1)
     alg  = MarkovChainMonteCarlo(rng, x -> -x^2 / 2)     # standard normal, up to a constant
 
-    step = StepSizeAdaptor(8.0; target = 0.4)            # start much too large
+    step = AdaptiveStep(8.0; target = 0.4)            # start much too large
     θ    = 0.0
     for _ in 1:20_000                                    # warm-up with adaptation
         θ′  = θ + step_size(step) * randn(rng)
@@ -37,7 +37,7 @@ end
 # A vector base keeps its ratios fixed while only the overall magnitude adapts.
 function test_step_size_vector_keeps_ratios()
     pass = true
-    step = StepSizeAdaptor([2.0, 0.5]; target = 0.234)
+    step = AdaptiveStep([2.0, 0.5]; target = 0.234)
     for _ in 1:100
         adapt!(step, true)                               # drive the magnitude up
     end
@@ -49,13 +49,38 @@ end
 
 # reset! restores the initial step and clears the counter.
 function test_step_size_reset()
-    step = StepSizeAdaptor(1.0)
+    step = AdaptiveStep(1.0)
     adapt!(step, true); adapt!(step, false)
     reset!(step)
     return check(step_size(step) == 1.0, "step size: reset restores base\n")
 end
 
-@testset "StepSizeAdaptor" begin
+# update! + adapt! in a two-phase (warm-up then sample) loop recovers a 2-D standard normal.
+function test_update_two_phase()
+    pass = true
+    rng  = Xoshiro(1)
+    alg  = MarkovChainMonteCarlo(rng, θ -> -0.5 * sum(abs2, θ))
+    step = AdaptiveStep(3.0; target = 0.234)
+    θ    = [0.0, 0.0]
+
+    for _ in 1:5_000                                     # warm-up: adapt the step
+        adapt!(step, update!(θ, alg, step_size(step)))
+    end
+    reset!(alg)
+    Δ = step_size(step)
+    S = zeros(2, 40_000)
+    for i in 1:40_000                                    # sampling
+        update!(θ, alg, Δ)
+        S[:, i] = θ
+    end
+
+    pass &= check(0.15 < acceptance_rate(alg) < 0.35, "update!: acceptance near target\n")
+    pass &= check(isapprox(vec(mean(S, dims = 2)), [0.0, 0.0]; atol = 0.05), "update!: means ≈ 0\n")
+    pass &= check(all(isapprox.(vec(std(S, dims = 2)), 1.0; atol = 0.1)), "update!: stds ≈ 1\n")
+    return pass
+end
+
+@testset "AdaptiveStep" begin
     @testset "targets acceptance rate" begin
         @test test_step_size_targets_acceptance()
     end
@@ -64,5 +89,8 @@ end
     end
     @testset "reset" begin
         @test test_step_size_reset()
+    end
+    @testset "update! two-phase" begin
+        @test test_update_two_phase()
     end
 end

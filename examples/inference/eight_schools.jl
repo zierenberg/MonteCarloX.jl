@@ -56,17 +56,37 @@ end
 # fell to ESS/N ≈ 0.001) — so *importance sampling* is out too. A Markov chain that
 # actively explores the posterior is the only workable option.
 
-function metropolis(logposterior, s0; n = 200_000, burnin = 20_000, seed = 42)
-    rng     = Xoshiro(seed)
-    alg     = MarkovChainMonteCarlo(rng, logposterior)
-    s       = copy(s0)
-    Δ       = [2.0, 0.4, fill(6.0, length(s) - 2)...]        # per-component step sizes
+# Same two-phase shape as the other examples, but in ten dimensions a *component-wise*
+# random walk (one parameter at a time) mixes far better than a joint move, so the step
+# is written out rather than using the vector `update!`. The [`AdaptiveStep`](@ref)
+# carries per-component sizes (its ratios) and adapts their overall magnitude to the
+# 0.234 target during warm-up.
+
+function step_component!(s, alg, Δ)
+    k     = rand(alg.rng, 1:length(s))                       # update one component
+    s_new = copy(s); s_new[k] += Δ[k] * randn(alg.rng)
+    accepted = accept!(alg, s_new, s)
+    accepted && (s[k] = s_new[k])
+    return accepted
+end
+
+function metropolis(logposterior, s0; n = 200_000, warmup = 20_000, seed = 42)
+    rng  = Xoshiro(seed)
+    alg  = MarkovChainMonteCarlo(rng, logposterior)
+    step = AdaptiveStep([2.0, 0.4, fill(6.0, length(s0) - 2)...]; target = 0.234)
+    s    = copy(s0)
+
+    for _ in 1:warmup                                        # warm-up: adapt the step sizes
+        accepted = step_component!(s, alg, step_size(step))
+        adapt!(step, accepted)
+    end
+    reset!(alg)
+
+    Δ = step_size(step)                                      # freeze
     samples = zeros(length(s), n)
-    for i in 1:(burnin + n)
-        k     = rand(rng, 1:length(s))                       # update one component
-        s_new = copy(s); s_new[k] += Δ[k] * randn(rng)
-        accept!(alg, s_new, s) && (s[k] = s_new[k])
-        i > burnin && (samples[:, i - burnin] = s)
+    for i in 1:n                                             # sampling
+        step_component!(s, alg, Δ)
+        samples[:, i] = s
     end
     return samples, alg
 end

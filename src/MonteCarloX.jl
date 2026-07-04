@@ -81,6 +81,7 @@ export  Roundtrips,
 
 include("measurements/measurements.jl")
 include("measurements/autocorrelations.jl")
+include("measurements/diagnostics.jl")
 export  Measurement,
         Measurements,
         MeasurementSchedule,
@@ -89,6 +90,7 @@ export  Measurement,
         integrated_autocorrelation_time,
         integrated_autocorrelation_times, #TODO: this needs to be solved in PT
         tau_int,
+        rhat,
         times,
         data,
         measure!,
@@ -169,7 +171,7 @@ export  AbstractMetropolis,
         Glauber
 
 include("algorithms/step_size.jl")
-export  StepSizeAdaptor,
+export  AdaptiveStep,
         step_size,
         adapt!
 
