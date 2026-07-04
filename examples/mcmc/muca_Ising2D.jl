@@ -1,8 +1,3 @@
-# %%                                                #src
-import Pkg                                          #src
-Pkg.activate(joinpath(@__DIR__, ".."))             #src
-Pkg.instantiate()                                  #src
-
 # # Multicanonical Sampling of the 2D Ising Model
 #
 # Multicanonical (muca) sampling iteratively reshapes the sampling weights until the

@@ -14,9 +14,13 @@
 # \dot S = -\beta S I, \qquad \dot I = \beta S I - \gamma I, \qquad \dot R = \gamma I.
 # ```
 
-using Random, Distributions, StatsBase, Plots
+using Random, Distributions, StatsBase, Plots, DelimitedFiles
 using OrdinaryDiffEq
 using MonteCarloX
+
+datadir      = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..", "docs", "src", "data")))  # hide
+samples_file = joinpath(datadir, "sir_samples.tsv")   # hide
+meta_file    = joinpath(datadir, "sir_meta.tsv")      # hide
 
 function sir!(du, u, θ, t)
     β, γ = θ
@@ -93,9 +97,16 @@ function metropolis(logposterior; n = 10_000, warmup = 2_000, Δ0 = [0.1, 0.04],
     return samples, alg
 end
 
+if !isfile(samples_file)                                       # hide
 samples, alg = metropolis(logposterior)
+mkpath(datadir)                                                # hide
+writedlm(samples_file, ["beta" "gamma"; permutedims(samples)], '\t')  # hide
+writedlm(meta_file, ["acceptance"; acceptance_rate(alg)], '\t')       # hide
+end                                                            # hide
+samples = permutedims(readdlm(samples_file, '\t'; header = true)[1])   # hide
+acc     = readdlm(meta_file, '\t'; header = true)[1][1]                # hide
 (; β = round(mean(samples[1, :]), digits = 2), γ = round(mean(samples[2, :]), digits = 2),
-   truth = truth, acceptance = round(acceptance_rate(alg); digits = 2))
+   truth = truth, acceptance = round(acc; digits = 2))
 
 # ## Results
 #

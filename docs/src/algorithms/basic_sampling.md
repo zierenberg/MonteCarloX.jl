@@ -87,9 +87,6 @@ acceptance_rate(alg)
 ## API reference
 
 ```@docs
-reweight
 weights
-ess
-log_normalization
 RejectionSampling
 ```
