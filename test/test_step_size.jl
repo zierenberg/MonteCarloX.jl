@@ -55,8 +55,9 @@ function test_step_size_reset()
     return check(step_size(step) == 1.0, "step size: reset restores base\n")
 end
 
-# update! + adapt! in a two-phase (warm-up then sample) loop recovers a 2-D standard normal.
-function test_update_two_phase()
+# A two-phase (warm-up then sample) random-walk loop with adaptation recovers a 2-D
+# standard normal — and drives the acceptance to the target.
+function test_two_phase_adaptation()
     pass = true
     rng  = Xoshiro(1)
     alg  = MarkovChainMonteCarlo(rng, θ -> -0.5 * sum(abs2, θ))
@@ -64,19 +65,23 @@ function test_update_two_phase()
     θ    = [0.0, 0.0]
 
     for _ in 1:5_000                                     # warm-up: adapt the step
-        adapt!(step, update!(θ, alg, step_size(step)))
+        θ′       = θ .+ step_size(step) .* randn(rng, 2)
+        accepted = accept!(alg, θ′, θ)
+        accepted && (θ = θ′)
+        adapt!(step, accepted)
     end
     reset!(alg)
     Δ = step_size(step)
     S = zeros(2, 40_000)
     for i in 1:40_000                                    # sampling
-        update!(θ, alg, Δ)
+        θ′ = θ .+ Δ .* randn(rng, 2)
+        accept!(alg, θ′, θ) && (θ = θ′)
         S[:, i] = θ
     end
 
-    pass &= check(0.15 < acceptance_rate(alg) < 0.35, "update!: acceptance near target\n")
-    pass &= check(isapprox(vec(mean(S, dims = 2)), [0.0, 0.0]; atol = 0.05), "update!: means ≈ 0\n")
-    pass &= check(all(isapprox.(vec(std(S, dims = 2)), 1.0; atol = 0.1)), "update!: stds ≈ 1\n")
+    pass &= check(0.15 < acceptance_rate(alg) < 0.35, "two-phase: acceptance near target\n")
+    pass &= check(isapprox(vec(mean(S, dims = 2)), [0.0, 0.0]; atol = 0.05), "two-phase: means ≈ 0\n")
+    pass &= check(all(isapprox.(vec(std(S, dims = 2)), 1.0; atol = 0.1)), "two-phase: stds ≈ 1\n")
     return pass
 end
 
@@ -90,7 +95,7 @@ end
     @testset "reset" begin
         @test test_step_size_reset()
     end
-    @testset "update! two-phase" begin
-        @test test_update_two_phase()
+    @testset "two-phase adaptation" begin
+        @test test_two_phase_adaptation()
     end
 end

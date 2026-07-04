@@ -98,10 +98,18 @@ evidence = sum(pdf.(Beta(2, 2), θgrid) .* exp.(loglik.(θgrid))) * step(θgrid)
 # unnormalized posterior (prior × likelihood), which is exactly what we can write
 # down. `accept!` evaluates the log-ratio and tracks the acceptance statistics.
 
-# The same two-phase shape as the other examples — a warm-up loop that adapts the step
-# size, then a frozen sampling loop. Here ``\theta`` is a single scalar bounded to
-# ``(0,1)`` (so the move is written out rather than using the vector `update!`), and the
-# 1-D acceptance target is the higher `0.44`.
+# We define our own move, as each example does. Here ``\theta`` is a single scalar
+# bounded to ``(0,1)`` (out-of-range proposals are rejected). A scalar cannot be mutated
+# in place, so this `update!` returns the (possibly new) ``\theta`` and whether it moved.
+
+function update!(θ, alg, Δ)
+    θ′       = θ + Δ * randn(alg.rng)
+    accepted = 0.0 < θ′ < 1.0 && accept!(alg, θ′, θ)
+    return (accepted ? θ′ : θ), accepted
+end
+
+# Same two-phase shape as the other examples — a warm-up loop that adapts the step size,
+# then a frozen sampling loop; the 1-D acceptance target is the higher `0.44`.
 
 function metropolis(logposterior; n = 100_000, warmup = 10_000, Δ0 = 0.2, seed = 1)
     rng  = Xoshiro(seed)
@@ -110,9 +118,7 @@ function metropolis(logposterior; n = 100_000, warmup = 10_000, Δ0 = 0.2, seed 
     θ    = 0.5
 
     for _ in 1:warmup                                       # warm-up: adapt the step size
-        θ′       = θ + step_size(step) * randn(rng)
-        accepted = 0.0 < θ′ < 1.0 && accept!(alg, θ′, θ)
-        accepted && (θ = θ′)
+        θ, accepted = update!(θ, alg, step_size(step))
         adapt!(step, accepted)
     end
     reset!(alg)
@@ -120,8 +126,7 @@ function metropolis(logposterior; n = 100_000, warmup = 10_000, Δ0 = 0.2, seed 
     Δ = step_size(step)                                     # freeze the step
     samples = Float64[]
     for _ in 1:n                                            # sampling
-        θ′ = θ + Δ * randn(rng)
-        0.0 < θ′ < 1.0 && accept!(alg, θ′, θ) && (θ = θ′)
+        θ, _ = update!(θ, alg, Δ)
         push!(samples, θ)
     end
     return samples, alg

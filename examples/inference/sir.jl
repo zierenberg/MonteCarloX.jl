@@ -59,10 +59,18 @@ logposterior(θ) = all(θ .> 0) ? logprior(θ) + loglik(θ) : -Inf
 
 # ## Metropolis
 #
-# The step per iteration is an ODE solve, but the sampler is unchanged — the same
-# two-phase [`update!`](@ref) structure as the [Gaussian](gaussian.md): a warm-up loop
-# that adapts the proposal size ([`AdaptiveStep`](@ref) + [`adapt!`](@ref), starting
-# from a deliberately-too-large guess), then a sampling loop with the step frozen.
+# The step per iteration is an ODE solve, but the sampler is unchanged. The move is the
+# same random-walk `update!` as the [Gaussian](gaussian.md) — the model defines it, only
+# `accept!` comes from MonteCarloX — and the run is the same two-phase structure: a
+# warm-up loop that adapts the proposal size ([`AdaptiveStep`](@ref) + [`adapt!`](@ref)),
+# then a sampling loop with the step frozen.
+
+function update!(θ, alg, Δ)
+    θ′       = θ .+ Δ .* randn(alg.rng, length(θ))
+    accepted = accept!(alg, θ′, θ)
+    accepted && (θ .= θ′)
+    return accepted
+end
 
 function metropolis(logposterior; n = 10_000, warmup = 2_000, Δ0 = [0.1, 0.04], seed = 1)
     rng  = Xoshiro(seed)

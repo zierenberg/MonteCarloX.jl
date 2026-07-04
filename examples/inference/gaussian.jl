@@ -61,13 +61,22 @@ iw = reweight(θs, logprior, logposterior)
 
 # ## Metropolis
 #
-# One move is a random-walk Metropolis update — propose ``\theta' = \theta + \Delta\,\xi``,
-# accept on the posterior ratio, move if accepted — packaged as [`update!`](@ref), the
-# continuous-parameter analogue of a spin flip (a proposal with ``\sigma' \le 0`` is
-# auto-rejected). The run splits into two phases, like thermalization then production:
-# a **warm-up** loop that adapts the step size — [`adapt!`](@ref) consumes each
-# `update!`'s accept/reject to drive the acceptance toward 0.234 — followed by a
-# **sampling** loop with the step frozen.
+# We define the move ourselves: one random-walk Metropolis update of the parameter
+# vector — propose ``\theta' = \theta + \Delta\,\xi``, judge it with `accept!`, and move
+# on acceptance (a proposal with ``\sigma' \le 0`` is auto-rejected). This is the
+# continuous-parameter analogue of a spin flip: MonteCarloX supplies only the `accept!`
+# judgement; the proposal is the model's to define.
+
+function update!(θ, alg, Δ)
+    θ′       = θ .+ Δ .* randn(alg.rng, length(θ))
+    accepted = accept!(alg, θ′, θ)
+    accepted && (θ .= θ′)
+    return accepted
+end
+
+# The run splits into two phases, like thermalization then production: a **warm-up** loop
+# that adapts the step size ([`adapt!`](@ref) consumes each `update!`'s accept/reject to
+# drive the acceptance toward 0.234), then a **sampling** loop with the step frozen.
 
 function metropolis(logposterior; n = 100_000, warmup = 10_000, Δ0 = 1.0, seed = 1)
     rng  = Xoshiro(seed)

@@ -116,23 +116,3 @@ function _reset!(alg::AbstractMarkovChainMonteCarlo)
     alg.steps = 0
     alg.accepted = 0
 end
-
-"""
-    update!(θ::AbstractVector, alg, Δ) -> Bool
-
-One random-walk Metropolis update of a parameter vector `θ`, in place: propose
-`θ + Δ .* ξ` with `ξ` standard normal and `Δ` a scalar or per-parameter step size,
-judge it with `alg` via [`accept!`](@ref), and move `θ` if accepted. Returns whether
-the move was accepted — feed that to [`adapt!`](@ref) during a warm-up phase to tune `Δ`.
-
-This is the continuous-parameter analogue of a spin flip: the generic, model-agnostic
-random-walk move, built from the existing `accept!`. The target is `alg`'s ensemble
-(e.g. `MarkovChainMonteCarlo(rng, logposterior)`), so the same call serves any
-log-density over a vector.
-"""
-function update!(θ::AbstractVector, alg::AbstractMarkovChainMonteCarlo, Δ)
-    θ′ = θ .+ Δ .* randn(alg.rng, length(θ))
-    accepted = accept!(alg, θ′, θ)
-    accepted && (θ .= θ′)
-    return accepted
-end
