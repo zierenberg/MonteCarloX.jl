@@ -60,7 +60,7 @@ function reweight(args, source, target=ConstantEnsemble())
 end
 
 """
-    weights(iw::ImportanceWeights) -> AnalyticWeights
+    weights(iw::ImportanceWeights) -> StatsBase.AnalyticWeights
 
 Self-normalized importance weights `exp(gᵢ - logZ)` (summing to 1) as StatsBase
 `AnalyticWeights`, ready for `mean(A, weights(iw))`, `var`, `std`, `quantile`, …

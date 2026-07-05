@@ -9,7 +9,7 @@ temperatures (Ferrenberg–Swendsen), or a flat [multicanonical](../algorithms/m
 reweighted to any ``\beta``.
 
 MonteCarloX forms the weights in log space and returns an [`ImportanceWeights`](@ref)
-object; [`weights`](@ref) exposes them as StatsBase weights for weighted statistics,
+object; `StatsBase.weights(iw)` exposes them as StatsBase weights for weighted statistics,
 [`ess`](@ref) reports how many effective independent samples remain, and
 [`log_normalization`](@ref) estimates ``\log(Z_p/Z_q)`` — the free-energy difference
 between the two ensembles.

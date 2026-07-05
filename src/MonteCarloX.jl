@@ -120,7 +120,6 @@ export  WangLandauEnsemble
 include("infrastructure/reweighting.jl")
 export  ImportanceWeights,
         reweight,
-        weights,
         log_normalization,
         ess
 

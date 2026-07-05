@@ -26,9 +26,11 @@ This keeps the framework compact and allows independent development of new model
 
 ## Algorithms
 
-Sorted by the standard literature partition, MonteCarloX organizes algorithms into three method classes:
+Sorted by the standard literature partition, MonteCarloX organizes algorithms into method classes:
 
-- **[Markov Chain Monte Carlo](algorithms/markov_chain_monte_carlo.md)** — discrete-step chains whose stationary distribution is a target ``\pi(x) \propto \exp(\text{logweight}(x))``. Algorithms differ in *how* the chain transitions: accept/reject from a log-weight ratio, or draw one coordinate at a time from its conditional.
+- **[Basic Sampling](algorithms/basic_sampling.md)** — simple (i.i.d.) sampling and standard importance sampling, expressed as one-line idioms over `AbstractEnsemble` objects. These have no dedicated algorithm type; their genuinely scalable variants are population-based and live under Population Monte Carlo.
+
+- **[Markov Chain Monte Carlo](algorithms/markov_chain_monte_carlo.md)** — discrete-step chains whose transitions follow a local rule: accept/reject from a log-weight difference, or resample one coordinate from its conditional. When that rule derives from a global log-weight (detailed balance), the stationary distribution is the target ``\pi(x) \propto \exp(\text{logweight}(x))``; when only a local difference is defined (e.g. nonreciprocal couplings), detailed balance breaks and the chain instead converges to a nonequilibrium steady state.
   - [`Metropolis`](algorithms/metropolis.md), `Glauber` — accept/reject with symmetric proposals.
   - `MetropolisHastings` (TODO) — asymmetric-proposal correction.
   - `HeatBath` — Gibbs-style sampling of one coordinate from its conditional (Bayesian "Gibbs sampling"). Subpage TODO.
@@ -42,8 +44,6 @@ Sorted by the standard literature partition, MonteCarloX organizes algorithms in
   - `BKL` / `n-fold way` (TODO) — discrete-time projection of `Gillespie`.
 
 - **[Population Monte Carlo](algorithms/population_monte_carlo.md)** (planned class, stub) — a weighted particle ensemble evolved through a sequence of intermediate targets. Sits orthogonally to MCMC and KMC, with any of them serving as the per-particle mutation kernel. Future home of all advanced importance-sampling methods (annealed IS, SMC samplers, population annealing, PERM, nested sampling, cross-entropy).
-
-**Not a separate class.** Direct (i.i.d.) sampling and standard importance sampling reduce to one-line idioms over `AbstractEnsemble` objects; no dedicated algorithm type is provided. The genuinely scalable IS methods are all population-based and live under Population Monte Carlo.
 
 **Continuous-state stochastic dynamics** (Langevin SDE / Fokker-Planck) are out of scope for the core package and can be handled by [`StochasticDiffEq.jl`](https://github.com/SciML/StochasticDiffEq.jl); we may add a thin wrapper later if motivated by a concrete use case.
 
@@ -76,9 +76,9 @@ the algorithmic structure remains unchanged when the system is replaced.
 The Julia ecosystem already has several Monte Carlo packages with different goals and interfaces.
 If your use case is better served by a domain-specific implementation, these are useful alternatives or complements:
 
-- [GeneralizedMonteCarlo.jl](https://juliapackages.com/p/generalizedmontecarlo): generalized-ensemble methods (for example multicanonical and related workflows).
 - [MonteCarlo.jl](https://github.com/carstenbauer/MonteCarlo.jl): quantum many-body focused Monte Carlo framework.
 - [Carlo.jl](https://github.com/lukas-weber/Carlo.jl): lattice-model Monte Carlo toolkit with a strong focus on physics applications.
+- [SpinMC.jl](https://github.com/fbuessen/SpinMC.jl): classical Monte Carlo for lattice spin models, with parallel tempering.
 
 Other related packages (grouped by common use cases):
 
@@ -93,7 +93,6 @@ Other related packages (grouped by common use cases):
 - Monte Carlo integration and low-discrepancy sampling:
   - [Cuba.jl](https://github.com/giordano/Cuba.jl)
   - [QuasiMonteCarlo.jl](https://github.com/SciML/QuasiMonteCarlo.jl)
-  - [SpinMC](https://github.com/fbuessen/SpinMC.jl)
 - Uncertainty propagation with particle arithmetic:
   - [MonteCarloMeasurements.jl](https://github.com/baggepinnen/MonteCarloMeasurements.jl)
 
@@ -105,6 +104,7 @@ MonteCarloX works with any Julia `AbstractRNG`.
 
 - Prefer `Xoshiro` as a modern default for new projects.
 - Use `MersenneTwister` when compatibility with existing workflows is needed.
+- Use `MutableRandomNumbers` — a custom `AbstractRNG` shipped with MonteCarloX that stores its draws in a mutable vector — when you need to control or perturb the underlying random numbers directly, as in rare-event sampling of stochastic dynamics.
 
 Because RNG is passed directly to algorithms, changing RNG is a one-line change.
 

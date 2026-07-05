@@ -37,7 +37,7 @@ Usually the interesting targets are easy to *evaluate* but hard to *sample*. Tak
 quartic density ``p(x) \propto e^{-x^4/4}``: there is no `rand` for it. We draw from a
 convenient source ``q`` and correct each draw by the density ratio. [`reweight`](@ref)
 holds one *log* weight per sample, ``g_i = \log p(x_i) - \log q(x_i)``, in log space so
-nothing overflows; [`weights`](@ref) turns them into StatsBase `AnalyticWeights`.
+nothing overflows; `StatsBase.weights(iw)` turns them into `AnalyticWeights`.
 
 ```@example basic
 q       = Normal(0.0, 1.5)
@@ -87,6 +87,5 @@ acceptance_rate(alg)
 ## API reference
 
 ```@docs
-weights
 RejectionSampling
 ```
