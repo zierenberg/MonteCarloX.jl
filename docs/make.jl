@@ -44,6 +44,11 @@ makedocs(;
     format = Documenter.HTML(;
         assets = ["assets/custom.css", "assets/custom.js"],
         collapselevel = 1,
+        # plot-heavy example pages: inline the SVG outputs instead of the file-fallback
+        # (which warns), and don't cap page size.
+        example_size_threshold = nothing,
+        size_threshold = nothing,
+        size_threshold_warn = nothing,
     ),
     draft = draft_docs,
     doctest = strict_docs,
