@@ -1,3 +1,17 @@
+"""
+    MulticanonicalEnsemble(bins; init=0.0, record_visits=true, smooth_window=0)
+
+Iteratively-learned flat-histogram ensemble over a binned observable (energy, order
+parameter, ...). It holds the current log-weights `W` and a visit `histogram` over `bins`;
+sampling with `logweight = W` targets a flat histogram, so one chain covers the whole range
+and the density of states follows from the converged weights.
+
+Run in iterations: sample, then `update!(ens; mode=:simple|:recursive)` refines `W` from the
+recorded histogram, and `reset!` clears the histogram between iterations. Monitor and shape
+convergence with [`flatness`](@ref), [`Roundtrips`](@ref), [`smooth!`](@ref), [`extend!`](@ref)
+and [`visited_range`](@ref). `bins` is a range/vector of bin edges (or a `BinnedObject`);
+`init` sets the initial flat log-weight.
+"""
 mutable struct MulticanonicalEnsemble{BO<:BinnedObject} <: AbstractEnsemble
     logweight::BO
     histogram::BO

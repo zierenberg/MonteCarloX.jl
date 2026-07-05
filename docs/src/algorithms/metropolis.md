@@ -30,7 +30,7 @@ Metropolis(rng::AbstractRNG, ens::AbstractEnsemble)   # explicit ensemble
 
 The convenience form is the canonical "Metropolis at inverse temperature ``\beta``" call.
 The explicit form accepts any `AbstractEnsemble` with `linear_logweight(ens) == true`; non-linear ensembles raise `ArgumentError` at construction.
-For non-linear targets (e.g. `MulticanonicalEnsemble`, `WangLandauEnsemble`, or a general `FunctionEnsemble`), use the generic `MarkovChainMonteCarlo` (alias `MCMC`) or one of the dedicated constructors documented on [Multicanonical](multicanonical.md) and [Wang-Landau](wang_landau.md).
+For non-linear targets (e.g. `MulticanonicalEnsemble`, `WangLandauEnsemble`, or a general `FunctionEnsemble`), use the generic `MarkovChainMonteCarlo` (alias `MCMC`) or one of the dedicated constructors documented on [Multicanonical](multicanonical.md) and Wang-Landau.
 
 ## Glauber: logistic acceptance variant
 
@@ -102,4 +102,13 @@ Metropolis
 Glauber
 AbstractMetropolis
 accept!(alg::AbstractMetropolis, delta_arg)
+```
+
+Adaptive warm-up for a random-walk proposal — tune the step to a target acceptance
+rate from the accept/reject decisions, then freeze it for the sampling phase:
+
+```@docs
+AdaptiveStep
+step_size
+adapt!
 ```

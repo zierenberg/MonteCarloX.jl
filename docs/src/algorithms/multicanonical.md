@@ -4,7 +4,7 @@ The multicanonical (muca) algorithm tabulates a log-weight ``W(x)`` over bins of
 A flat marginal enables the chain to traverse free-energy barriers that the canonical sampler would never cross in finite time, and lets a single run cover the full range of ``x`` for density-of-states estimation or reweighting to any temperature within that range.
 
 For the shared MCMC protocol — `accept!`, ensembles, the linearity trait — see the [class page](markov_chain_monte_carlo.md).
-The closely related [Wang-Landau](wang_landau.md) algorithm pursues the same flat-histogram goal with a different weight-refinement strategy and is documented separately.
+The closely related Wang-Landau algorithm pursues the same flat-histogram goal with a different weight-refinement strategy and is documented separately.
 
 ## Concept
 

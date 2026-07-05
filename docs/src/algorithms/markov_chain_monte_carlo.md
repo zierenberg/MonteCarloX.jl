@@ -5,7 +5,7 @@ The same machinery samples a Boltzmann distribution in statistical mechanics, a 
 What differs between algorithms is *how* the chain transitions and *what* ensemble defines the target.
 
 This page sets up the vocabulary and API shared by every MCMC algorithm in MonteCarloX.
-Concrete algorithms — [Metropolis-Hastings](metropolis.md), [Heat bath](heat_bath.md), [Multicanonical](multicanonical.md), [Wang-Landau](wang_landau.md), [Replica exchange](replica_exchange.md) — are documented as subpages.
+Concrete algorithms — [Metropolis-Hastings](metropolis.md), Heat bath, [Multicanonical](multicanonical.md), Wang-Landau, Replica exchange — are documented as subpages.
 
 !!! note "Naming"
     The abstract supertype is `AbstractMarkovChainMonteCarlo`; the generic algorithm is `MarkovChainMonteCarlo` with the short alias `const MCMC = MarkovChainMonteCarlo`. The old names `AbstractImportanceSampling` and `MarkovChainMonteCarlo` are kept as deprecated bindings and resolve with a warning. `HeatBath` is conceptually MCMC but currently a sibling type (`AbstractHeatBath <: AbstractAlgorithm`) pending a follow-up refactor of the conditional-vs-accept-reject split.
@@ -44,7 +44,7 @@ For a proposal density ``q(x' \mid x)``, the Metropolis-Hastings acceptance prob
 ```
 
 When ``q`` is symmetric, this reduces to ``\pi(x') / \pi(x) = \exp(\text{logweight}(x') - \text{logweight}(x))``.
-This log-ratio is what every accept/reject MCMC algorithm in MonteCarloX computes; the algorithm decides how to use it. Conditional samplers ([heat bath / Gibbs](heat_bath.md)) bypass the log-ratio entirely by drawing one coordinate at a time from its exact conditional.
+This log-ratio is what every accept/reject MCMC algorithm in MonteCarloX computes; the algorithm decides how to use it. Conditional samplers (heat bath / Gibbs) bypass the log-ratio entirely by drawing one coordinate at a time from its exact conditional.
 
 ## Ensembles
 
@@ -65,7 +65,7 @@ Built-in ensembles:
 | `WangLandauEnsemble(bins)` | tabulated ``W(x)``, modified on every visit | no | On-the-fly density-of-states estimation |
 
 Adaptive ensembles also expose `update!(ens, ...)`, which reshapes `logweight` from accumulated data.
-See [Multicanonical](multicanonical.md) and [Wang-Landau](wang_landau.md) for the update rules.
+See [Multicanonical](multicanonical.md) and Wang-Landau for the update rules.
 
 ### The linearity trait
 
@@ -181,10 +181,10 @@ Only the ensemble, the algorithm carrier, and the form of `accept!` differ.
 | Goal | Algorithm |
 |------|-----------|
 | Sample equilibrium at fixed temperature or a fixed posterior | [`Metropolis`](metropolis.md) (also: `Glauber`) |
-| Update one coordinate at a time from its exact conditional distribution | [`HeatBath`](heat_bath.md) (also: Gibbs sampling) |
+| Update one coordinate at a time from its exact conditional distribution | `HeatBath` (also: Gibbs sampling) |
 | Sample across free-energy barriers using pre-computed flat-histogram weights | [`Multicanonical`](multicanonical.md) |
-| Estimate the density of states without prior knowledge of the weights | [`WangLandau`](wang_landau.md) |
-| Overcome critical slowing-down with parallel chains at different parameters | [`ReplicaExchange`](replica_exchange.md) (also: `ParallelTempering`) |
+| Estimate the density of states without prior knowledge of the weights | `WangLandau` |
+| Overcome critical slowing-down with parallel chains at different parameters | `ReplicaExchange` (also: `ParallelTempering`) |
 
 ## Diagnostics
 
@@ -194,9 +194,9 @@ Useful ranges depend on the system; for high-dimensional local moves, 30–50% i
 - Very high acceptance (>90%) typically indicates proposals too small to mix efficiently.
 - Very low acceptance (<5%) typically indicates proposals too large or the target too peaked.
 
-For adaptive ensembles ([Multicanonical](multicanonical.md), [Wang-Landau](wang_landau.md)), additional histogram-based diagnostics (`flatness`, `Roundtrips`) are documented with those algorithms.
+For adaptive ensembles ([Multicanonical](multicanonical.md), Wang-Landau), additional histogram-based diagnostics (`flatness`, `Roundtrips`) are documented with those algorithms.
 
-For correlation diagnostics, the [measurements](../measurements.md) infrastructure provides `integrated_autocorrelation_time` on recorded observable traces — the effective number of independent samples in a chain of length ``N`` is ``N / (2 \tau_{\text{int}})``:
+For correlation diagnostics, the [measurements](../infrastructure/measurements.md) infrastructure provides `integrated_autocorrelation_time` on recorded observable traces — the effective number of independent samples in a chain of length ``N`` is ``N / (2 \tau_{\text{int}})``:
 
 ```julia
 τ = integrated_autocorrelation_time(data(measurements, :energy))
@@ -222,8 +222,8 @@ update!(ens::AbstractEnsemble, args...)
 ## See also
 
 - [Metropolis-Hastings](metropolis.md) — accept/reject sampler with symmetric proposals (covers `Glauber` as a variant)
-- [Heat bath](heat_bath.md) — conditional sampling (Gibbs)
+- Heat bath — conditional sampling (Gibbs)
 - [Multicanonical](multicanonical.md) — flat-histogram sampling with iterative weight refinement (covers `ParallelMulticanonical`)
-- [Wang-Landau](wang_landau.md) — flat-histogram sampling with on-the-fly weight adaptation
-- [Replica exchange](replica_exchange.md) — parallel chains coupled by ensemble swaps (covers `ParallelTempering`)
+- Wang-Landau — flat-histogram sampling with on-the-fly weight adaptation
+- Replica exchange — parallel chains coupled by ensemble swaps (covers `ParallelTempering`)
 - [Population Monte Carlo](population_monte_carlo.md) — home of advanced importance-sampling methods (AIS, SMC, PMC, nested sampling)

@@ -8,25 +8,30 @@ let
     isfile(src) && cp(src, dst; force=true)
 end
 
-# --- Literate: process examples ---
-example_dir   = joinpath(@__DIR__, "src", "examples")
+# --- Literate: process examples (single source: the top-level examples/) ---
 generated_dir = joinpath(@__DIR__, "src", "generated")
 
-include(joinpath(@__DIR__, "src", "examples", "defaults.jl"))
+# Examples read (and, when run standalone, write) their cached data here.
+ENV["MCX_EXAMPLE_DATA"] = abspath(joinpath(@__DIR__, "src", "data"))
+
+# Plotting defaults for docs rendering (transparent backgrounds, etc.).
+include(joinpath(@__DIR__, "..", "examples", "defaults.jl"))
+
+# Every runnable example lives in the top-level examples/. Light ones execute at
+# build; heavy ones cache their outcome into docs/src/data/ and only reload. Skipped:
+# parallel (_mpi/_threads) reference scripts, incomplete todos/, the smoke runner, the
+# plotting defaults, and reweighting (kept as a script — no docs page yet).
+example_dir = joinpath(@__DIR__, "..", "examples")
+skip_files  = ("reweighting.jl", "defaults.jl", "runtests.jl")
+skip_dirs   = ("todos",)
 for (root, dirs, files) in walkdir(example_dir)
-    rel_path = relpath(root, example_dir)
-    filter!(d -> d != "todos", dirs)
-    if !contains(rel_path, "todos")
-        for file in files
-            if endswith(file, ".jl")            &&
-               !endswith(file, "_mpi.jl")       &&
-               !endswith(file, "_threads.jl")   &&
-               file != "runtests.jl"            &&
-               file != "defaults.jl"
-                filepath = joinpath(root, file)
-                Literate.markdown(filepath, generated_dir; documenter=true)
-            end
-        end
+    basename(root) in skip_dirs && continue
+    for file in files
+        endswith(file, ".jl")         || continue
+        endswith(file, "_mpi.jl")     && continue
+        endswith(file, "_threads.jl") && continue
+        file in skip_files            && continue
+        Literate.markdown(joinpath(root, file), generated_dir; documenter = true)
     end
 end
 
@@ -39,6 +44,11 @@ makedocs(;
     format = Documenter.HTML(;
         assets = ["assets/custom.css", "assets/custom.js"],
         collapselevel = 1,
+        # plot-heavy example pages: inline the SVG outputs instead of the file-fallback
+        # (which warns), and don't cap page size.
+        example_size_threshold = nothing,
+        size_threshold = nothing,
+        size_threshold_warn = nothing,
     ),
     draft = draft_docs,
     doctest = strict_docs,
@@ -46,13 +56,14 @@ makedocs(;
     warnonly = !strict_docs,
     pages = [
         "Home" => "index.md",
-        "Fundamentals" => [
-            "Monte Carlo Fundamentals"   => "monte_carlo_fundamentals.md",
-            "Systems"                    => "systems.md",
-            "Build Your Own System"      => "build_your_own_system.md",
-            "Weights and Ensembles"      => "weights.md",
+        "Getting Started" => [
+            "Monte Carlo Fundamentals"   => "getting_started/monte_carlo_fundamentals.md",
+            "Systems"                    => "getting_started/systems.md",
+            "Build Your Own System"      => "getting_started/build_your_own_system.md",
+            "Weights and Ensembles"      => "getting_started/weights.md",
         ],
         "Algorithm Classes" => [
+            "Basic Sampling"    => "algorithms/basic_sampling.md",
             "Markov Chain Monte Carlo" => [
                 "Overview"        => "algorithms/markov_chain_monte_carlo.md",
                 "Metropolis"      => "algorithms/metropolis.md",
@@ -66,41 +77,38 @@ makedocs(;
             ],
         ],
         "Infrastructure" => [
-            "Measurements"   => "measurements.md",
-            "Checkpointing"  => "checkpointing.md",
-            "Helpers"        => "helper.md",
+            "Measurements"   => "infrastructure/measurements.md",
+            "Reweighting"    => "infrastructure/reweighting.md",
+            "Checkpointing"  => "infrastructure/checkpointing.md",
+            "Helpers"        => "infrastructure/helper.md",
         ],
         "Examples" => [
-            "Getting Started" => [
-                "Coin Flip (Bayesian inference)"     => "generated/coin_flip.md",
-                "Ising Model (importance sampling)"  => "generated/importance_Ising2D.md",
-                "Birth-Death (Gillespie)"            => "generated/gillespie_birth_death.md",
-            ],
-            "Spins" => [
-                "Ising 2D (importance sampling)"     => "generated/importance_Ising2D.md",
-                "Ising 2D (parallel tempering)"      => "generated/pt_Ising2D.md",
-                "Ising 2D (multicanonical)"          => "generated/muca_Ising2D.md",
-                "Blume-Capel (multicanonical)"       => "generated/muca_BlumeCapel.md",
-            ],
-            "Soft Matter" => [
-                "LJ gas (multicanonical)"            => "generated/muca_LJgas.md",
-            ],
-            "Bayesian Inference" => [
-                "Coin Flip"                          => "generated/coin_flip.md",
-                "House Price Prediction"             => "generated/house_price_prediction.md",
-                "Eight Schools (hierarchical)"       => "generated/eight_schools.md",
-            ],
-            "Stochastic Processes" => [
-                "Poisson Process (Gillespie)"        => "generated/kmc_poisson.md",
-                "Dimerization (Gillespie)"           => "generated/gillespie_dimerization.md",
+            "Markov Chain Monte Carlo" => [
+                "Ising 2D (importance sampling)"      => "generated/importance_Ising2D.md",
+                "Ising 2D (parallel tempering)"       => "generated/pt_Ising2D.md",
+                "Ising 2D (multicanonical)"           => "generated/muca_Ising2D.md",
+                "Blume-Capel (multicanonical)"        => "generated/muca_BlumeCapel.md",
+                "LJ gas (multicanonical)"             => "generated/muca_LJgas.md",
                 "Ornstein-Uhlenbeck (multicanonical)" => "generated/muca_OU.md",
+                "Sum of Gaussians (multicanonical)"   => "generated/muca_sum_gaussian.md",
+                "Ising 2D (checkpointing)"            => "generated/checkpoint_Ising2D.md",
             ],
-            "Large Deviation Theory" => [
-                "Sum of Gaussians (multicanonical)"  => "generated/muca_sum_gaussian.md",
-                "Ornstein-Uhlenbeck (multicanonical)" => "generated/muca_OU.md",
+            "Kinetic Monte Carlo" => [
+                "Birth-Death (Gillespie)"             => "generated/gillespie_birth_death.md",
+                "Dimerization (Gillespie)"            => "generated/gillespie_dimerization.md",
+                "Poisson Process (Gillespie)"         => "generated/kmc_poisson.md",
+                "Contact Process (Gillespie)"         => "generated/contact_process.md",
+                "Hawkes Process"                      => "generated/hawkes_process.md",
+            ],
+            "Inference" => [
+                "Coin Flip"                           => "generated/coin_flip.md",
+                "Conjugate Gaussian"                  => "generated/gaussian.md",
+                "Eight Schools (hierarchical)"        => "generated/eight_schools.md",
+                "SIR (dynamical model)"               => "generated/sir.md",
+                "House Price Prediction"              => "generated/house_price_prediction.md",
             ],
             "Infrastructure" => [
-                "Checkpointing"                      => "generated/checkpointing.md",
+                "Checkpointing"                       => "generated/checkpointing.md",
             ],
         ],
     ],

@@ -81,6 +81,7 @@ export  Roundtrips,
 
 include("measurements/measurements.jl")
 include("measurements/autocorrelations.jl")
+include("measurements/diagnostics.jl")
 export  Measurement,
         Measurements,
         MeasurementSchedule,
@@ -89,6 +90,7 @@ export  Measurement,
         integrated_autocorrelation_time,
         integrated_autocorrelation_times, #TODO: this needs to be solved in PT
         tau_int,
+        rhat,
         times,
         data,
         measure!,
@@ -103,12 +105,23 @@ export  FunctionEnsemble
 include("ensembles/boltzmann.jl")
 export  BoltzmannEnsemble
 
+include("ensembles/constant.jl")
+export  ConstantEnsemble
+
 include("ensembles/multicanonical.jl")
 export  MulticanonicalEnsemble,
         visited_range
 
 include("ensembles/wang_landau.jl")
 export  WangLandauEnsemble
+
+# ── Reweighting ─────────────────────────────────────────────────────────────
+
+include("infrastructure/reweighting.jl")
+export  ImportanceWeights,
+        reweight,
+        log_normalization,
+        ess
 
 # ── Event handlers (non-equilibrium) ────────────────────────────────────────
 
@@ -155,6 +168,17 @@ include("algorithms/metropolis.jl")
 export  AbstractMetropolis,
         Metropolis,
         Glauber
+
+include("algorithms/step_size.jl")
+export  AdaptiveStep,
+        step_size,
+        adapt!
+
+include("algorithms/log_density_target.jl")
+export  LogDensityTarget
+
+include("algorithms/rejection_sampling.jl")
+export  RejectionSampling
 
 include("algorithms/heat_bath.jl")
 export  HeatBath
