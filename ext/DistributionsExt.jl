@@ -7,6 +7,6 @@ module DistributionsExt
 using MonteCarloX
 using Distributions: Distribution, logpdf
 
-MonteCarloX._as_ensemble(d::Distribution) = FunctionEnsemble(x -> logpdf(d, x))
+MonteCarloX._as_ensemble(d::Distribution) = FunctionEnsemble(x -> logpdf(d, x); dimension=length(d))
 
 end # module DistributionsExt

@@ -174,9 +174,6 @@ export  AdaptiveStep,
         step_size,
         adapt!
 
-include("algorithms/log_density_target.jl")
-export  LogDensityTarget
-
 include("algorithms/rejection_sampling.jl")
 export  RejectionSampling
 

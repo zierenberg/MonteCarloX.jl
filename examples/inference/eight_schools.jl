@@ -41,6 +41,7 @@ function logposterior(s)
     μ, logτ = s[1], s[2]
     θ = @view s[3:end]
     τ = exp(logτ)
+    isfinite(τ) || return -Inf     # overflow guard: extreme proposals get zero mass, not an error
     lp  = logpdf(Normal(0, 10), μ)                              # hyperprior on μ
     lp += logpdf(truncated(Cauchy(0, 5), 0, Inf), τ) + logτ    # half-Cauchy on τ, + Jacobian
     lp += sum(logpdf.(Normal(μ, τ), θ))                         # population → effects
@@ -134,12 +135,110 @@ panels = map(1:J) do j
 end
 plot(panels...; layout = (2, 4), size = (1100, 450), margin = 3Plots.mm)
 
+# ## Gradient-based sampling: Hamiltonian Monte Carlo
+#
+# Ten dimensions is where the random walk starts to hurt. Component-wise Metropolis
+# accepts often, but each accepted move shifts a single coordinate a little — the chain
+# *diffuses*, and successive samples stay correlated for a long time. **Hamiltonian
+# Monte Carlo** (HMC) proposes differently: augment the parameters ``s`` with a momentum
+# ``p \sim \mathcal{N}(0, I)`` and treat
+#
+# ```math
+# H(s, p) = -\log p(s \mid y) + \tfrac12 \lVert p \rVert^2
+# ```
+#
+# as an energy. Integrating the corresponding Hamiltonian dynamics (``L`` *leapfrog*
+# steps of size ``\epsilon``) carries the state far across parameter space while nearly
+# conserving ``H`` — a *distant* proposal that is still likely to be accepted. The
+# integrator needs ``\nabla \log p``, and that is the only genuinely new ingredient;
+# every piece of the machinery is one we already have:
+#
+# - **The gradient comes from the ecosystem.** A [`FunctionEnsemble`](@ref) with its
+#   `dimension` declared satisfies the LogDensityProblems.jl interface, so an AD backend
+#   (here ForwardDiff) equips the *same* log-posterior with a gradient — no derivative
+#   code in the model, none in MonteCarloX.
+# - **The accept step is plain Metropolis.** Leapfrog conserves ``H`` only up to
+#   integration error; accepting with probability ``\min(1, e^{H_0 - H})`` corrects it
+#   exactly. That is a [`Metropolis`](@ref MonteCarloX.Metropolis) judgement at ``\beta = 1`` on the energy
+#   ``H`` — the same `accept!` that judged the spin flip and the random walk.
+# - **The step size is adapted the same way.** The same [`AdaptiveStep`](@ref) drives
+#   ``\epsilon`` toward HMC's optimal acceptance rate of ``\approx 0.65``.
+
+using LogDensityProblems, LogDensityProblemsAD, ForwardDiff
+
+ℓ = ADgradient(:ForwardDiff, FunctionEnsemble(logposterior; dimension = 2 + J))
+∇logp(s) = LogDensityProblems.logdensity_and_gradient(ℓ, s)
+
+# The proposal — the leapfrog flight — is ours to define, exactly like the
+# component-wise move before it:
+
+function hmc_update!(s, alg, ϵ; L = 20)
+    p     = randn(alg.rng, length(s))                # fresh momentum
+    lp, g = ∇logp(s)
+    H0    = -lp + 0.5 * sum(abs2, p)
+    s′    = copy(s)
+    for _ in 1:L
+        p  .+= 0.5ϵ .* g                             # half momentum kick
+        s′ .+= ϵ .* p                                # full position drift
+        lp, g = ∇logp(s′)
+        p  .+= 0.5ϵ .* g                             # half momentum kick
+    end
+    H = -lp + 0.5 * sum(abs2, p)
+    accepted = accept!(alg, H - H0)                  # Metropolis at β = 1 on H
+    accepted && (s .= s′)
+    return accepted
+end
+
+# The driver has the same two-phase shape as every run in this series — warm-up with
+# adaptation, freeze, sample:
+
+function hmc(logposterior, s0; n = 2_000, warmup = 500, seed = 42)
+    rng  = Xoshiro(seed)
+    alg  = Metropolis(rng; β = 1.0)                  # judges ΔH, an energy difference
+    step = AdaptiveStep(0.1; target = 0.65)
+    s    = copy(s0)
+
+    for _ in 1:warmup                                # warm-up: adapt the leapfrog step
+        accepted = hmc_update!(s, alg, step_size(step))
+        adapt!(step, accepted)
+    end
+    reset!(alg)
+
+    ϵ = step_size(step)                              # freeze
+    samples = zeros(length(s), n)
+    for i in 1:n                                     # sampling
+        hmc_update!(s, alg, ϵ)
+        samples[:, i] = s
+    end
+    return samples, alg
+end
+
+samples_hmc, alg_hmc = hmc(logposterior, s0)
+μ_hmc = samples_hmc[1, :]
+τ_hmc = exp.(samples_hmc[2, :])
+(; μ = round(mean(μ_hmc), digits = 1), τ = round(median(τ_hmc), digits = 1),
+   acceptance = round(acceptance_rate(alg_hmc); digits = 2))
+
+# Same posterior — but count the *independent* draws. The autocorrelation-based
+# [`ess`](@ref) makes the difference concrete (each HMC sample costs ``L + 1 = 21``
+# gradient evaluations, so compare information per posterior evaluation, not per sample):
+
+(; ess_metropolis = round(Int, ess(μ_post)), n_metropolis = length(μ_post),
+   ess_hmc = round(Int, ess(μ_hmc)), n_hmc = length(μ_hmc))
+
 # ## Where this is heading
 #
-# This centered parameterization has a notorious difficulty: when ``\tau`` is small
-# the effects ``\theta_j`` are squeezed tightly around ``\mu``, forming a *funnel*
-# that a random walk (and even basic HMC) struggles to explore. The standard fix is a
-# *non-centered* reparameterization, ``\theta_j = \mu + \tau\,z_j`` with
-# ``z_j \sim \mathcal{N}(0,1)`` — a transform of the parameters. Combined with
-# gradient-based sampling (HMC), that is what makes genuinely high-dimensional
-# hierarchical models tractable, and it is the direction the inference API is built toward.
+# The HMC above is deliberately minimal — fixed path length, unit mass matrix, a single
+# chain — because its point is the *composition*: a caller-owned proposal (leapfrog),
+# the universal `accept!` judgement, `AdaptiveStep` for tuning, and a gradient borrowed
+# through the LogDensityProblems seam. The production route keeps the target exactly as
+# it is and swaps only the driver: AdvancedHMC.jl's NUTS adds dynamic path lengths,
+# dual-averaging step sizes, and mass-matrix adaptation through the same bridge.
+#
+# One honest caveat remains. This centered parameterization has a notorious difficulty:
+# when ``\tau`` is small the effects ``\theta_j`` are squeezed tightly around ``\mu``,
+# forming a *funnel* that both the random walk and basic HMC explore poorly. The
+# standard fix is the *non-centered* reparameterization ``\theta_j = \mu + \tau\,z_j``
+# with ``z_j \sim \mathcal{N}(0,1)`` — a change of the *target*, not the sampler.
+# Transforms, gradients, and drivers around a log-density are generic; spelling them out
+# by hand here marks exactly the seam where a future MCXInference layer would generalize.
