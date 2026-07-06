@@ -80,8 +80,13 @@ export  SpinSystem,
         VisionCone,
         LatticeTopology,
         NonreciprocalIsing,
-        NonreciprocalBlumeCapel,
-        structure_factor,
+        NonreciprocalBlumeCapel
+
+# -- Observables ---------------------------------------------------------------
+
+include("observables/structure_factor.jl")
+include("observables/correlation.jl")
+export  structure_factor,
         correlation_length
 
 # -- Updates ------------------------------------------------------------------

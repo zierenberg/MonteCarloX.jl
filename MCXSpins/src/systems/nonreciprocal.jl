@@ -108,16 +108,20 @@ struct LatticeTopology{D, NN}
     nbrs::Vector{NTuple{NN,Int}}
 end
 
-# Directional neighbor sums: `minus` over `-dir` neighbors (odd index), `plus` over `+dir` (even).
+# Neighbor spin sums split by axis direction. `topo.nbrs[i]` is ordered `(-x, +x, -y, +y, …)`
+# (see `_build_lattice_neighbors`: slot k belongs to axis (k+1)÷2, odd k is the -direction, even k
+# the +direction). Hence `sum_neg` collects the negative-direction neighbors — left and down in 2D,
+# the vision cone of a down spin with polarization p̂ = -(x̂+ŷ)/√2 — and `sum_pos` the
+# positive-direction ones — right and up, the cone of an up spin.
 @inline function _dir_sums(topo::LatticeTopology{D,NN}, spins, i) where {D,NN}
     nb = @inbounds topo.nbrs[i]
-    minus = 0
-    plus = 0
+    sum_neg = 0
+    sum_pos = 0
     @inbounds for k in 1:NN
         s = Int(spins[nb[k]])
-        isodd(k) ? (minus += s) : (plus += s)
+        isodd(k) ? (sum_neg += s) : (sum_pos += s)
     end
-    return minus, plus
+    return sum_neg, sum_pos
 end
 
 #### System + cache ####
@@ -218,14 +222,14 @@ neighbors; `forward` is the sum over the neighbors inside `s_ref`'s vision cone 
 `Reciprocal`, and `0` when `s_ref == 0`). The local field is `h = J·full + κ·forward`.
 """
 @inline function field_components(sys::SpinSystem{M,Reciprocal}, i, s_ref) where {M}
-    minus, plus = _dir_sums(sys.topo, sys.spins, i)
-    return (minus + plus, 0)
+    sum_neg, sum_pos = _dir_sums(sys.topo, sys.spins, i)
+    return (sum_neg + sum_pos, 0)
 end
 
 @inline function field_components(sys::SpinSystem{M,<:VisionCone}, i, s_ref) where {M}
-    minus, plus = _dir_sums(sys.topo, sys.spins, i)
-    forward = s_ref > 0 ? plus : (s_ref < 0 ? minus : 0)
-    return (minus + plus, forward)
+    sum_neg, sum_pos = _dir_sums(sys.topo, sys.spins, i)
+    forward = s_ref > 0 ? sum_pos : (s_ref < 0 ? sum_neg : 0)
+    return (sum_neg + sum_pos, forward)
 end
 
 #### Interface: proposal + local energy (drives the generic spin_flip!) ####
@@ -271,49 +275,4 @@ function energy(sys::SpinSystem)
         Eonsite += onsite_energy(sys.model, sys.spins[i])
     end
     return Epair / 2 + Eonsite
-end
-
-"""
-    structure_factor(sys, d) -> Float64
-
-Static structure factor `|Σ_j σ_j e^{i k·r_j}|²` at the smallest wavevector along axis `d`
-(`k = 2π/L_d`). These are the `cos`/`sin` Fourier sums used for the correlation length.
-"""
-function structure_factor(sys::SpinSystem, d::Int)
-    dims = sys.topo.dims
-    L = dims[d]
-    L < 2 && return 0.0
-    stride = d == 1 ? 1 : prod(dims[1:d-1])
-    k = 2π / L
-    c = 0.0
-    s = 0.0
-    @inbounds for site in eachindex(sys.spins)
-        x = ((site - 1) ÷ stride) % L
-        σ = Int(sys.spins[site])
-        c += σ * cos(k * x)
-        s += σ * sin(k * x)
-    end
-    return c^2 + s^2
-end
-
-"""
-    correlation_length(sys) -> Float64
-
-Second-moment correlation length `ξ = (1/2sin(π/L)) √(S(0)/S(k_min) − 1)`, averaged over lattice
-axes, with `S(0) = (Σσ)²`. Returns `0` when the structure factor vanishes.
-"""
-function correlation_length(sys::SpinSystem)
-    dims = sys.topo.dims
-    S0 = float(magnetization(sys))^2
-    acc = 0.0
-    n = 0
-    for d in 1:length(dims)
-        L = dims[d]
-        L < 2 && continue
-        Sk = structure_factor(sys, d)
-        Sk <= 0 && continue
-        acc += sqrt(max(S0 / Sk - 1, 0.0)) / (2 * sin(π / L))
-        n += 1
-    end
-    return n > 0 ? acc / n : 0.0
 end
