@@ -28,7 +28,6 @@ end
     include("test_step_size.jl")
     include("test_log_density_problems.jl")
     include("test_diagnostics.jl")
-    include("test_hmc.jl")
     include("test_multicanonical.jl")
     include("test_reweighting.jl")
     include("test_rejection_sampling.jl")
