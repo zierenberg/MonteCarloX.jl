@@ -1,15 +1,18 @@
-# # Importance Sampling of the 2D Ising Model
+# # Standard MCMC Algorithms for the 2D Ising Model
 #
-# This example demonstrates importance sampling for the 2D Ising model with
-# Hamiltonian ``H = -J\sum_{\langle ij\rangle} s_i s_j``. We cover three topics:
-# (1) system implementations and their runtime, (2) sampling algorithms, and
-# (3) validation against the exact solution.
+# This example gives an overview of the standard Markov-chain Monte Carlo (MCMC)
+# algorithms for the 2D Ising model with Hamiltonian
+# ``H = -J\sum_{\langle ij\rangle} s_i s_j``: Metropolis, Heat Bath, and Glauber.
+# We cover three topics: (1) system implementations and their runtime, (2) the
+# sampling algorithms themselves, and (3) validation against the exact solution.
+#
+# (Importance sampling proper — reweighting samples drawn from one distribution to
+# estimate another — is a distinct technique; see the reweighting example.)
+import Pkg; Pkg.activate(joinpath(@__DIR__, "..")); Pkg.instantiate()  #src
 
 using Random, StatsBase, Plots, BenchmarkTools
 using MonteCarloX, MCXSpins
 using Graphs, SparseArrays
-
-
 
 therm_sweeps     = 1_000;
 prod_sweeps      = 10_000;
@@ -18,7 +21,7 @@ measure_interval = 10;
 # ## Parameters
 
 L    = 8;
-β    = 0.3;
+β    = 0.44;
 seed = 42;
 
 # ## System implementations
@@ -115,7 +118,7 @@ end
 # ## Validation helper
 #
 # The exact energy distribution follows the Boltzmann weights applied to the
-# exact density of states (Beale 1996). `plot_importance_sampling` overlays
+# exact density of states (Beale 1996). `plot_algorithms` overlays
 # the sampled histograms of all algorithms against this reference.
 
 exact_logdos          = logdos_exact_ising2D(L)
@@ -129,7 +132,7 @@ E_exact  = get_centers(exact_logdos)
 P_exact  = zeros(length(log_w))
 P_exact[mask] = exp.(log_w[mask] .- log_Z)
 
-function plot_importance_sampling(results, labels)
+function plot_algorithms(results, labels)
     p_ts   = plot(xlabel="Measurement step", ylabel="Energy",
                   title="Time series", legend=:topright)
     p_dist = plot(xlabel="Energy", ylabel="Probability",
@@ -158,7 +161,7 @@ sys_meta = Ising([L, L])
 init!(sys_meta, :random, rng=MersenneTwister(seed))
 res_meta = run_chain!(sys_meta, Metropolis(MersenneTwister(seed); β=β))
 
-plot_importance_sampling([res_meta], ["Metropolis"])
+plot_algorithms([res_meta], ["Metropolis"])
 
 # ## Heat Bath
 #
@@ -171,7 +174,7 @@ sys_hb = Ising([L, L])
 init!(sys_hb, :random, rng=MersenneTwister(seed))
 res_hb = run_chain!(sys_hb, HeatBath(MersenneTwister(seed); β=β))
 
-plot_importance_sampling([res_hb], ["HeatBath"])
+plot_algorithms([res_hb], ["HeatBath"])
 
 # ## Glauber
 #
@@ -184,7 +187,7 @@ sys_gla = Ising([L, L])
 init!(sys_gla, :random, rng=MersenneTwister(seed))
 res_gla = run_chain!(sys_gla, Glauber(MersenneTwister(seed); β=β))
 
-plot_importance_sampling([res_gla], ["Glauber"])
+plot_algorithms([res_gla], ["Glauber"])
 
 # ## Comparison
 #
@@ -192,7 +195,7 @@ plot_importance_sampling([res_gla], ["Glauber"])
 # them confirms that the choice of algorithm does not affect the physics,
 # only the efficiency.
 
-plot_importance_sampling(
+plot_algorithms(
     [res_meta, res_hb, res_gla],
     ["Metropolis", "HeatBath", "Glauber"]
 )

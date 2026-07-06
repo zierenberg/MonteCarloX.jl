@@ -84,7 +84,8 @@ makedocs(;
         ],
         "Examples" => [
             "Markov Chain Monte Carlo" => [
-                "Ising 2D (importance sampling)"      => "generated/importance_Ising2D.md",
+                "Ising 2D (MCMC algorithms)"          => "generated/mcmc_Ising2D.md",
+                "Nonreciprocal Ising 2D (Glauber)"    => "generated/glauber_nonreciprocal_Ising2D.md",
                 "Ising 2D (parallel tempering)"       => "generated/pt_Ising2D.md",
                 "Ising 2D (multicanonical)"           => "generated/muca_Ising2D.md",
                 "Blume-Capel (multicanonical)"        => "generated/muca_BlumeCapel.md",

@@ -70,6 +70,20 @@ export  BlumeCapel,
         BlumeCapelGraph,
         BlumeCapelMatrix
 
+include("systems/nonreciprocal.jl")
+export  SpinSystem,
+        SpinModel,
+        IsingModel,
+        BlumeCapelModel,
+        Nonreciprocity,
+        Reciprocal,
+        VisionCone,
+        LatticeTopology,
+        NonreciprocalIsing,
+        NonreciprocalBlumeCapel,
+        structure_factor,
+        correlation_length
+
 # -- Updates ------------------------------------------------------------------
 
 include("updates/spin_flip.jl")

@@ -80,3 +80,8 @@ end
     alg.steps += 1
     return nothing
 end
+
+# The composed nonreciprocal `SpinSystem` needs no bespoke method: with the temperature-independent
+# vision-cone coupling J + κ its `delta_energy` is β-free, so it drives the generic
+# `spin_flip!(::AbstractSpinSystem, ::AbstractMetropolis)` above via `propose_state`/`delta_energy`
+# (defined in systems/nonreciprocal.jl) with `Metropolis` and `Glauber` alike.

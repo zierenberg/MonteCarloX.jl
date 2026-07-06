@@ -92,7 +92,7 @@ end
 
 Replacing `Metropolis` with `Glauber` or `HeatBath` in either example leaves the loop body unchanged; the algorithm type selects the update rule.
 
-For a runnable, plotted version see [Ising 2D (importance sampling)](../generated/importance_Ising2D.md).
+For a runnable, plotted version see [Ising 2D (MCMC algorithms)](../generated/mcmc_Ising2D.md).
 The class page shows the corresponding [Bayesian variant](markov_chain_monte_carlo.md) (same loop shape, different ensemble, full-state `accept!`).
 
 ## API reference
