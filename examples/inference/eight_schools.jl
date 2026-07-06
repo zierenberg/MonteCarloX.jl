@@ -159,7 +159,7 @@ plot(panels...; layout = (2, 4), size = (1100, 450), margin = 3Plots.mm)
 #   code in the model, none in MonteCarloX.
 # - **The accept step is plain Metropolis.** Leapfrog conserves ``H`` only up to
 #   integration error; accepting with probability ``\min(1, e^{H_0 - H})`` corrects it
-#   exactly. That is a [`Metropolis`](@ref) judgement at ``\beta = 1`` on the energy
+#   exactly. That is a [`Metropolis`](@ref MonteCarloX.Metropolis) judgement at ``\beta = 1`` on the energy
 #   ``H`` — the same `accept!` that judged the spin flip and the random walk.
 # - **The step size is adapted the same way.** The same [`AdaptiveStep`](@ref) drives
 #   ``\epsilon`` toward HMC's optimal acceptance rate of ``\approx 0.65``.
