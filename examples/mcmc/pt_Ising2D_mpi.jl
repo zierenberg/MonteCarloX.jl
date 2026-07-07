@@ -104,11 +104,11 @@ on_root(pt) do
             push!(energy_samples[i], e)
         end
     end
+    logdos = logdos_exact_ising2D(L)
+    E_exact = get_centers(logdos)
     for (i, β) in enumerate(betas)
         samples = energy_samples[i]
-        dist_exact = distribution_exact_ising2D(L, β)
-        E_exact = get_centers(dist_exact)
-        mean_exact = sum(E_exact .* dist_exact.values)
+        mean_exact = mean(E_exact, weights(reweight(logdos, -β .* E_exact)))
         mean_measured = isempty(samples) ? NaN : mean(samples)
         delta_mean = abs(mean_measured - mean_exact)
         println("  β=$(round(β, digits=3)): <E>_meas=$(round(mean_measured, digits=1)) vs <E>_exact=$(round(mean_exact, digits=1)) Δ=$(round(delta_mean, digits=2))")

@@ -60,6 +60,32 @@ function reweight(args, source, target=ConstantEnsemble())
 end
 
 """
+    reweight(logdensity::BinnedObject, logw::AbstractVector) -> ImportanceWeights
+
+Per-bin importance weights from a binned log-density (e.g. a log-DOS) and an additional
+log-weight aligned with `get_centers(logdensity)`: `gᵢ = logdensity.values[i] + logw[i]`.
+Bins with non-finite log-density (`NaN` or `-Inf`, marking empty or forbidden bins)
+receive zero weight.
+
+The canonical distribution and mean energy at inverse temperature `β` from an exact
+log-DOS read
+
+```julia
+logdos = logdos_exact_ising2D(L)
+E      = get_centers(logdos)
+P      = weights(reweight(logdos, -β .* E))   # P(E), sums to 1
+mean_E = mean(E, P)
+```
+"""
+function reweight(logdensity::BinnedObject, logw::AbstractVector)
+    length(logw) == length(logdensity.values) ||
+        throw(DimensionMismatch("logw must match the number of bins"))
+    g = [isfinite(lg) ? lg + lw : -Inf for (lg, lw) in zip(logdensity.values, logw)]
+    any(isfinite, g) || throw(ArgumentError("log-density has no finite entries"))
+    return ImportanceWeights(g)
+end
+
+"""
     weights(iw::ImportanceWeights) -> StatsBase.AnalyticWeights
 
 Self-normalized importance weights `exp(gᵢ - logZ)` (summing to 1) as StatsBase

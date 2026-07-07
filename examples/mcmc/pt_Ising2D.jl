@@ -108,10 +108,13 @@ nothing # hide
 # ## Sampled vs. exact energy distributions
 #
 # For each temperature the sampled energy histogram sits on top of the exact
-# Boltzmann-weighted density of states ([Beale 1996](https://doi.org/10.1103/PhysRevLett.76.78)).
+# density of states ([Beale 1996](https://doi.org/10.1103/PhysRevLett.76.78))
+# reweighted to ``\beta``: the canonical distribution is just importance weights
+# ``\log w = \log g(E) - \beta E``, normalized by `weights`.
 
-exact_logdos = logdos_exact_ising2D(L)
-edges = get_edges(exact_logdos.bins[1])
+logdos  = logdos_exact_ising2D(L)          # BinnedObject: centers, edges, values
+E_exact = get_centers(logdos)
+edges   = get_edges(logdos.bins[1])
 plots = Any[]
 for (i, β) in enumerate(betas)
     p_i = plot(xlabel = "energy", ylabel = "probability",
@@ -122,8 +125,8 @@ for (i, β) in enumerate(betas)
         dist_i = StatsBase.normalize(hist_i; mode = :probability)
         plot!(p_i, dist_i; label = "PT", lw = 2, color = :steelblue)
     end
-    dist_exact = distribution_exact_ising2D(L, β)
-    plot!(p_i, get_centers(dist_exact), dist_exact.values;
+    P_exact = weights(reweight(logdos, -β .* E_exact))
+    plot!(p_i, E_exact, P_exact;
           label = "exact", lw = 2, color = :black, ls = :dash)
     push!(plots, p_i)
 end

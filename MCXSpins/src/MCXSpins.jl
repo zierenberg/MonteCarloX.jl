@@ -97,7 +97,6 @@ export  spin_flip!
 # -- Exact results ------------------------------------------------------------
 
 include("exact_solutions/ising2d_exact.jl")
-export  logdos_exact_ising2D,
-        distribution_exact_ising2D
+export  logdos_exact_ising2D
 
 end # module MCXSpins

@@ -116,6 +116,50 @@ function test_reweight_flat_default()
     return pass
 end
 
+# Binned log-density (log-DOS) → per-bin weights: replaces distribution_from_logdos.
+function test_reweight_binned_logdos()
+    pass = true
+
+    logdos = BinnedObject(-1:1, 0.0)
+    logdos.values .= log.([1.0, 2.0, 4.0])
+    β = 0.5
+    E = get_centers(logdos)
+    P = weights(reweight(logdos, -β .* E))
+
+    wlin = exp.(logdos.values .- β .* E)
+    expected = wlin ./ sum(wlin)
+    pass &= check(isapprox(sum(P), 1.0; atol = 1e-12), "binned: normalized\n")
+    pass &= check(all(isapprox.(P, expected; atol = 1e-12)), "binned: values match naive\n")
+    pass &= check(isapprox(mean(E, weights(reweight(logdos, -β .* E))), sum(E .* expected); atol = 1e-12), "binned: mean(E, P)\n")
+
+    # NaN and -Inf mark empty/forbidden bins: zero weight, normalization over the rest.
+    masked = BinnedObject(-1:2, 0.0)
+    masked.values .= [0.0, NaN, -Inf, log(3.0)]
+    Pm = weights(reweight(masked, zero(get_centers(masked))))
+    pass &= check(Pm[2] == 0.0 && Pm[3] == 0.0, "binned: non-finite bins get zero weight\n")
+    pass &= check(isapprox(sum(Pm), 1.0; atol = 1e-12), "binned: masked normalized\n")
+    pass &= check(isapprox(Pm[1], 0.25; atol = 1e-12) && isapprox(Pm[4], 0.75; atol = 1e-12), "binned: masked values\n")
+
+    threw = try
+        bad = BinnedObject(0:2, NaN)
+        reweight(bad, zeros(3))
+        false
+    catch err
+        err isa ArgumentError
+    end
+    pass &= check(threw, "binned: all-masked throws ArgumentError\n")
+
+    threw = try
+        reweight(logdos, zeros(2))
+        false
+    catch err
+        err isa DimensionMismatch
+    end
+    pass &= check(threw, "binned: length mismatch throws\n")
+
+    return pass
+end
+
 @testset "Reweighting" begin
     @testset "identity (source == target)" begin
         @test test_reweight_identity()
@@ -134,5 +178,8 @@ end
     end
     @testset "flat default target" begin
         @test test_reweight_flat_default()
+    end
+    @testset "binned log-density" begin
+        @test test_reweight_binned_logdos()
     end
 end

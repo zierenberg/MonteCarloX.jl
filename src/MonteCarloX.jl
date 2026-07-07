@@ -42,8 +42,7 @@ export  BinnedObject,
 include("infrastructure/utils.jl")
 export  log_sum,
         binary_search,
-        kldivergence,
-        distribution_from_logdos
+        kldivergence
 
 include("infrastructure/rng.jl")
 export  MutableRandomNumbers,

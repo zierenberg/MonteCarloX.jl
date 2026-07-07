@@ -34,9 +34,9 @@ function logdos_exact_ising2D(L::Integer; format::Symbol=:binned)
 end
 logdos_exact_ising2D(; L::Integer, format::Symbol=:binned) = logdos_exact_ising2D(L; format)
 
-""" 
-    distribution_exact_ising2D(L::Integer, β::Real)
-Exact canonical distribution for 2D Ising at inverse temperature `β`, from the exact DOS.
-"""
-distribution_exact_ising2D(L::Integer, β::Real) = 
-    MonteCarloX.distribution_from_logdos(logdos_exact_ising2D(L; format=:binned), β)
+# The canonical distribution at β is deliberately NOT wrapped in a function: it is plain
+# reweighting of the exact DOS, and should read as such at the call site —
+#     logdos = logdos_exact_ising2D(L)
+#     E = get_centers(logdos)
+#     P = weights(reweight(logdos, -β .* E))   # P(E) at β, sums to 1
+#     mean(E, P)                               # ⟨E⟩ at β

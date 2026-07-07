@@ -87,25 +87,6 @@ Numerically stable logistic sigmoid:
     return ex / (1 + ex)
 end
 
-"""
-    distribution_from_logdos(logdos::BinnedObject, β::Real)
-
-Given a log-DOS (logarithmic density of states) as a BinnedObject, return the corresponding distribution at inverse temperature `β` by reweighting with the Boltzmann factor `exp(-β * E)` and normalizing.
-"""
-function distribution_from_logdos(logdos::BinnedObject, β::Real)
-    E = get_centers(logdos)
-    log_w = logdos.values .- β .* E
-    mask = isfinite.(log_w)
-    any(mask) || throw(ArgumentError("logdos must contain at least one finite entry"))
-    log_Z = log_sum(log_w[mask])
-
-    out = zero(logdos)
-    out.values[mask] .= exp.(log_w[mask] .- log_Z)
-    return out
-end
-
-
-
 
 ###### Additional utility of Histogram class from StatsBase (does not work with documenter right now)
 # """
