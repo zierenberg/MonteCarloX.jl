@@ -14,7 +14,6 @@ export  AbstractSystem,
 include("algorithms/abstract_algorithm.jl")
 export  AbstractAlgorithm,
         AbstractMarkovChainMonteCarlo,
-        AbstractHeatBath,
         AbstractKineticMonteCarlo,
         steps
 
@@ -142,31 +141,28 @@ export  EventQueue,
 
 # ── Algorithms (equilibrium) ────────────────────────────────────────────────
 
-include("algorithms/markov_chain_monte_carlo.jl")
+include("algorithms/balance.jl")
+export  BalanceFunction,
+        MetropolisBalance,
+        GlauberBalance,
+        acceptance_probability,
+        transition_rate
 
-# Short user-facing alias for the constructor.
-const MCMC = MarkovChainMonteCarlo
-
-# Deprecated bindings — old names still resolve with a deprecation warning.
-Base.@deprecate_binding AbstractImportanceSampling AbstractMarkovChainMonteCarlo
-Base.@deprecate_binding ImportanceSampling MarkovChainMonteCarlo
-
+include("algorithms/metropolis_hastings.jl")
 export  AbstractMarkovChainMonteCarlo,
-        AbstractHeatBath,
-        MarkovChainMonteCarlo,
-        MCMC,
-        AbstractImportanceSampling,   # deprecated alias
-        ImportanceSampling,           # deprecated alias
+        MetropolisHastingsAlgorithm,
         ensemble,
+        balance,
         logweight,
         accept!,
         acceptance_rate,
         reset!
 
 include("algorithms/metropolis.jl")
-export  AbstractMetropolis,
-        Metropolis,
-        Glauber
+export  MetropolisAlgorithm
+
+include("algorithms/glauber.jl")
+export  GlauberAlgorithm
 
 include("algorithms/step_size.jl")
 export  AdaptiveStep,
@@ -180,10 +176,11 @@ include("algorithms/rejection_sampling.jl")
 export  RejectionSampling
 
 include("algorithms/heat_bath.jl")
-export  HeatBath
+export  HeatBath,
+        HeatBathAlgorithm
 
 include("algorithms/multicanonical.jl")
-export  Multicanonical
+export  MulticanonicalAlgorithm
 
 include("algorithms/parallel_multicanonical.jl")
 export  ParallelMulticanonical,
@@ -203,7 +200,24 @@ export  ParallelTempering,
         set_betas
 
 include("algorithms/wang_landau.jl")
-export  WangLandau
+export  WangLandauAlgorithm
+
+# ── Deprecated algorithm names (old API resolves with a warning) ─────────────
+Base.@deprecate_binding AbstractImportanceSampling AbstractMarkovChainMonteCarlo
+Base.@deprecate_binding ImportanceSampling MetropolisHastingsAlgorithm
+Base.@deprecate_binding AbstractMetropolis AbstractMarkovChainMonteCarlo
+Base.@deprecate_binding AbstractHeatBath AbstractMarkovChainMonteCarlo
+Base.@deprecate_binding MetropolisHastings MetropolisHastingsAlgorithm
+Base.@deprecate_binding MarkovChainMonteCarlo MetropolisHastingsAlgorithm
+Base.@deprecate_binding MCMC MetropolisHastingsAlgorithm
+Base.@deprecate_binding Metropolis MetropolisAlgorithm
+Base.@deprecate_binding Glauber GlauberAlgorithm
+Base.@deprecate_binding Multicanonical MulticanonicalAlgorithm
+Base.@deprecate_binding WangLandau WangLandauAlgorithm
+export  AbstractImportanceSampling, ImportanceSampling,
+        AbstractMetropolis, AbstractHeatBath,
+        MetropolisHastings, MarkovChainMonteCarlo, MCMC,
+        Metropolis, Glauber, Multicanonical, WangLandau
 
 # ── Algorithms (non-equilibrium) ────────────────────────────────────────────
 
@@ -219,5 +233,11 @@ export  AbstractKineticMonteCarlo,
 
 include("algorithms/gillespie.jl")
 export  Gillespie
+
+# Fenwick-tree rate handler: lives in event_handler/, included here so the KMC
+# `next`/`next_event`/`next_time` it overloads already exist.
+include("event_handler/event_rate_tree.jl")
+export  EventRateTree,
+        total_rate
 
 end # module MonteCarloX

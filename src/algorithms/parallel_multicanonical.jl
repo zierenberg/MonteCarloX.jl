@@ -19,12 +19,12 @@ Create `ParallelChains` for multicanonical algorithms.
 Validates that the algorithm(s) carry a `MulticanonicalEnsemble`.
 """
 function ParallelMulticanonical(backend::ThreadsBackend,
-                                alg::AbstractVector{<:MarkovChainMonteCarlo{<:MulticanonicalEnsemble}})
+                                alg::AbstractVector{<:MetropolisHastingsAlgorithm{<:MulticanonicalEnsemble}})
     return ParallelChains(backend, alg)
 end
 
 function ParallelMulticanonical(backend::MPIBackend,
-                                alg::MarkovChainMonteCarlo{<:MulticanonicalEnsemble})
+                                alg::MetropolisHastingsAlgorithm{<:MulticanonicalEnsemble})
     return ParallelChains(backend, alg)
 end
 
@@ -35,7 +35,7 @@ Sum histograms across all chains into the root chain. After this call only the
 root holds the merged histogram; other chains' buffers are unchanged.
 Use `distribute_logweight!` to propagate the refined weights back.
 """
-function merge_histograms!(pc::ParallelChains{ThreadsBackend, <:Vector{<:MarkovChainMonteCarlo{<:MulticanonicalEnsemble}}})
+function merge_histograms!(pc::ParallelChains{ThreadsBackend, <:Vector{<:MetropolisHastingsAlgorithm{<:MulticanonicalEnsemble}}})
     n = size(pc)
     r = root_chain(pc)
     h_root = ensemble(algorithm(pc, r)).histogram.values
@@ -46,7 +46,7 @@ function merge_histograms!(pc::ParallelChains{ThreadsBackend, <:Vector{<:MarkovC
     return nothing
 end
 
-function merge_histograms!(pc::ParallelChains{<:MPIBackend, <:MarkovChainMonteCarlo{<:MulticanonicalEnsemble}})
+function merge_histograms!(pc::ParallelChains{<:MPIBackend, <:MetropolisHastingsAlgorithm{<:MulticanonicalEnsemble}})
     MPI.Reduce!(ensemble(algorithm(pc)).histogram.values, +, pc.backend.comm; root=pc.backend.root)
     return nothing
 end
@@ -56,7 +56,7 @@ end
 
 Broadcast logweights from the root chain to all other chains.
 """
-function distribute_logweight!(pc::ParallelChains{ThreadsBackend, <:Vector{<:MarkovChainMonteCarlo{<:MulticanonicalEnsemble}}})
+function distribute_logweight!(pc::ParallelChains{ThreadsBackend, <:Vector{<:MetropolisHastingsAlgorithm{<:MulticanonicalEnsemble}}})
     r = root_chain(pc)
     root_lw = ensemble(algorithm(pc, r)).logweight.values
     n = size(pc)
@@ -67,7 +67,7 @@ function distribute_logweight!(pc::ParallelChains{ThreadsBackend, <:Vector{<:Mar
     return nothing
 end
 
-function distribute_logweight!(pc::ParallelChains{<:MPIBackend, <:MarkovChainMonteCarlo{<:MulticanonicalEnsemble}})
+function distribute_logweight!(pc::ParallelChains{<:MPIBackend, <:MetropolisHastingsAlgorithm{<:MulticanonicalEnsemble}})
     MPI.Bcast!(ensemble(algorithm(pc)).logweight.values, pc.backend.root, pc.backend.comm)
     return nothing
 end

@@ -8,7 +8,7 @@ This page sets up the vocabulary and API shared by every MCMC algorithm in Monte
 Concrete algorithms — [Metropolis-Hastings](metropolis.md), Heat bath, [Multicanonical](multicanonical.md), Wang-Landau, Replica exchange — are documented as subpages.
 
 !!! note "Naming"
-    The abstract supertype is `AbstractMarkovChainMonteCarlo`; the generic algorithm is `MarkovChainMonteCarlo` with the short alias `const MCMC = MarkovChainMonteCarlo`. The old names `AbstractImportanceSampling` and `MarkovChainMonteCarlo` are kept as deprecated bindings and resolve with a warning. `HeatBath` is conceptually MCMC but currently a sibling type (`AbstractHeatBath <: AbstractAlgorithm`) pending a follow-up refactor of the conditional-vs-accept-reject split.
+    `AbstractMarkovChainMonteCarlo` is the umbrella for the whole category. The accept/reject engine is `MetropolisHastingsAlgorithm{E,B,RNG}` (ensemble × balance × rng); `HeatBath` is a sibling concrete type under the *same* umbrella — direct conditional sampling with no accept step, hence no `accepted` counter. The friendly constructors `MetropolisAlgorithm`, `GlauberAlgorithm`, `MulticanonicalAlgorithm`, `WangLandauAlgorithm`, `HeatBathAlgorithm` build these. Old names (`Metropolis`, `Glauber`, `MarkovChainMonteCarlo`, `MCMC`, `AbstractImportanceSampling`, `AbstractMetropolis`, `AbstractHeatBath`) are kept as deprecated bindings and resolve with a warning.
 
 !!! note "Direct & importance sampling"
     Pure i.i.d. sampling from a tractable proposal and standard importance sampling (reweighting i.i.d. draws to a target) are not provided as dedicated algorithm types — they reduce to one-line idioms over two `AbstractEnsemble` objects. Genuinely scalable importance-sampling methods (annealed IS, SMC samplers, population MC, nested sampling, cross-entropy) all live under [Population Monte Carlo](population_monte_carlo.md).
@@ -27,9 +27,10 @@ In the textbook presentation, an MCMC algorithm is parameterized directly by the
 MonteCarloX inverts this: the ensemble is the first-class object that defines the target, and algorithms are *consumers* of an ensemble.
 The consequences are concrete:
 
-- **Bayesian inference and statistical mechanics share an interface.** `Metropolis(rng, BoltzmannEnsemble(β=1.0))` and `Metropolis(rng, FunctionEnsemble(logposterior, linear=true))` differ only in the ensemble.
+- **Bayesian inference and statistical mechanics share an interface.** `MetropolisAlgorithm(rng, BoltzmannEnsemble(β=1.0))` and `MetropolisAlgorithm(rng, FunctionEnsemble(logposterior))` differ only in the ensemble.
 - **Replica exchange is an ensemble swap.** Two algorithms hold two ensembles; a successful exchange moves the ensembles, not the configurations.
-- **Adaptive methods are ensembles that learn.** Multicanonical and Wang-Landau are not new algorithms; they are `MarkovChainMonteCarlo` with an adaptive ensemble whose `update!` reshapes `logweight` from accumulated histograms.
+- **Adaptive methods are ensembles that learn.** Multicanonical and Wang-Landau are not new algorithms; they are `MetropolisHastingsAlgorithm` (Metropolis balance) with an adaptive ensemble whose `update!` reshapes `logweight` from accumulated histograms.
+- **Metropolis vs Glauber is a balance-function choice.** The two differ only in the `BalanceFunction` slot; the same balance also supplies continuous-time rates via `transition_rate` (see [Metropolis, Glauber, and the balance function](metropolis.md)).
 
 ## Targets, chains, and the acceptance rule
 
@@ -79,44 +80,38 @@ i.e. when the log-weight change under a proposal can be computed from a state *d
 For Boltzmann, ``\Delta \log \pi = -\beta \Delta E``, so the trait holds.
 For multicanonical and Wang-Landau, the tabulated weight is non-linear in ``x``, so it does not.
 
-This trait gates which algorithm form can be used.
-Delta-based algorithms ([`Metropolis`](metropolis.md), `Glauber`) require `linear_logweight(ens) == true` and error otherwise:
-
-```julia
-Metropolis(rng, MulticanonicalEnsemble(bins))
-# ArgumentError: MulticanonicalEnsemble does not have a linear logweight and
-# cannot be used with Metropolis. Use MarkovChainMonteCarlo or a dedicated algorithm instead.
-```
-
-For non-linear ensembles use the generic `MarkovChainMonteCarlo` algorithm — which always evaluates the full-state log-weight difference — or one of the dedicated constructors (`Multicanonical`, `WangLandau`) that wrap it.
+This trait selects which *form* of the log-ratio is cheap — not which algorithm you may build.
+For a linear ensemble the log-ratio comes from the local difference alone, ``\log R = \text{logweight}(\text{ens}, \Delta E)`` (the spin fast path).
+For a non-linear ensemble (multicanonical, Wang-Landau) the weight is not linear in ``\Delta E``, so the log-ratio is assembled from absolute values around the move via the two-argument `accept!(alg, arg_new, arg_old)`.
+Both forms drive the same `MetropolisHastingsAlgorithm` engine; `linear_logweight(ens)` is a compile-time constant, so a system's update can branch on it at no cost.
+(Locality of the *weight* — needed by cluster bonds and cached n-fold rates — is a separate factorization property, asserted only where those constructions are built.)
 
 ## Algorithms
 
-Every accept/reject MCMC algorithm subtypes `AbstractMarkovChainMonteCarlo` (to be renamed `AbstractMarkovChainMonteCarlo`) and carries:
+The accept/reject engine `MetropolisHastingsAlgorithm <: AbstractMarkovChainMonteCarlo` carries:
 
 | Field | Meaning |
 |-------|---------|
 | `rng::AbstractRNG` | Random number source (any Julia `AbstractRNG`) |
 | `ensemble::AbstractEnsemble` | The target distribution |
+| `balance::BalanceFunction` | The dynamics (Metropolis / Glauber) |
 | `steps::Int` | Cumulative attempted moves |
 | `accepted::Int` | Cumulative accepted moves |
 
 Shared API:
 
 ```julia
-accept!(alg, arg_new, arg_old) -> Bool   # full-state form (always available)
-accept!(alg, Δx)            -> Bool   # delta form (linear ensembles only)
-acceptance_rate(alg)        -> Float64
-steps(alg)                  -> Int
-ensemble(alg)               -> AbstractEnsemble
-reset!(alg)                                # zeroes step and acceptance counters
+accept!(alg, logR)             -> Bool   # primitive: apply the balance function to logR
+accept!(alg, arg_new, arg_old) -> Bool   # convenience: forms logR from a logweight difference
+acceptance_rate(alg)           -> Float64
+balance(alg)                   -> BalanceFunction
+steps(alg)                     -> Int
+ensemble(alg)                  -> AbstractEnsemble
+reset!(alg)                              # zeroes step and acceptance counters
 ```
 
-`accept!` updates the internal counters and returns whether the proposal was accepted.
-The full-state form computes ``\text{logweight}(\text{ens}, x_{\text{new}}) - \text{logweight}(\text{ens}, x_{\text{old}})``;
-the delta form computes ``\text{logweight}(\text{ens}, \Delta x)`` directly and requires linearity.
-Either form may be more efficient depending on the system: for a spin flip, ``\Delta E`` is local and cheap;
-for a Bayesian posterior move, recomputing ``\log \pi`` over the full parameter vector is usually unavoidable.
+`accept!(alg, logR)` is the core contract: it applies `balance(alg)` to the log acceptance-ratio and updates the counters.
+The caller assembles ``\log R`` — for a symmetric move on a linear ensemble that is `logweight(ensemble(alg), ΔE)` (local and cheap for a spin flip); the two-argument convenience forms it from ``\text{logweight}(\text{ens}, x_{\text{new}}) - \text{logweight}(\text{ens}, x_{\text{old}})`` (unavoidable for a full Bayesian posterior move, and the form multicanonical / Wang-Landau use for visit recording).
 
 ## A canonical simulation loop
 
@@ -127,7 +122,7 @@ using MonteCarloX, Random
 
 rng = Xoshiro(1)
 sys = ...                                          # AbstractSystem (from a companion package)
-alg = Metropolis(rng; β=0.44)                      # algorithm + ensemble
+alg = MetropolisAlgorithm(rng; β=0.44)             # ensemble × balance
 
 measurements = Measurements(
     [:energy => energy => Float64[]],
@@ -137,7 +132,7 @@ measurements = Measurements(
 for step in 1:1_000_000
     i  = rand(rng, 1:nsites(sys))
     ΔE = local_energy_change(sys, i)               # system-defined: change if site i were flipped
-    if accept!(alg, ΔE)                            # delta form (Boltzmann is linear)
+    if accept!(alg, logweight(ensemble(alg), ΔE))  # linear fast path: logR = -βΔE
         flip!(sys, i)                              # commit the change
     end
     measure!(measurements, sys, step)
@@ -146,18 +141,18 @@ end
 println("acceptance: ", acceptance_rate(alg))
 ```
 
-Swap `Metropolis` for `Multicanonical` or `WangLandau`, and the loop body needs one change: the delta form is no longer available, so the system passes `(arg_new, arg_old)` to `accept!`.
+Swap `MetropolisAlgorithm` for `MulticanonicalAlgorithm` or `WangLandauAlgorithm`, and the loop body needs one change: the ensemble is non-linear, so the system forms the log-ratio from absolute values — pass `(arg_new, arg_old)` to `accept!`.
 
 ### Bayesian variant: same loop, different ensemble
 
-A general log-posterior is non-linear in the parameter vector ``\theta``, so we use the generic `MarkovChainMonteCarlo` algorithm (which always computes the full-state log-ratio) and the corresponding form of `accept!`:
+A general log-posterior is non-linear in the parameter vector ``\theta``, so the loop forms the log-ratio from the full-state difference (the two-argument `accept!`):
 
 ```julia
 using MonteCarloX, Random
 
 rng  = Xoshiro(1)
 θ    = zeros(D)
-alg  = MCMC(rng, FunctionEnsemble(logposterior))   # linear=false (default)
+alg  = MetropolisAlgorithm(rng, FunctionEnsemble(logposterior))
 
 measurements = Measurements(
     [:logp => logposterior => Float64[]],
@@ -206,7 +201,7 @@ For correlation diagnostics, the [measurements](../infrastructure/measurements.m
 
 ```@docs
 AbstractMarkovChainMonteCarlo
-MarkovChainMonteCarlo
+MetropolisHastingsAlgorithm
 AbstractEnsemble
 linear_logweight
 logweight(ens::AbstractEnsemble)
@@ -214,7 +209,7 @@ logweight(ens::AbstractEnsemble, arg)
 ensemble(alg::AbstractMarkovChainMonteCarlo)
 accept!
 acceptance_rate
-reset!(alg::AbstractMarkovChainMonteCarlo)
+reset!(alg::MetropolisHastingsAlgorithm)
 steps
 update!(ens::AbstractEnsemble, args...)
 ```

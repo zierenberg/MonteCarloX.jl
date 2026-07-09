@@ -3,8 +3,10 @@ module MCXSoftMatter
 using StaticArrays
 using MonteCarloX: AbstractSystem,
                    AbstractMarkovChainMonteCarlo,
-                   AbstractMetropolis,
-                   accept!
+                   accept!,
+                   ensemble,
+                   logweight,
+                   linear_logweight
 import MonteCarloX: init!
 
 abstract type AbstractSoftMatterSystem <: AbstractSystem end

@@ -6,15 +6,18 @@ function translate!(sys::ParticleSystem{D,T}, alg::AbstractMarkovChainMonteCarlo
     end
 end
 
-# Accept dispatch
-# Metropolis with linear logweight: O(1), no energy(sys) call needed
-@inline function _accept_energy_change!(alg::AbstractMetropolis, sys, dE)
-    accept!(alg, dE)
-end
-# General IS: needs full energies for non-linear logweights + record_visit!
+# Accept dispatch: assemble the log acceptance-ratio from the ensemble. A linear ensemble uses the
+# O(1) local ΔE (logR = logweight(ens, dE), no energy(sys) call); a nonlinear ensemble reads the
+# absolute energies around the move and drives record_visit!. linear_logweight(ens) is a
+# compile-time constant, so the branch folds away and the linear path stays allocation-free.
 @inline function _accept_energy_change!(alg::AbstractMarkovChainMonteCarlo, sys, dE)
-    E_old = energy(sys)
-    accept!(alg, E_old + dE, E_old)
+    ens = ensemble(alg)
+    if linear_logweight(ens)
+        return accept!(alg, logweight(ens, dE))
+    else
+        E_old = energy(sys)
+        return accept!(alg, E_old + dE, E_old)
+    end
 end
 
 #### Monomer translate ####

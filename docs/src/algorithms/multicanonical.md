@@ -275,7 +275,7 @@ The combination "flatness > 0.8 AND at least two roundtrips" is a reasonable con
 ## API reference
 
 ```@docs
-Multicanonical
+MulticanonicalAlgorithm
 MulticanonicalEnsemble
 update!(e::MulticanonicalEnsemble; mode::Symbol)
 visited_range

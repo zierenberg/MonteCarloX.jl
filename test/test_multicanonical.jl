@@ -10,12 +10,12 @@ function test_multicanonical_accept_and_reset()
     lw = BinnedObject(bins, 0.0)
 
     # default RNG constructor
-    alg_default = Multicanonical(lw)
+    alg_default = MulticanonicalAlgorithm(lw)
     pass &= check(alg_default.rng === Random.GLOBAL_RNG, "default RNG is GLOBAL_RNG\n")
 
     # flat weights: acceptance rate should be 1.0
     rng = MersenneTwister(42)
-    alg = Multicanonical(rng, lw)
+    alg = MulticanonicalAlgorithm(rng, lw)
 
     step = 0.1
     function update!(x::Float64, alg::AbstractMarkovChainMonteCarlo)::Float64
@@ -56,7 +56,7 @@ function test_multicanonical_weight_update()
 
     bins = 0.0:1.0:4.0
     lw = BinnedObject(bins, 0.0)
-    alg = Multicanonical(rng, lw)
+    alg = MulticanonicalAlgorithm(rng, lw)
 
     # in-place weight update from histogram
     w_before = copy(ensemble(alg).logweight.values)
@@ -88,7 +88,7 @@ end
 
 function test_multicanonical_set_logweight()
     bins = 0.0:1.0:6.0
-    alg = Multicanonical(MulticanonicalEnsemble(bins))
+    alg = MulticanonicalAlgorithm(MulticanonicalEnsemble(bins))
     pass = true
 
     # set! on ensemble synchronizes d_logweight
@@ -420,7 +420,7 @@ function test_visited_range()
 
     bins = 0:1:10
     rng = MersenneTwister(42)
-    alg = Multicanonical(rng, bins)
+    alg = MulticanonicalAlgorithm(rng, bins)
     ens = ensemble(alg)
 
     # initially empty

@@ -24,6 +24,7 @@ end
     include("test_kinetic_monte_carlo.jl")
     include("test_measurements.jl")
     include("test_message_backend.jl")
+    include("test_balance.jl")
     include("test_markov_chain_monte_carlo.jl")
     include("test_step_size.jl")
     include("test_log_density_target.jl")

@@ -33,11 +33,13 @@ using Random
 using Graphs
 using SparseArrays: SparseMatrixCSC, sparse
 using MonteCarloX: AbstractSystem,
-                   AbstractMarkovChainMonteCarlo,
-                   AbstractMetropolis,
-                   AbstractHeatBath,
+                   MetropolisHastingsAlgorithm,
+                   HeatBath,
                    BinnedObject,
                    accept!,
+                   ensemble,
+                   logweight,
+                   linear_logweight,
                    logistic
 
 import MonteCarloX

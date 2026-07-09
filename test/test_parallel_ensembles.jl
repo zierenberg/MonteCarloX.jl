@@ -13,8 +13,8 @@ function test_parallel_chains()
     pass = true
 
     # Threads backend
-    alg1 = Metropolis(MersenneTwister(1); β=1.0)
-    alg2 = Metropolis(MersenneTwister(2); β=0.5)
+    alg1 = MetropolisAlgorithm(MersenneTwister(1); β=1.0)
+    alg2 = MetropolisAlgorithm(MersenneTwister(2); β=0.5)
     tb = ThreadsBackend(2)
     pc = ParallelChains(tb, [alg1, alg2])
     pass &= check(pc isa ParallelChains{ThreadsBackend}, "ParallelChains Threads type\n")
@@ -43,7 +43,7 @@ function test_parallel_chains()
     # MPI backend
     _ensure_mpi_init()
     mb = MPIBackend(MPI.COMM_WORLD)
-    alg = Metropolis(MersenneTwister(1); β=1.0)
+    alg = MetropolisAlgorithm(MersenneTwister(1); β=1.0)
     pc_mpi = ParallelChains(mb, alg)
     pass &= check(pc_mpi isa ParallelChains{<:MPIBackend}, "ParallelChains MPI type\n")
     pass &= check(rank(pc_mpi) == 0, "MPI rank == 0\n")
@@ -72,7 +72,7 @@ function test_parallel_multicanonical()
     pass = true
 
     bins = 0.0:1.0:4.0
-    muca = Multicanonical(MersenneTwister(1234), BinnedObject(bins, 0.0))
+    muca = MulticanonicalAlgorithm(MersenneTwister(1234), BinnedObject(bins, 0.0))
 
     # MPI backend
     backend = MPIBackend(MPI.COMM_WORLD)
@@ -93,8 +93,8 @@ function test_parallel_multicanonical()
     pass &= check(all(ensemble(muca).logweight.values .== [10.0, 20.0, 30.0, 40.0]), "distribute logweight unchanged\n")
 
     # Threads backend
-    alg1 = Multicanonical(MersenneTwister(1), BinnedObject(bins, 0.0))
-    alg2 = Multicanonical(MersenneTwister(2), BinnedObject(bins, 0.0))
+    alg1 = MulticanonicalAlgorithm(MersenneTwister(1), BinnedObject(bins, 0.0))
+    alg2 = MulticanonicalAlgorithm(MersenneTwister(2), BinnedObject(bins, 0.0))
     ensemble(alg1).histogram.values .= [1.0, 2.0, 3.0, 4.0]
     ensemble(alg2).histogram.values .= [4.0, 3.0, 2.0, 1.0]
     pmucav = ParallelMulticanonical(ThreadsBackend(2), [alg1, alg2])
@@ -120,7 +120,7 @@ function test_parallel_tempering()
     pass = true
 
     backend = MPIBackend(MPI.COMM_WORLD)
-    alg = Metropolis(MersenneTwister(10); β=0.8)
+    alg = MetropolisAlgorithm(MersenneTwister(10); β=0.8)
     pt = ParallelTempering(backend, alg)
     pass &= check(rank(pt) == 0, "rank == 0\n")
     pass &= check(size(pt) == 1, "size == 1\n")
@@ -158,7 +158,7 @@ function test_parallel_tempering()
     pass &= check(b2[end] ≈ 0.5, "geometric betas last\n")
 
     # Threads mode
-    v_algs = [Metropolis(MersenneTwister(11); β=1.0), Metropolis(MersenneTwister(12); β=0.5)]
+    v_algs = [MetropolisAlgorithm(MersenneTwister(11); β=1.0), MetropolisAlgorithm(MersenneTwister(12); β=0.5)]
     v_pt = ParallelTempering(ThreadsBackend(2), v_algs)
     pass &= check(v_pt isa ReplicaExchange{ThreadsBackend}, "Threads type\n")
     pass &= check(index(v_pt,1) == v_pt.indices[1], "Threads index\n")
@@ -187,8 +187,8 @@ function test_parallel_tempering()
     pass &= check(MonteCarloX._resolve_pair(3, 1, 4) == (active=true, pair_id=2, partner_index=2), "resolve_pair (3,1,4)\n")
 
     # exchange_log_ratio and attempt_exchange_pair!
-    alg_i = Metropolis(MersenneTwister(21); β=1.0)
-    alg_j = Metropolis(MersenneTwister(22); β=0.5)
+    alg_i = MetropolisAlgorithm(MersenneTwister(21); β=1.0)
+    alg_j = MetropolisAlgorithm(MersenneTwister(22); β=0.5)
     x_i, x_j = 0.0, -5.0
     log_ratio = exchange_log_ratio(ensemble(alg_i), ensemble(alg_j), x_i, x_j)
     pass &= check(isapprox(log_ratio, 2.5; atol=1e-12), "exchange log ratio\n")
@@ -198,8 +198,8 @@ function test_parallel_tempering()
     pass &= check(ensemble(alg_i).beta == 0.5, "betas swapped (i)\n")
     pass &= check(ensemble(alg_j).beta == 1.0, "betas swapped (j)\n")
 
-    alg_i_reject = Metropolis(MersenneTwister(23); β=1.0)
-    alg_j_reject = Metropolis(MersenneTwister(24); β=0.5)
+    alg_i_reject = MetropolisAlgorithm(MersenneTwister(23); β=1.0)
+    alg_j_reject = MetropolisAlgorithm(MersenneTwister(24); β=0.5)
     rejected = attempt_exchange_pair!(alg_i_reject, alg_j_reject, x_j, x_i, 1.0)
     pass &= check(!rejected, "exchange rejected\n")
     pass &= check(ensemble(alg_i_reject).beta == 1.0, "betas unchanged (i)\n")

@@ -16,7 +16,7 @@ function test_log_density_target()
                   "ldt: capabilities order 0\n")
 
     # An uphill move (toward higher density) is always accepted by the MonteCarloX sampler.
-    alg = MarkovChainMonteCarlo(Xoshiro(1), t)
+    alg = MetropolisHastingsAlgorithm(Xoshiro(1), t)
     pass &= check(accept!(alg, [0.0, 0.0, 0.0], [3.0, 0.0, 0.0]), "ldt: usable by MCX accept!\n")
     return pass
 end

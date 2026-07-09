@@ -31,10 +31,9 @@ Sorted by the standard literature partition, MonteCarloX organizes algorithms in
 - **[Basic Sampling](algorithms/basic_sampling.md)** — simple (i.i.d.) sampling and standard importance sampling, expressed as one-line idioms over `AbstractEnsemble` objects. These have no dedicated algorithm type; their genuinely scalable variants are population-based and live under Population Monte Carlo.
 
 - **[Markov Chain Monte Carlo](algorithms/markov_chain_monte_carlo.md)** — discrete-step chains whose transitions follow a local rule: accept/reject from a log-weight difference, or resample one coordinate from its conditional. When that rule derives from a global log-weight (detailed balance), the stationary distribution is the target ``\pi(x) \propto \exp(\text{logweight}(x))``; when only a local difference is defined (e.g. nonreciprocal couplings), detailed balance breaks and the chain instead converges to a nonequilibrium steady state.
-  - [`Metropolis`](algorithms/metropolis.md), `Glauber` — accept/reject with symmetric proposals.
-  - `MetropolisHastings` (TODO) — asymmetric-proposal correction.
-  - `HeatBath` — Gibbs-style sampling of one coordinate from its conditional (Bayesian "Gibbs sampling"). Subpage TODO.
-  - [`Multicanonical`](algorithms/multicanonical.md), `WangLandau` (subpage TODO), `SAMC` (TODO) — flat-histogram methods with iteratively adapted weights.
+  - [`MetropolisAlgorithm`, `GlauberAlgorithm`](algorithms/metropolis.md) — accept/reject with a symmetric proposal; the two differ only in the **balance function** (`MetropolisBalance` vs `GlauberBalance`), which also supplies the continuous-time rates of the rejection-free n-fold way. Both build the `MetropolisHastingsAlgorithm` engine; Metropolis–Hastings needs no separate type — an asymmetric proposal just adds its ratio to ``\log R``.
+  - `HeatBathAlgorithm` — Gibbs-style sampling of one coordinate from its conditional (Bayesian "Gibbs sampling"). Subpage TODO.
+  - [`MulticanonicalAlgorithm`](algorithms/multicanonical.md), `WangLandauAlgorithm` (subpage TODO), `SAMC` (TODO) — flat-histogram methods (Metropolis balance with an iteratively adapted ensemble).
   - `ReplicaExchange`, `ParallelTempering` — parallel chains coupled by ensemble swaps. Subpage TODO.
   - `HMC` (TODO) — gradient-informed Hamiltonian proposals.
 

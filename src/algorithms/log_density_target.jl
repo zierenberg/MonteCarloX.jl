@@ -17,13 +17,13 @@ Wrap a log-density `logdensity` over a `dimension`-dimensional parameter vector.
 via the usual `logweight` protocol). The wrapper adds the one thing a callable lacks
 for gradient-based sampling: the parameter-space `dimension`.
 
-Usable directly as a target for [`MarkovChainMonteCarlo`](@ref), and — when
+Usable directly as a target for [`MetropolisHastingsAlgorithm`](@ref), and — when
 `LogDensityProblems` is loaded — it satisfies that interface (order-0), so an AD
 package can equip it with gradients and hand it to AdvancedHMC/NUTS.
 
 ```julia
 target = LogDensityTarget(logposterior, 2)      # 2 parameters
-alg    = MarkovChainMonteCarlo(rng, target)     # MonteCarloX's own sampler
+alg    = MetropolisHastingsAlgorithm(rng, target)        # MonteCarloX's own sampler
 # or, with LogDensityProblems + ForwardDiff + AdvancedHMC loaded, drive it by NUTS.
 ```
 """

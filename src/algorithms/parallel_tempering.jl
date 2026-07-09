@@ -15,7 +15,7 @@ ParallelTempering(backend::MPIBackend, alg::AbstractMarkovChainMonteCarlo) =
     ParallelTempering(betas; seed=1000, rng=Xoshiro, backend=nothing)
 
 Convenience constructor that creates per-replica RNGs from `seed + i` and builds
-`Metropolis` replicas over `betas`.
+`MetropolisAlgorithm` replicas over `betas`.
 
 - `backend=nothing` (default): threads mode.
 - `backend::ThreadsBackend`: threads mode.
@@ -32,20 +32,20 @@ function ParallelTempering(betas::AbstractVector{<:Real};
     # if nothing: create a threads backend with one thread per beta
     if backend === nothing
         backend = ThreadsBackend(n)
-        alg = [Metropolis(rng(seed + i); β=vals[i]) for i in 1:n]
+        alg = [MetropolisAlgorithm(rng(seed + i); β=vals[i]) for i in 1:n]
         return ReplicaExchange(backend, alg)
     end
 
     if backend isa ThreadsBackend
         size(backend) == n || throw(ArgumentError("size(backend) (=$(size(backend))) must equal length(betas) (=$n)"))
-        alg = [Metropolis(rng(seed + i); β=vals[i]) for i in 1:n]
+        alg = [MetropolisAlgorithm(rng(seed + i); β=vals[i]) for i in 1:n]
         return ReplicaExchange(backend, alg)
     end
 
     if backend isa MPIBackend
         size(backend) == n || throw(ArgumentError("size(backend) (=$(size(backend))) must equal length(betas) (=$n)"))
         i = rank(backend) + 1
-        alg = Metropolis(rng(seed + i); β=vals[i])
+        alg = MetropolisAlgorithm(rng(seed + i); β=vals[i])
         return ReplicaExchange(backend, alg)
     end
 

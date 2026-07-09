@@ -1,57 +1,56 @@
-# Metropolis
+# Metropolis, Glauber, and the balance function
 
-The Metropolis algorithm is the default first-choice MCMC sampler: propose a local change, compute the log-weight difference, accept with probability ``\min(1, e^{\Delta})``.
+The Metropolis algorithm is the default first-choice MCMC sampler: propose a local change, form the log acceptance-ratio ``\log R``, and accept with probability ``\min(1, e^{\log R})``.
 For the shared MCMC protocol — `accept!`, ensembles, the linearity trait — see the [class page](markov_chain_monte_carlo.md).
 
 ## When to use it
 
 - Standard equilibrium sampling at fixed parameters (canonical ensemble, fixed posterior).
-- Whenever the local proposal is *symmetric*: ``q(x' \mid x) = q(x \mid x')``. Asymmetric proposals need Metropolis-Hastings (TODO), which corrects the acceptance with the proposal ratio.
-- When the log-weight change is cheap to compute as a local difference (e.g. ``\Delta E`` for a spin flip). Linear ensembles such as `BoltzmannEnsemble` enable this directly via the delta form of `accept!`.
+- Whenever the local proposal is *symmetric*: ``q(x' \mid x) = q(x \mid x')``. Asymmetric proposals are Metropolis-Hastings — no separate type: fold the proposal ratio into ``\log R`` at the call site.
+- When the log-weight change is cheap to compute as a local difference (e.g. ``\Delta E`` for a spin flip).
 
-## Acceptance rule
+## The acceptance ratio and the balance function
 
-Given current state ``x`` and proposal ``x'`` drawn from a symmetric ``q``, the Metropolis-Hastings acceptance probability reduces to
+Given current state ``x`` and proposal ``x'``, the log acceptance-ratio is
 
 ```math
-\alpha(x \to x') = \min(1,\ e^{\Delta}),
-\quad
-\Delta = \text{logweight}(\text{ens}, x') - \text{logweight}(\text{ens}, x).
+\log R = \log\frac{\pi(x')\,q(x \mid x')}{\pi(x)\,q(x' \mid x)}
+       = \underbrace{\text{logweight}(\text{ens}, \Delta E)}_{\text{ensemble}}
+       + \underbrace{\log\frac{q(x \mid x')}{q(x' \mid x)}}_{\text{proposal (0 if symmetric)}}.
 ```
 
-`accept!` evaluates this rule and updates the algorithm's `steps` and `accepted` counters.
+A **balance function** turns ``\log R`` into dynamics. It is a first-class object in core, shared by every algorithm:
+
+| Balance | acceptance probability ``= `` transition rate | reduces to |
+|---------|-----------------------------------------------|------------|
+| [`MetropolisBalance`](@ref) | ``\min(1, e^{\log R})`` | Metropolis 1953 / Hastings 1970 |
+| [`GlauberBalance`](@ref) | ``1/(1+e^{-\log R}) = \sigma(\log R)`` | Glauber ≡ Barker 1965 |
+
+Both satisfy detailed balance, ``f(\log R)/f(-\log R) = e^{\log R}``, and reach the same stationary distribution; they differ only in the off-equilibrium dynamics.
+The single object has **two readings of the same ``f``**:
+
+```julia
+acceptance_probability(balance, logR)   # discrete-time reading → accept!
+transition_rate(balance, logR)          # continuous-time reading → n-fold / kMC rates
+```
+
+This is why "a probability in one model class becomes a rate in another" is literally the same code: the rejection-free [`NFoldWay`](@ref) in MCXSpins builds its event rates from `transition_rate(balance, logR)`, so it is honestly the rejection-free form of the very same `{Metropolis|Glauber}` dynamics.
 
 ## Constructors
 
 ```julia
-Metropolis(rng::AbstractRNG; β::Real)                 # convenience: BoltzmannEnsemble(β=β)
-Metropolis(rng::AbstractRNG, ens::AbstractEnsemble)   # explicit ensemble
+MetropolisAlgorithm(rng::AbstractRNG; β::Real)        # convenience: BoltzmannEnsemble(β=β)
+MetropolisAlgorithm(rng::AbstractRNG, ens)            # any ensemble
+GlauberAlgorithm(rng::AbstractRNG; β::Real)           # Glauber balance
+GlauberAlgorithm(rng::AbstractRNG, ens)
 ```
 
-The convenience form is the canonical "Metropolis at inverse temperature ``\beta``" call.
-The explicit form accepts any `AbstractEnsemble` with `linear_logweight(ens) == true`; non-linear ensembles raise `ArgumentError` at construction.
-For non-linear targets (e.g. `MulticanonicalEnsemble`, `WangLandauEnsemble`, or a general `FunctionEnsemble`), use the generic `MarkovChainMonteCarlo` (alias `MCMC`) or one of the dedicated constructors documented on [Multicanonical](multicanonical.md) and Wang-Landau.
+Both build the [`MetropolisHastingsAlgorithm`](@ref) engine with the appropriate balance; they accept *any* ensemble (linear or not — multicanonical/Wang-Landau are `MetropolisBalance` with an adaptive ensemble).
+The short names `Metropolis` / `Glauber` remain as deprecated aliases and resolve with a warning.
 
-## Glauber: logistic acceptance variant
+## `accept!` takes the log-ratio
 
-`Glauber` shares the proposal and log-ratio mechanics of `Metropolis` but replaces the Metropolis acceptance rule with the logistic function:
-
-```math
-p_{\text{accept}}(\Delta) = \frac{1}{1 + e^{-\Delta}}.
-```
-
-Both rules satisfy detailed balance and reach the same stationary distribution; they differ only in the off-equilibrium dynamics and acceptance statistics.
-Use `Glauber` when the dynamics being modelled prescribe logistic acceptance (e.g. certain Ising-dynamics conventions, some neuroscience contexts).
-Constructors mirror `Metropolis`:
-
-```julia
-alg = Glauber(rng; β=0.44)
-```
-
-## Example: a self-contained 1D Ising chain
-
-A minimal, dependency-free example that exposes the propose / ``\Delta E`` / accept / commit pattern explicitly.
-The "system" here is just a `Vector{Int}` with two helper functions; no companion package is involved.
+Core's acceptance contract is one primitive — `accept!(alg, logR)` applies the balance function and updates the counters — so the *ensemble*, *balance*, and *proposal* concerns stay visibly separate at the call site.
 
 ```julia
 using MonteCarloX, Random
@@ -61,12 +60,12 @@ spins        = rand([-1, 1], L)
 local_dE(s, i) = 2 * s[i] * (s[mod1(i-1, L)] + s[mod1(i+1, L)])
 
 rng = Xoshiro(1)
-alg = Metropolis(rng; β=1.0)
+alg = MetropolisAlgorithm(rng; β=1.0)
 
 for _ in 1:200_000
     i  = rand(rng, 1:L)
-    ΔE = local_dE(spins, i)         # log-weight change for flipping spin i
-    if accept!(alg, ΔE)              # delta form: Boltzmann is linear
+    ΔE = local_dE(spins, i)                          # energy change for flipping spin i
+    if accept!(alg, logweight(ensemble(alg), ΔE))    # form logR from the ensemble
         spins[i] = -spins[i]
     end
 end
@@ -74,34 +73,35 @@ end
 println("acceptance: ", acceptance_rate(alg))
 ```
 
-What MonteCarloX provides is `accept!(alg, ΔE)` — the decision.
-Everything else — picking a site, computing ``\Delta E``, committing the flip — is system-layer code.
-This separation is what makes the algorithm reusable: for a Bayesian posterior, the same `accept!` is called with `(θ_new, θ)`; for a polymer move, with `(config_new, config_old)`.
+`logweight(ensemble(alg), ΔE)` is ``-\beta\,\Delta E`` for a Boltzmann ensemble — the linear fast path.
+For a full-state move, the two-argument convenience `accept!(alg, arg_new, arg_old)` forms ``\log R`` from `logweight(ens, arg_new) - logweight(ens, arg_old)` (this is the path multicanonical / Wang-Landau use, and it drives their visit recording).
 
-Companion packages bundle this loop body for their model families.
-For richer spin systems (Ising / Blume-Capel on lattices, graphs, or arbitrary couplings), [`MCXSpins`](https://github.com/zierenberg/MonteCarloX.jl/tree/main/MCXSpins) provides the system types and a `spin_flip!(sys, alg)` wrapper that hides the propose / ``\Delta E`` / accept / commit dance:
+Companion packages bundle this loop body. For richer spin systems, [`MCXSpins`](https://github.com/zierenberg/MonteCarloX.jl/tree/main/MCXSpins) provides the system types and a `spin_flip!(sys, alg)` wrapper that hides the propose / ``\Delta E`` / accept / commit dance:
 
 ```julia
 using MonteCarloX, MCXSpins, Random
-sys = Ising([32, 32]; J=1); init!(sys, :hot; rng=Xoshiro(1))
-alg = Metropolis(Xoshiro(1); β=0.44)
+sys = Ising([32, 32]; J=1); init!(sys, :random; rng=Xoshiro(1))
+alg = MetropolisAlgorithm(Xoshiro(1); β=0.44)
 for _ in 1:1_000_000
     spin_flip!(sys, alg)
 end
 ```
 
-Replacing `Metropolis` with `Glauber` or `HeatBath` in either example leaves the loop body unchanged; the algorithm type selects the update rule.
+Replacing `MetropolisAlgorithm` with `GlauberAlgorithm` or `HeatBathAlgorithm` leaves the loop body unchanged; the algorithm selects the update rule (heat bath draws directly from the local conditional — no accept step).
 
 For a runnable, plotted version see [Ising 2D (MCMC algorithms)](../generated/mcmc_Ising2D.md).
-The class page shows the corresponding [Bayesian variant](markov_chain_monte_carlo.md) (same loop shape, different ensemble, full-state `accept!`).
 
 ## API reference
 
 ```@docs
-Metropolis
-Glauber
-AbstractMetropolis
-accept!(alg::AbstractMetropolis, delta_arg)
+MetropolisAlgorithm
+GlauberAlgorithm
+BalanceFunction
+MetropolisBalance
+GlauberBalance
+acceptance_probability
+transition_rate
+balance
 ```
 
 Adaptive warm-up for a random-walk proposal — tune the step to a target acceptance
