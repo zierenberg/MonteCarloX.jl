@@ -64,11 +64,6 @@ Return the algorithm's ensemble as a logweight callable. Equivalent to `logweigh
 """
 @inline logweight(alg::AbstractMarkovChainMonteCarlo) = logweight(ensemble(alg))
 
-# Optional ensemble-level visit hooks used by the 2-argument accept!.
-# Ensembles that need histogram/visit bookkeeping (multicanonical) specialize these.
-@inline should_record_visit(ens) = false
-@inline record_visit!(_ens, _arg_vis) = nothing
-
 """
     accept!(alg::MetropolisHastingsAlgorithm, logR) -> Bool
 
@@ -125,3 +120,30 @@ function _reset!(alg::MetropolisHastingsAlgorithm)
     alg.steps = 0
     alg.accepted = 0
 end
+
+# ── Named dynamics: the classic points in ensemble × balance space ────────────
+
+"""
+    MetropolisAlgorithm(rng, ensemble)
+    MetropolisAlgorithm(rng; β)
+
+Metropolis-dynamics sampler: the engine with [`MetropolisBalance`](@ref). The keyword form is
+the canonical-ensemble convenience (`BoltzmannEnsemble(β=β)`). Metropolis–Hastings needs no
+separate type — a proposal with nonzero ratio folds into the `logR` passed to [`accept!`](@ref).
+"""
+MetropolisAlgorithm(rng::AbstractRNG, ensemble) =
+    MetropolisHastingsAlgorithm(rng, ensemble, MetropolisBalance())
+MetropolisAlgorithm(rng::AbstractRNG; β::Real) =
+    MetropolisHastingsAlgorithm(rng, BoltzmannEnsemble(β=β), MetropolisBalance())
+
+"""
+    GlauberAlgorithm(rng, ensemble)
+    GlauberAlgorithm(rng; β)
+
+Glauber-dynamics sampler: the engine with [`GlauberBalance`](@ref) (logistic acceptance). For a
+two-state local update this coincides with single-site heat bath.
+"""
+GlauberAlgorithm(rng::AbstractRNG, ensemble) =
+    MetropolisHastingsAlgorithm(rng, ensemble, GlauberBalance())
+GlauberAlgorithm(rng::AbstractRNG; β::Real) =
+    MetropolisHastingsAlgorithm(rng, BoltzmannEnsemble(β=β), GlauberBalance())

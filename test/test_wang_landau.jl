@@ -56,7 +56,7 @@ function test_wang_landau_update_mechanics()
 
     # update! halves logf
     logf0 = ensemble(wl).logf
-    pass &= check(update!(ensemble(wl)) === nothing, "update! returns nothing\n")
+    pass &= check(update_logweight!(ensemble(wl)) === nothing, "update! returns nothing\n")
     pass &= check(ensemble(wl).logf == 0.5 * logf0, "logf halved\n")
 
     return pass

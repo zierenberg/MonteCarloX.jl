@@ -15,9 +15,9 @@ end
 @inline logweight(e::WangLandauEnsemble, arg) = e.logweight(arg)
 
 """
-    update!(e::WangLandauEnsemble; power=0.5)
+    update_logweight!(e::WangLandauEnsemble; power=0.5)
 
 Update Wang-Landau schedule by scaling the modification factor:
 `logf <- power * logf` with default `power=0.5`.
 """
-@inline update!(e::WangLandauEnsemble; power::Real=0.5) = (e.logf *= power; nothing)
+@inline update_logweight!(e::WangLandauEnsemble; power::Real=0.5) = (e.logf *= power; nothing)

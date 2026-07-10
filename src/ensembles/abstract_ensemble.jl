@@ -1,7 +1,9 @@
 """
     AbstractEnsemble
 
-Base type for all ensemble objects.
+Base type for all ensemble objects. An ensemble assigns a log-weight to the coordinate its
+sampling is parameterized by — an energy (`BoltzmannEnsemble`), a parameter vector (a Bayesian
+`FunctionEnsemble`), a binned reaction coordinate (`MulticanonicalEnsemble`).
 """
 abstract type AbstractEnsemble end
 
@@ -26,8 +28,9 @@ linear_logweight(::AbstractEnsemble) = false
 """
     logweight(ens::AbstractEnsemble)
 
-Return a callable logweight object/function for an ensemble.
-Concrete ensembles must implement this.
+Return the ensemble's logweight as a read-only callable (for tabulated ensembles: the
+underlying binned object). To modify weights, use [`set_logweight!`](@ref) and
+[`update_logweight!`](@ref).
 """
 function logweight(ens::AbstractEnsemble)
     throw(ArgumentError("logweight not implemented for ensemble type $(typeof(ens))"))
@@ -36,32 +39,31 @@ end
 """
     logweight(ens::AbstractEnsemble, arg)
 
-Evaluate the ensemble's logweight on `arg` — the quantity the ensemble's
-weight is parameterized by (e.g. energy for `BoltzmannEnsemble`, parameter
-vector for a Bayesian `FunctionEnsemble`, reaction coordinate for a
-`MulticanonicalEnsemble`). Concrete ensembles should provide this directly
-or rely on a callable from `logweight(ens)`.
+Evaluate the ensemble's logweight on `arg` — the quantity the ensemble's weight is
+parameterized by (energy for `BoltzmannEnsemble`, parameter vector for a Bayesian
+`FunctionEnsemble`, reaction coordinate for a `MulticanonicalEnsemble`).
 """
 function logweight(ens::AbstractEnsemble, arg)
     return logweight(ens)(arg)
 end
 
-# """
-#     set!(ens::AbstractEnsemble, args...; kwargs...)
+"""
+    set_logweight!(ens::AbstractEnsemble, args...)
 
-# Configure/modify an ensemble in-place.
-# Concrete ensembles must specialize this when supported.
-# """
-# function set!(ens::AbstractEnsemble, args...; kwargs...)
-#     throw(ArgumentError("set! not implemented for ensemble type $(typeof(ens))"))
-# end
+Overwrite (part of) an ensemble's tabulated logweight. Provided by adaptive ensembles
+(multicanonical); see their methods for the accepted arguments.
+"""
+function set_logweight! end
 
 """
-    update!(ens::AbstractEnsemble, args...; kwargs...)
+    update_logweight!(ens::AbstractEnsemble; kwargs...)
 
-Perform in-place adaptation/update of an ensemble.
-Concrete ensembles must specialize this when supported.
+Adapt an ensemble's logweight in place from its recorded statistics (multicanonical: refine
+the weights from the histogram; Wang-Landau: shrink the modification factor).
 """
-function update!(ens::AbstractEnsemble, args...; kwargs...)
-    throw(ArgumentError("update! not implemented for ensemble type $(typeof(ens))"))
-end
+function update_logweight! end
+
+# Optional visit hooks used by the two-argument accept! of the Metropolis-Hastings engine.
+# Ensembles that need histogram/visit bookkeeping (multicanonical) specialize these.
+@inline should_record_visit(ens) = false
+@inline record_visit!(_ens, _arg_vis) = nothing

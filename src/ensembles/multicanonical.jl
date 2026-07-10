@@ -6,8 +6,8 @@ parameter, ...). It holds the current log-weights `W` and a visit `histogram` ov
 sampling with `logweight = W` targets a flat histogram, so one chain covers the whole range
 and the density of states follows from the converged weights.
 
-Run in iterations: sample, then `update!(ens; mode=:simple|:recursive)` refines `W` from the
-recorded histogram, and `reset!` clears the histogram between iterations. Monitor and shape
+Run in iterations: sample, then `update_logweight!(ens; mode=:simple|:recursive)` refines `W`
+from the recorded histogram, and `reset!` clears the histogram between iterations. Monitor and shape
 convergence with [`flatness`](@ref), [`Roundtrips`](@ref), [`smooth!`](@ref), [`extend!`](@ref)
 and [`visited_range`](@ref). `bins` is a range/vector of bin edges (or a `BinnedObject`);
 `init` sets the initial flat log-weight.
@@ -112,12 +112,12 @@ function _integrate!(e::MulticanonicalEnsemble)
 end
 
 """
-    set!(ens::MulticanonicalEnsemble, args...)
+    set_logweight!(ens::MulticanonicalEnsemble, args...)
 
 Set logweight values and synchronize d_logweight.
 Accepts the same arguments as `set!(::BinnedObject, ...)`.
 """
-function set!(ens::MulticanonicalEnsemble, args...; kwargs...)
+function set_logweight!(ens::MulticanonicalEnsemble, args...; kwargs...)
     set!(ens.logweight, args...; kwargs...)
     _differentiate!(ens)
     return nothing
@@ -140,7 +140,7 @@ end
 #### Weight update ####
 
 """
-    update!(e::MulticanonicalEnsemble; mode=:simple)
+    update_logweight!(e::MulticanonicalEnsemble; mode=:simple)
 
 Update logweights from the current histogram.
 
@@ -174,7 +174,7 @@ Update logweights from the current histogram.
   The estimate ``\\Delta_k^{\\mathrm{est}}`` uses the actual ``logweight`` to
   correctly account for this.
 """
-function update!(e::MulticanonicalEnsemble; mode::Symbol=:simple)
+function update_logweight!(e::MulticanonicalEnsemble; mode::Symbol=:simple)
     if mode === :simple
         _update_simple!(e)
     elseif mode === :recursive

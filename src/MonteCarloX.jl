@@ -20,6 +20,8 @@ export  AbstractAlgorithm,
 include("ensembles/abstract_ensemble.jl")
 export  AbstractEnsemble,
         linear_logweight,
+        set_logweight!,
+        update_logweight!,
         update!
 
 # ── Infrastructure ──────────────────────────────────────────────────────────
@@ -151,6 +153,8 @@ export  BalanceFunction,
 include("algorithms/metropolis_hastings.jl")
 export  AbstractMarkovChainMonteCarlo,
         MetropolisHastingsAlgorithm,
+        MetropolisAlgorithm,
+        GlauberAlgorithm,
         ensemble,
         balance,
         logweight,
@@ -158,49 +162,33 @@ export  AbstractMarkovChainMonteCarlo,
         acceptance_rate,
         reset!
 
-include("algorithms/metropolis.jl")
-export  MetropolisAlgorithm
-
-include("algorithms/glauber.jl")
-export  GlauberAlgorithm
-
-include("algorithms/step_size.jl")
+include("infrastructure/step_size.jl")
 export  AdaptiveStep,
         step_size,
         adapt!
-
-include("algorithms/log_density_target.jl")
-export  LogDensityTarget
 
 include("algorithms/rejection_sampling.jl")
 export  RejectionSampling
 
 include("algorithms/heat_bath.jl")
-export  HeatBath,
-        HeatBathAlgorithm
+export  HeatBathAlgorithm
 
-include("algorithms/multicanonical.jl")
-export  MulticanonicalAlgorithm
-
-include("algorithms/parallel_multicanonical.jl")
-export  ParallelMulticanonical,
+include("algorithms/flat_histogram.jl")
+export  MulticanonicalAlgorithm,
+        WangLandauAlgorithm,
+        ParallelMulticanonical,
         merge_histograms!,
         distribute_logweight!
 
 include("algorithms/replica_exchange.jl")
-export  ReplicaExchange
-
-include("algorithms/parallel_tempering.jl")
-export  ParallelTempering,
+export  ReplicaExchange,
+        ParallelTempering,
         index,
         optimize_exchange_interval!,
         acceptance_rates,
         exchange_log_ratio,
         attempt_exchange_pair!,
         set_betas
-
-include("algorithms/wang_landau.jl")
-export  WangLandauAlgorithm
 
 # ── Deprecated algorithm names (old API resolves with a warning) ─────────────
 Base.@deprecate_binding AbstractImportanceSampling AbstractMarkovChainMonteCarlo
@@ -214,10 +202,16 @@ Base.@deprecate_binding Metropolis MetropolisAlgorithm
 Base.@deprecate_binding Glauber GlauberAlgorithm
 Base.@deprecate_binding Multicanonical MulticanonicalAlgorithm
 Base.@deprecate_binding WangLandau WangLandauAlgorithm
+Base.@deprecate_binding HeatBath HeatBathAlgorithm
 export  AbstractImportanceSampling, ImportanceSampling,
-        AbstractMetropolis, AbstractHeatBath,
+        AbstractMetropolis, AbstractHeatBath, HeatBath,
         MetropolisHastings, MarkovChainMonteCarlo, MCMC,
         Metropolis, Glauber, Multicanonical, WangLandau
+
+# Deprecated ensemble-mutation names: logweight is read-only, mutations are explicit.
+Base.@deprecate update!(ens::MulticanonicalEnsemble; kwargs...) update_logweight!(ens; kwargs...)
+Base.@deprecate update!(ens::WangLandauEnsemble; kwargs...) update_logweight!(ens; kwargs...)
+Base.@deprecate set!(ens::MulticanonicalEnsemble, args...; kwargs...) set_logweight!(ens, args...; kwargs...)
 
 # ── Algorithms (non-equilibrium) ────────────────────────────────────────────
 
@@ -239,5 +233,15 @@ export  Gillespie
 include("event_handler/event_rate_tree.jl")
 export  EventRateTree,
         total_rate
+
+# Rejection-free n-fold way over the local-states protocol (nsites/local_states/
+# delta_energy/modify!/partners), driven by Gillespie/advance!.
+include("algorithms/nfold_way.jl")
+export  NFoldWay,
+        nsites,
+        local_states,
+        partners,
+        delta_energy,
+        assert_linear_ensemble
 
 end # module MonteCarloX
