@@ -22,7 +22,7 @@ end
     include("test_ensembles.jl")
     include("test_event_handler.jl")
     include("test_kinetic_monte_carlo.jl")
-    include("test_nfold_way.jl")
+    include("test_site_events.jl")
     include("test_measurements.jl")
     include("test_message_backend.jl")
     include("test_balance.jl")

@@ -11,7 +11,7 @@ Propose-and-accept Markov-chain Monte Carlo engine. Carries an `ensemble` (the t
 proposal is not stored here: it is the caller's move, which assembles the log acceptance-ratio
 `logR` passed to [`accept!`](@ref).
 
-The friendly named constructors [`MetropolisAlgorithm`](@ref), [`GlauberAlgorithm`](@ref),
+The named constructors [`MetropolisAlgorithm`](@ref), [`GlauberAlgorithm`](@ref),
 [`MulticanonicalAlgorithm`](@ref) and [`WangLandauAlgorithm`](@ref) build this engine with the
 appropriate ensemble × balance; construct it directly for a custom combination.
 
@@ -43,26 +43,11 @@ MetropolisHastingsAlgorithm(rng::AbstractRNG, ensemble, balance::BalanceFunction
     MetropolisHastingsAlgorithm(rng, _as_ensemble(ensemble), balance, 0, 0)
 
 """
-    ensemble(alg::AbstractMarkovChainMonteCarlo)
-
-Return the ensemble object carried by an MCMC algorithm — the object whose `logweight` defines
-the acceptance.
-"""
-@inline ensemble(alg::AbstractMarkovChainMonteCarlo) = getfield(alg, :ensemble)
-
-"""
     balance(alg::MetropolisHastingsAlgorithm)
 
 Return the [`BalanceFunction`](@ref) (Metropolis, Glauber, …) governing the acceptance dynamics.
 """
 @inline balance(alg::MetropolisHastingsAlgorithm) = getfield(alg, :balance)
-
-"""
-    logweight(alg::AbstractMarkovChainMonteCarlo)
-
-Return the algorithm's ensemble as a logweight callable. Equivalent to `logweight(ensemble(alg))`.
-"""
-@inline logweight(alg::AbstractMarkovChainMonteCarlo) = logweight(ensemble(alg))
 
 """
     accept!(alg::MetropolisHastingsAlgorithm, logR) -> Bool
@@ -91,6 +76,10 @@ logweight(ens, arg_old)` from the ensemble's logweight arguments (energies for
 `BoltzmannEnsemble`, parameter vectors for a Bayesian `FunctionEnsemble`, the binned reaction
 coordinate for `MulticanonicalEnsemble`). This is the general path valid for any ensemble
 (linear or not); it also drives multicanonical visit recording.
+
+Argument-order convention: STATE pairs follow the acceptance-ratio order — numerator first,
+`(arg_new, arg_old)`, as in `min(1, π(x′)/π(x))`. (Ensemble pairs, e.g. in `reweight`,
+follow the flow order source → target instead.)
 """
 @inline function accept!(alg::MetropolisHastingsAlgorithm, arg_new::T, arg_old::T) where T
     ens = ensemble(alg)

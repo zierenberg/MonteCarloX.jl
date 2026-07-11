@@ -8,8 +8,6 @@ determines the parallelism strategy:
 - `ReplicaExchange{MPIBackend}`: one algorithm per MPI rank, MPI communication.
 """
 
-using MPI
-
 mutable struct ReplicaExchange{B, A} <: AbstractAlgorithm
     replica::ParallelChains{B, A}
     stage::Int

@@ -63,6 +63,19 @@ the weights from the histogram; Wang-Landau: shrink the modification factor).
 """
 function update_logweight! end
 
+"""
+    assert_linear_ensemble(ensemble, what)
+
+Throw unless [`linear_logweight`](@ref) holds. The gate for every method that factorizes
+weights locally from argument DIFFERENCES alone — the heat-bath conditional (`resample!`),
+local event rates (`NFoldRates`), cluster bond probabilities. Nonlinear ensembles
+(multicanonical, Wang-Landau) couple every local weight to the global argument; use the
+two-argument `accept!(alg, arg_new, arg_old)` path instead.
+"""
+assert_linear_ensemble(ensemble, what) =
+    linear_logweight(ensemble) ? nothing : throw(ArgumentError(
+        "$what requires a linear log-weight ensemble (e.g. BoltzmannEnsemble); got $(typeof(ensemble))"))
+
 # Optional visit hooks used by the two-argument accept! of the Metropolis-Hastings engine.
 # Ensembles that need histogram/visit bookkeeping (multicanonical) specialize these.
 @inline should_record_visit(ens) = false

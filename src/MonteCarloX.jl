@@ -1,21 +1,17 @@
 module MonteCarloX
 
-# Core dependencies
+# Dependencies (declared once here; included files must not repeat `using`)
 using Random
 using StatsBase
 using LinearAlgebra
-using StaticArrays
+using MPI
+using Serialization
+using RecipesBase
 
 # Core abstractions (shared by all algorithms)
 include("abstract_system.jl")
 export  AbstractSystem,
         init!
-
-include("algorithms/abstract_algorithm.jl")
-export  AbstractAlgorithm,
-        AbstractMarkovChainMonteCarlo,
-        AbstractKineticMonteCarlo,
-        steps
 
 include("ensembles/abstract_ensemble.jl")
 export  AbstractEnsemble,
@@ -23,6 +19,14 @@ export  AbstractEnsemble,
         set_logweight!,
         update_logweight!,
         update!
+
+include("algorithms/abstract_algorithm.jl")
+export  AbstractAlgorithm,
+        AbstractMarkovChainMonteCarlo,
+        AbstractKineticMonteCarlo,
+        steps,
+        ensemble,
+        logweight
 
 # ── Infrastructure ──────────────────────────────────────────────────────────
 
@@ -141,7 +145,7 @@ export  EventQueue,
         set_time!,
         add!
 
-# ── Algorithms (equilibrium) ────────────────────────────────────────────────
+# ── Markov-chain Monte Carlo ────────────────────────────────────────────────
 
 include("algorithms/balance.jl")
 export  BalanceFunction,
@@ -155,23 +159,14 @@ export  AbstractMarkovChainMonteCarlo,
         MetropolisHastingsAlgorithm,
         MetropolisAlgorithm,
         GlauberAlgorithm,
-        ensemble,
         balance,
-        logweight,
         accept!,
         acceptance_rate,
         reset!
 
-include("infrastructure/step_size.jl")
-export  AdaptiveStep,
-        step_size,
-        adapt!
-
-include("algorithms/rejection_sampling.jl")
-export  RejectionSampling
-
 include("algorithms/heat_bath.jl")
-export  HeatBathAlgorithm
+export  HeatBathAlgorithm,
+        resample!
 
 include("algorithms/flat_histogram.jl")
 export  MulticanonicalAlgorithm,
@@ -190,30 +185,12 @@ export  ReplicaExchange,
         attempt_exchange_pair!,
         set_betas
 
-# ── Deprecated algorithm names (old API resolves with a warning) ─────────────
-Base.@deprecate_binding AbstractImportanceSampling AbstractMarkovChainMonteCarlo
-Base.@deprecate_binding ImportanceSampling MetropolisHastingsAlgorithm
-Base.@deprecate_binding AbstractMetropolis AbstractMarkovChainMonteCarlo
-Base.@deprecate_binding AbstractHeatBath AbstractMarkovChainMonteCarlo
-Base.@deprecate_binding MetropolisHastings MetropolisHastingsAlgorithm
-Base.@deprecate_binding MarkovChainMonteCarlo MetropolisHastingsAlgorithm
-Base.@deprecate_binding MCMC MetropolisHastingsAlgorithm
-Base.@deprecate_binding Metropolis MetropolisAlgorithm
-Base.@deprecate_binding Glauber GlauberAlgorithm
-Base.@deprecate_binding Multicanonical MulticanonicalAlgorithm
-Base.@deprecate_binding WangLandau WangLandauAlgorithm
-Base.@deprecate_binding HeatBath HeatBathAlgorithm
-export  AbstractImportanceSampling, ImportanceSampling,
-        AbstractMetropolis, AbstractHeatBath, HeatBath,
-        MetropolisHastings, MarkovChainMonteCarlo, MCMC,
-        Metropolis, Glauber, Multicanonical, WangLandau
+include("infrastructure/step_size.jl")
+export  AdaptiveStep,
+        step_size,
+        adapt!
 
-# Deprecated ensemble-mutation names: logweight is read-only, mutations are explicit.
-Base.@deprecate update!(ens::MulticanonicalEnsemble; kwargs...) update_logweight!(ens; kwargs...)
-Base.@deprecate update!(ens::WangLandauEnsemble; kwargs...) update_logweight!(ens; kwargs...)
-Base.@deprecate set!(ens::MulticanonicalEnsemble, args...; kwargs...) set_logweight!(ens, args...; kwargs...)
-
-# ── Algorithms (non-equilibrium) ────────────────────────────────────────────
+# ── Kinetic Monte Carlo ─────────────────────────────────────────────────────
 
 include("algorithms/kinetic_monte_carlo.jl")
 export  AbstractKineticMonteCarlo,
@@ -221,27 +198,49 @@ export  AbstractKineticMonteCarlo,
         step!,
         next_time,
         next_event,
+        total_rate,
         event_source,
+        observe!,
         modify!,
-        advance!
-
-include("algorithms/gillespie.jl")
-export  Gillespie
+        advance!,
+        Gillespie
 
 # Fenwick-tree rate handler: lives in event_handler/, included here so the KMC
-# `next`/`next_event`/`next_time` it overloads already exist.
+# `total_rate`/`next_event` generics it overloads already exist.
 include("event_handler/event_rate_tree.jl")
-export  EventRateTree,
-        total_rate
+export  EventRateTree
 
-# Rejection-free n-fold way over the local-states protocol (nsites/local_states/
-# delta_energy/modify!/partners), driven by Gillespie/advance!.
-include("algorithms/nfold_way.jl")
-export  NFoldWay,
-        nsites,
-        local_states,
-        partners,
-        delta_energy,
+# Event generator family: sources that maintain their own rate ledger from a model
+# interface. SiteEvents covers local-transition dynamics (n-fold way, contact processes);
+# NFoldRates is the balance-induced rate rule (rejection-free Metropolis/Glauber).
+include("event_handler/site_events.jl")
+export  SiteEvents,
+        NFoldRates,
         assert_linear_ensemble
+
+include("event_handler/reaction_events.jl")
+export  ReactionEvents,
+        nreactions
+
+# ── Static sampling ─────────────────────────────────────────────────────────
+# Independent-draw methods (future home of population Monte Carlo: AIS, SMC, …).
+
+include("algorithms/rejection_sampling.jl")
+export  RejectionSampling
+
+# ── Deprecated names (old API resolves with a warning) ──────────────────────
+
+Base.@deprecate_binding MetropolisHastings MetropolisHastingsAlgorithm
+Base.@deprecate_binding Metropolis MetropolisAlgorithm
+Base.@deprecate_binding Glauber GlauberAlgorithm
+Base.@deprecate_binding Multicanonical MulticanonicalAlgorithm
+Base.@deprecate_binding WangLandau WangLandauAlgorithm
+Base.@deprecate_binding HeatBath HeatBathAlgorithm
+export  HeatBath, MetropolisHastings, Metropolis, Glauber, Multicanonical, WangLandau
+
+# Deprecated ensemble-mutation names: logweight is read-only, mutations are explicit.
+Base.@deprecate update!(ens::MulticanonicalEnsemble; kwargs...) update_logweight!(ens; kwargs...)
+Base.@deprecate update!(ens::WangLandauEnsemble; kwargs...) update_logweight!(ens; kwargs...)
+Base.@deprecate set!(ens::MulticanonicalEnsemble, args...; kwargs...) set_logweight!(ens, args...; kwargs...)
 
 end # module MonteCarloX

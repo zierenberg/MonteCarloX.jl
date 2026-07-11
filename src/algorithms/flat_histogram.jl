@@ -13,8 +13,6 @@
 # smooth!, flatness, extend!) live with the ensembles (src/ensembles/multicanonical.jl,
 # wang_landau.jl); here are only the named constructors and the engine hooks.
 
-using Random
-
 """
     MulticanonicalAlgorithm([rng,] bins; init=0.0, kwargs...)
     MulticanonicalAlgorithm([rng,] ens::MulticanonicalEnsemble)
@@ -73,8 +71,6 @@ end
 
 # ── Parallel multicanonical: independent chains, merged weight refinement ────
 
-
-using MPI
 
 """
     ParallelMulticanonical(backend, alg)

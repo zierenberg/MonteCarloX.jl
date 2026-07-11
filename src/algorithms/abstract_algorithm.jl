@@ -41,6 +41,21 @@ end
 @inline steps(alg::AbstractMarkovChainMonteCarlo) = getfield(alg, :steps)
 @inline steps(alg::AbstractKineticMonteCarlo) = getfield(alg, :steps)
 
+"""
+    ensemble(alg::AbstractMarkovChainMonteCarlo)
+
+Return the ensemble object carried by an MCMC algorithm — the object whose `logweight` defines
+the acceptance.
+"""
+@inline ensemble(alg::AbstractMarkovChainMonteCarlo) = getfield(alg, :ensemble)
+
+"""
+    logweight(alg::AbstractMarkovChainMonteCarlo)
+
+Return the algorithm's ensemble as a logweight callable. Equivalent to `logweight(ensemble(alg))`.
+"""
+@inline logweight(alg::AbstractMarkovChainMonteCarlo) = logweight(ensemble(alg))
+
 function Base.:(==)(a::T, b::T) where {T<:AbstractAlgorithm}
     all(getfield(a, f) == getfield(b, f) for f in fieldnames(T))
 end
