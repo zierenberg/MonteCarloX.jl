@@ -414,8 +414,6 @@ function set!(target::BinnedObject, source::BinnedObject;
 end
 
 # Plotting
-using RecipesBase
-
 @recipe function f(bo::BinnedObject{1})
     seriestype --> :path
     get_centers(bo, 1), bo.values

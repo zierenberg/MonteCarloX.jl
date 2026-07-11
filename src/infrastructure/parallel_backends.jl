@@ -11,8 +11,6 @@ The backend is passed to parallel algorithm constructors (e.g. `ParallelChains`,
 """
 
 import Base: size, merge!
-using MPI
-
 function rank end
 
 """

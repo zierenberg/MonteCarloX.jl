@@ -183,3 +183,10 @@ end
         @test test_reweight_binned_logdos()
     end
 end
+
+@testset "reweight Pair form (source => target)" begin
+    E = [-2.0, 0.0, 1.5, 3.0]
+    w_pos  = reweight(E, BoltzmannEnsemble(β=0.4), BoltzmannEnsemble(β=0.5))
+    w_pair = reweight(E, BoltzmannEnsemble(β=0.4) => BoltzmannEnsemble(β=0.5))
+    @test w_pair.logw == w_pos.logw
+end

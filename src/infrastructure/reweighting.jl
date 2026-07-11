@@ -31,6 +31,7 @@ Base.length(iw::ImportanceWeights) = length(iw.logw)
 
 """
     reweight(args, source, target=ConstantEnsemble()) -> ImportanceWeights
+    reweight(args, source => target)
 
 Log importance weights that reweight samples drawn under `source` to expectations under
 `target`, evaluated on the recorded `args` — the coordinate each ensemble's `logweight`
@@ -45,8 +46,12 @@ unbiased density, e.g. the density of states from a multicanonical run.
 mechanics (`BoltzmannEnsemble`, `MulticanonicalEnsemble`) and Bayesian inference
 (`FunctionEnsemble` of a log-posterior).
 
+Argument-order convention: ENSEMBLE pairs follow the flow order, source → target — also
+available as the self-documenting Pair form `reweight(args, source => target)`. (State
+pairs, e.g. in `accept!`, follow the acceptance-ratio order — numerator first — instead.)
+
 ```julia
-w      = reweight(energies, BoltzmannEnsemble(β=0.40), BoltzmannEnsemble(β=0.44))
+w      = reweight(energies, BoltzmannEnsemble(β=0.40) => BoltzmannEnsemble(β=0.44))
 mean_E = mean(energies, weights(w))
 logZ   = log_normalization(w)          # log(Z_target / Z_source)
 neff   = ess(w)
@@ -58,6 +63,7 @@ function reweight(args, source, target=ConstantEnsemble())
     logw = [logweight(t, a) - logweight(s, a) for a in args]
     return ImportanceWeights(logw)
 end
+reweight(args, (source, target)::Pair) = reweight(args, source, target)
 
 """
     reweight(logdensity::BinnedObject, logw::AbstractVector) -> ImportanceWeights

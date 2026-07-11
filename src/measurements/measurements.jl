@@ -1,8 +1,6 @@
 # Measurement framework
 # Based on examples/api.ipynb
 
-using StatsBase
-
 """
     Measurement{F,T}
 
