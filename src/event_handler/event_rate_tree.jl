@@ -75,9 +75,3 @@ total_rate(handler::EventRateTree) = fenwick_prefix(handler.tree, length(handler
 
 next_event(rng::AbstractRNG, handler::EventRateTree) =
     fenwick_sample(handler.tree, rand(rng) * total_rate(handler))
-
-function next(alg::AbstractKineticMonteCarlo, handler::EventRateTree)
-    dt = next_time(alg.rng, total_rate(handler))
-    isfinite(dt) || return (Inf, nothing)
-    return dt, next_event(alg.rng, handler)
-end
