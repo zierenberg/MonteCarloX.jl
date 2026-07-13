@@ -2,7 +2,10 @@
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
+LogDensityProblemsAD = "996a588d-648d-4e1f-a8f0-a84b347e47b1"
 MCXSoftMatter = "b82f78d4-0170-4332-a38c-35e6832ae2e9"
 MCXSpins = "a4536488-68f2-4eaf-b6de-eac06300b674"
 MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
@@ -13,6 +16,6 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [sources]
-MonteCarloX = {path = ".."}
 MCXSpins = {path = "../MCXSpins"}
 MCXSoftMatter = {path = "../MCXSoftMatter"}
+MonteCarloX = {path = ".."}

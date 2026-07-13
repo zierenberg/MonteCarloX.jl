@@ -29,22 +29,22 @@ seed = 42;
 # **MonteCarloX.jl** provides several ways to represent the 2D Ising model,
 # trading generality for performance:
 #
-# - `Ising([L,L])`: periodic hypercubic lattice with NTuple neighbors (fastest)
-# - `Ising([L,L]; periodic=false)`: arbitrary graph, Vector neighbors
-# - `Ising(J_matrix)`: sparse coupling matrix, arbitrary topology
+# - `IsingSystem([L,L])`: periodic hypercubic lattice with NTuple neighbors (fastest)
+# - `IsingSystem(graph)`: arbitrary graph, Vector neighbors
+# - `IsingSystem(J)`: sparse coupling matrix, arbitrary topology
 #
 # We benchmark a single `spin_flip!` step for each.
 
 alg_bench = Metropolis(Xoshiro(seed); β=β)
 
-sys_lattice = Ising([L, L])
+sys_lattice = IsingSystem([L, L])
 init!(sys_lattice, :random, rng=MersenneTwister(seed))
 
-sys_graph  = Ising([L, L]; periodic=false)
+sys_graph  = IsingSystem(Graphs.SimpleGraphs.grid([L, L]; periodic=true))
 init!(sys_graph,  :random, rng=MersenneTwister(seed))
 
 grid_graph = Graphs.SimpleGraphs.grid([L, L]; periodic=true)
-sys_matrix = Ising(SparseMatrixCSC{Float64,Int}(adjacency_matrix(grid_graph)))
+sys_matrix = IsingSystem(SparseMatrixCSC{Float64,Int}(adjacency_matrix(grid_graph)))
 init!(sys_matrix, :random, rng=MersenneTwister(seed))
 
 println("Lattice Ising (NTuple neighbors):")
@@ -85,7 +85,7 @@ TableMetropolis(rng::AbstractRNG; β::Real) =
     return accepted
 end
 
-sys_table = Ising([L, L])
+sys_table = IsingSystem([L, L])
 init!(sys_table, :random, rng=Xoshiro(seed))
 alg_table = TableMetropolis(Xoshiro(seed); β=β)
 
@@ -157,7 +157,7 @@ end
 # probability ``\min(1, e^{-\beta\Delta E})``. It is the standard workhorse
 # for spin systems: simple, general, and efficient.
 
-sys_meta = Ising([L, L])
+sys_meta = IsingSystem([L, L])
 init!(sys_meta, :random, rng=MersenneTwister(seed))
 res_meta = run_chain!(sys_meta, Metropolis(MersenneTwister(seed); β=β))
 
@@ -170,7 +170,7 @@ plot_algorithms([res_meta], ["Metropolis"])
 # single spin given its neighbours. It tends to have shorter autocorrelation
 # times than Metropolis at low temperatures.
 
-sys_hb = Ising([L, L])
+sys_hb = IsingSystem([L, L])
 init!(sys_hb, :random, rng=MersenneTwister(seed))
 res_hb = run_chain!(sys_hb, HeatBath(MersenneTwister(seed); β=β))
 
@@ -183,7 +183,7 @@ plot_algorithms([res_hb], ["HeatBath"])
 # with more than two spin states, where Glauber uses a linearised transition
 # rate rather than the exact conditional distribution.
 
-sys_gla = Ising([L, L])
+sys_gla = IsingSystem([L, L])
 init!(sys_gla, :random, rng=MersenneTwister(seed))
 res_gla = run_chain!(sys_gla, Glauber(MersenneTwister(seed); β=β))
 

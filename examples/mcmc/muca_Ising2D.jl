@@ -22,7 +22,7 @@ nothing # hide
 # histogram and weights so we can watch the convergence.
 if !isfile(lw_file)                                             # hide
 E   = get_centers(logdos_exact_ising2D(L))
-sys = Ising([L, L])
+sys = IsingSystem([L, L])
 init!(sys, :random, rng = Xoshiro(1000))
 alg = Multicanonical(Xoshiro(1000), E)
 
@@ -32,7 +32,7 @@ for it in 1:n_iter
     for _ in 1:(1_000   * length(sys.spins)); spin_flip!(sys, alg); end
     reset!(alg)
     for _ in 1:(100_000 * length(sys.spins)); spin_flip!(sys, alg); end
-    update!(ensemble(alg); mode = :simple)
+    update_logweight!(ensemble(alg); mode = :simple)
     W[:, it] = ensemble(alg).logweight.values
     H[:, it] = ensemble(alg).histogram.values
 end

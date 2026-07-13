@@ -8,7 +8,7 @@ axes, with `S(0) = (Σσ)²`. Returns `0` when the structure factor vanishes (up
 its Fourier sums, so uniform configurations give `0` rather than a huge spurious `ξ`).
 """
 function correlation_length(sys::SpinSystem)
-    dims = sys.topo.dims
+    dims = _lattice_dims(sys)
     S0 = float(magnetization(sys))^2
     # The c/s sums in structure_factor carry O(N·eps) roundoff, so an exactly vanishing S(k) shows
     # up as O((N·eps)²) > 0; anything below this floor is noise, not signal.

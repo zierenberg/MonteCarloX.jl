@@ -50,7 +50,7 @@ betas = set_betas(nranks, inv(Tmax), inv(Tmin), :uniform)
 pt = ParallelTempering(betas; seed=seed, rng=Xoshiro, backend=backend)
 alg = algorithm(pt)
 
-sys = Ising([L, L])
+sys = IsingSystem([L, L])
 init!(sys, :random; rng=alg.rng)
 
 on_root(pt) do

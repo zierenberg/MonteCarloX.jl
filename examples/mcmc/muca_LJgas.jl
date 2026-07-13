@@ -63,7 +63,7 @@ E_min, E_max = e_min * N, e_max * N
 alg = Multicanonical(Xoshiro(42), E_min - N:dE:E_max + N; warn_overwrite = false)
 ens = ensemble(alg)
 rt  = Roundtrips(E_min, E_max)
-set!(ens, E -> -E / T_max)
+set_logweight!(ens, E -> -E / T_max)
 
 E = collect(get_centers(ens.histogram))
 H = zeros(length(E), num_iter)
@@ -80,7 +80,7 @@ for iter in 1:num_iter
         sweep!(sys, alg, dx_short, dx_long)
         update!(rt, energy(sys))
     end
-    update!(ens; mode = :recursive)
+    update_logweight!(ens; mode = :recursive)
     extend!(ens, :high; anchor = E_max, slope = -1 / T_max)   # temperature ramps outside range
     extend!(ens, :low;  anchor = E_min, slope = -1 / T_min)
     H[:, iter]          = ens.histogram.values

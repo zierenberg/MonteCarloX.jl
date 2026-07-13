@@ -17,7 +17,7 @@ can equip it with gradients and hand it to AdvancedHMC/NUTS. MonteCarloX's own
 samplers never need it.
 
 ```julia
-alg    = MarkovChainMonteCarlo(rng, logposterior)          # dimension not needed
+alg    = MetropolisHastingsAlgorithm(rng, logposterior)    # dimension not needed
 target = FunctionEnsemble(logposterior; dimension = 10)    # HMC-ready via LogDensityProblems
 ```
 """

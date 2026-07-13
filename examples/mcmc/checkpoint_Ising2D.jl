@@ -31,7 +31,7 @@ checkpoint_base = get(
 )
 checkpoint_file = checkpoint_base * ".mcx"
 
-sys = Ising([L, L])
+sys = IsingSystem([L, L])
 alg = Metropolis(Xoshiro(2026); β=beta)
 ckpt = init_checkpoint(checkpoint_file, (sys=sys, alg=alg, sweep=0))
 

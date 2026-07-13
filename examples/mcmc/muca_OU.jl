@@ -161,9 +161,9 @@ for it in 1:n_iter
     for _ in 1:n_therm;      update!(sys_iter, alg_iter; δ = 0.5); end
     reset!(alg_iter)
     for _ in 1:n_iter_steps; update!(sys_iter, alg_iter; δ = 0.5); end
-    MonteCarloX.update!(ensemble(alg_iter); mode = :simple)
-    set!(logweight(alg_iter), (first(cs), x_left),  x -> logweight(alg_iter)(x_left)  + (x - x_left)  * 2.0)
-    set!(logweight(alg_iter), (x_right, last(cs)),  x -> logweight(alg_iter)(x_right) - (x - x_right) * 2.0)
+    update_logweight!(ensemble(alg_iter); mode = :simple)
+    set_logweight!(ensemble(alg_iter), (first(cs), x_left),  x -> logweight(alg_iter)(x_left)  + (x - x_left)  * 2.0)
+    set_logweight!(ensemble(alg_iter), (x_right, last(cs)),  x -> logweight(alg_iter)(x_right) - (x - x_right) * 2.0)
     iter_hist[:, it]  = ensemble(alg_iter).histogram.values
     iter_lw[:, it]    = logweight(alg_iter).values
     iter_accept[it]   = acceptance_rate(alg_iter)

@@ -1,9 +1,26 @@
+# MCXSpins top-performance benchmark: how close does the composed SpinSystem get to
+# hand-optimized "custom C"-style code?
+#
+# Contenders (2D Ising 64×64 at β = 0.44, plus Blume–Capel 48×48):
+#   local     — LocalTightIsing: a hand-rolled typewriter-sweep kernel with inlined
+#               neighbor arithmetic and tabulated acceptance. No framework, no proposal,
+#               no bookkeeping: the speed ceiling a dedicated C program would hit.
+#   MCX table — composed SpinSystem + TableMetropolis (tabulated acceptance, random site,
+#               full delta/cache bookkeeping)
+#   MCX cont  — composed SpinSystem + MetropolisAlgorithm (continuous exp() acceptance)
+#
+# Run from the repo root:
+#     julia --project=MCXSpins MCXSpins/benchmarks/benchmark_mcxspins.jl [sweeps] [equi]
+#
+# Caveat: `local` sweeps sites in typewriter order while MCX picks random sites — identical
+# stationary distribution, different memory-access pattern. The comparison bounds the total
+# framework cost (generic hooks + cache updates + rng site picks), not one isolated factor.
+
 using Random
 using Printf
 using MonteCarloX
 using MCXSpins
 
-# CLI: julia --project=. benchmark.jl [sweeps_global] [sweeps_equi]
 const SWEEPS_GLOBAL = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 100_000
 const SWEEPS_EQUI = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 1_000
 const BETA_ISING = 0.44
@@ -30,7 +47,7 @@ function benchmark_case(case::AbstractString, mode::AbstractString, rng::Abstrac
     ns_per_flip = elapsed_ns / nsteps_measured
     final_E = energy(sys)
 
-        @printf("%-22s %-8s %-7s %8d %6.2f %10.3f %10.6f %10d %10.3f\n",
+    @printf("%-22s %-8s %-7s %8d %6.2f %10.3f %10.6f %10d %10.3f\n",
             case, mode, rng, seed, Float64(β), cpu_ms, ns_per_flip, nsteps_measured, final_E)
     return nothing
 end
@@ -43,18 +60,23 @@ end
     return nothing
 end
 
-# tabulated version
-mutable struct TableMetropolis{R<:AbstractRNG} <: AbstractMetropolis
+# ── Tabulated Metropolis (benchmark-only) ─────────────────────────────────────
+#
+# Zero-exp() acceptance for 2D-lattice-Ising-like ΔE ∈ {−8,−4,0,4,8}, which the interactions
+# design delivers whenever J is an integer (caches store coupling-free Int sums). Deliberately
+# NOT part of MCXSpins: the acceptance table silently assumes the Ising ΔE spectrum, which is
+# too easy to misuse outside a benchmark.
+
+mutable struct TableMetropolis{R<:AbstractRNG} <: MonteCarloX.AbstractMarkovChainMonteCarlo
     rng::R
     p4::Float64
     p8::Float64
     steps::Int
     accepted::Int
 end
+TableMetropolis(rng::AbstractRNG; β::Real) = TableMetropolis(rng, exp(-4β), exp(-8β), 0, 0)
 
-TableMetropolis(rng::AbstractRNG; β::Real) =
-    TableMetropolis(rng, exp(-4β), exp(-8β), 0, 0)
-
+# The scalar passed to accept! IS the integer ΔE (not a logR) — a specialized fast path.
 @inline function MonteCarloX.accept!(alg::TableMetropolis, dE::Int)
     alg.steps += 1
     dE <= 0 && (alg.accepted += 1; return true)
@@ -64,7 +86,17 @@ TableMetropolis(rng::AbstractRNG; β::Real) =
     return accepted
 end
 
-# local super optimized version
+@inline function MCXSpins.spin_flip!(sys::MCXSpins.AbstractSpinSystem, alg::TableMetropolis)
+    i = pick_site(alg.rng, length(sys.spins))
+    s_new = propose_state(alg.rng, sys, i)
+    δs = MCXSpins.delta_sys(sys, i, s_new)
+    ΔE = delta_energy(sys, i, s_new, δs)
+    MonteCarloX.accept!(alg, ΔE) && modify!(sys, i, s_new, δs)
+    return nothing
+end
+
+# ── Hand-rolled speed ceiling: inlined typewriter sweep, tabulated acceptance ──
+
 mutable struct LocalTightIsing
     spins::Vector{Int8}
     L::Int
@@ -144,7 +176,7 @@ end
 end
 
 function main()
-    println("MCXSpins benchmark")
+    println("MCXSpins top-performance benchmark (vs hand-rolled kernel)")
     println("Configuration: sweeps_equi=$(SWEEPS_EQUI), sweeps_global=$(SWEEPS_GLOBAL)")
     println()
     @printf("%-22s %-8s %-7s %8s %6s %10s %10s %10s %10s\n",
@@ -154,43 +186,37 @@ function main()
 
     seed = 2026
 
-    # Local tight Ising kernel first (same benchmark_case path)
+    # Hand-rolled speed ceiling
     sys_local = LocalTightIsing(64, Xoshiro(seed))
     alg_local = LocalTightMetropolis(Xoshiro(seed); β=BETA_ISING)
-    benchmark_case("Local Ising 64x64", "table", "xoshiro", seed, BETA_ISING, sys_local, alg_local)
+    benchmark_case("local Ising 64x64", "table", "xoshiro", seed, BETA_ISING, sys_local, alg_local)
 
-    # Framework Ising: tabulated and continuous, two RNGs
-    rng_init_tbl_x = Xoshiro(seed)
-    sys_tbl_x = Ising([64, 64])
-    init!(sys_tbl_x, :random; rng=rng_init_tbl_x)
-    alg_tbl_x = TableMetropolis(Xoshiro(seed); β=BETA_ISING)
-    benchmark_case("MCX Ising 64x64", "table", "xoshiro", seed, BETA_ISING, sys_tbl_x, alg_tbl_x)
+    # Composed SpinSystem: tabulated and continuous, two RNGs
+    sys_tbl_x = IsingSystem([64, 64])
+    init!(sys_tbl_x, :random; rng=Xoshiro(seed))
+    benchmark_case("MCX ising 64x64", "table", "xoshiro", seed, BETA_ISING, sys_tbl_x,
+                   TableMetropolis(Xoshiro(seed); β=BETA_ISING))
 
-    rng_init_tbl_m = MersenneTwister(seed)
-    sys_tbl_m = Ising([64, 64])
-    init!(sys_tbl_m, :random; rng=rng_init_tbl_m)
-    alg_tbl_m = TableMetropolis(MersenneTwister(seed); β=BETA_ISING)
-    benchmark_case("MCX Ising 64x64", "table", "mt", seed, BETA_ISING, sys_tbl_m, alg_tbl_m)
+    sys_tbl_m = IsingSystem([64, 64])
+    init!(sys_tbl_m, :random; rng=MersenneTwister(seed))
+    benchmark_case("MCX ising 64x64", "table", "mt", seed, BETA_ISING, sys_tbl_m,
+                   TableMetropolis(MersenneTwister(seed); β=BETA_ISING))
 
-    rng_init_cont_x = Xoshiro(seed)
-    sys_cont_x = Ising([64, 64])
-    init!(sys_cont_x, :random; rng=rng_init_cont_x)
-    alg_cont_x = Metropolis(Xoshiro(seed); β=BETA_ISING)
-    benchmark_case("MCX Ising 64x64", "cont", "xoshiro", seed, BETA_ISING, sys_cont_x, alg_cont_x)
+    sys_cont_x = IsingSystem([64, 64])
+    init!(sys_cont_x, :random; rng=Xoshiro(seed))
+    benchmark_case("MCX ising 64x64", "cont", "xoshiro", seed, BETA_ISING, sys_cont_x,
+                   MetropolisAlgorithm(Xoshiro(seed); β=BETA_ISING))
 
-    
-    rng_init_cont_m = MersenneTwister(seed)
-    sys_cont_m = Ising([64, 64])
-    init!(sys_cont_m, :random; rng=rng_init_cont_m)
-    alg_cont_m = Metropolis(MersenneTwister(seed); β=BETA_ISING)
-    benchmark_case("MCX Ising 64x64", "cont", "mt", seed, BETA_ISING, sys_cont_m, alg_cont_m)
+    sys_cont_m = IsingSystem([64, 64])
+    init!(sys_cont_m, :random; rng=MersenneTwister(seed))
+    benchmark_case("MCX ising 64x64", "cont", "mt", seed, BETA_ISING, sys_cont_m,
+                   MetropolisAlgorithm(MersenneTwister(seed); β=BETA_ISING))
 
-    # Framework BC
-    rng_bc = Xoshiro(2028)
-    sys_bc = BlumeCapel([48, 48]; J=1.0, D=0.5, h=0.1)
-    init!(sys_bc, :random; rng=rng_bc)
-    alg_bc = Metropolis(Xoshiro(seed); β=BETA_BC)
-    benchmark_case("MCX BlumeCapel 48x48", "cont", "xoshiro", seed, BETA_BC, sys_bc, alg_bc)
+    # Blume-Capel (3-state, crystal field + field term)
+    sys_bc = BlumeCapelSystem([48, 48]; J=1.0, D=0.5, h=0.1)
+    init!(sys_bc, :random; rng=Xoshiro(2028))
+    benchmark_case("MCX blume_capel 48x48", "cont", "xoshiro", seed, BETA_BC, sys_bc,
+                   MetropolisAlgorithm(Xoshiro(seed); β=BETA_BC))
 
     return nothing
 end

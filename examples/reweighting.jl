@@ -69,7 +69,7 @@ writetsv("reweighting_exact_avgE.tsv", ("beta", "avgE_exact"),
 # effective sample size collapses away from β0.
 
 β0    = 0.30
-sys_c = Ising([L, L]); init!(sys_c, :random, rng = Xoshiro(seed))
+sys_c = IsingSystem([L, L]); init!(sys_c, :random, rng = Xoshiro(seed))
 alg_c = Metropolis(Xoshiro(seed); β = β0)
 for _ in 1:(sweeps_therm * N); spin_flip!(sys_c, alg_c); end
 meas_c = Measurements([:E => energy => Float64[]], interval = N)
@@ -99,13 +99,13 @@ scatter!(p1, βwin, E_sh; ms = 3, color = 1, label = "reweighted")
 # One multicanonical run flattens the energy histogram, so its samples span the
 # whole spectrum and reweight to any β.
 
-sys_m = Ising([L, L]); init!(sys_m, :random, rng = Xoshiro(seed))
+sys_m = IsingSystem([L, L]); init!(sys_m, :random, rng = Xoshiro(seed))
 alg_m = Multicanonical(Xoshiro(seed), Es)
 for _ in 1:muca_iter
     for _ in 1:(sweeps_therm * N); spin_flip!(sys_m, alg_m); end
     reset!(alg_m)
     for _ in 1:(muca_sweeps * N);  spin_flip!(sys_m, alg_m); end
-    update!(ensemble(alg_m); mode = :simple)
+    update_logweight!(ensemble(alg_m); mode = :simple)
 end
 reset!(alg_m)
 meas_m = Measurements([:E => energy => Float64[]], interval = N)

@@ -36,13 +36,13 @@ seed = 42;
 
 alg = Glauber(Xoshiro(seed); β=1/2.5)
 
-sys_eq = Ising([L, L])
+sys_eq = IsingSystem([L, L])
 init!(sys_eq, :random, rng=MersenneTwister(seed))
 
-sys_rec = NonreciprocalIsing([L, L]; κ=0.0)
+sys_rec = VisionConeIsingSystem([L, L]; κ=0.0)
 init!(sys_rec, :random, rng=MersenneTwister(seed))
 
-sys_nr = NonreciprocalIsing([L, L]; κ=1.0)
+sys_nr = VisionConeIsingSystem([L, L]; κ=1.0)
 init!(sys_nr, :random, rng=MersenneTwister(seed))
 
 println("Equilibrium Ising (specialized fast path):")
@@ -64,7 +64,7 @@ println("Nonreciprocal Ising, κ=1:")
 function mean_abs_m(κ, T; L=L, warmup=100_000, samples=100_000, seed=seed)
     rng = MersenneTwister(seed)
     # Nikos definition kappp=lambda/beta
-    sys = NonreciprocalIsing([L, L]; κ=κ*T)
+    sys = VisionConeIsingSystem([L, L]; κ=κ*T)
     init!(sys, :up)
     alg = Glauber(rng; β=1/T)
     N = L * L

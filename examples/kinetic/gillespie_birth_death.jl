@@ -40,7 +40,7 @@ end
 #
 # We run a single simulation at ``\lambda = 0.42``, ``\mu = 0.40`` — a
 # slightly super-critical regime — and record the population every 0.5 time
-# units. `advance!` handles the event loop internally, calling `measure!`
+# units. `advance!` handles the event loop internally, calling `observe!`
 # before each state update and stopping when the total time is reached or
 # all rates vanish (extinction: ``N = 0``).
 
@@ -55,7 +55,7 @@ measurements = Measurements(
 measure!(measurements, sys, alg.time)
 
 advance!(alg, sys, T;
-    measure! = (sys, event, t) -> measure!(measurements, sys, t),
+    observe! = (sys, event, t) -> measure!(measurements, sys, t),
 )
 
 pop = measurements[:population].data
@@ -82,7 +82,7 @@ function run_birth_death(N0, λ, μ, T; seed=1)
     )
     measure!(meas, sys, alg.time)
     advance!(alg, sys, T;
-        measure! = (sys, event, t) -> measure!(meas, sys, t),
+        observe! = (sys, event, t) -> measure!(meas, sys, t),
     )
     measure!(meas, sys, T)
     return meas

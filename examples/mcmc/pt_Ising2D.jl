@@ -46,7 +46,7 @@ end
 
 if !isfile(samples_file)                                        # hide
 betas   = set_betas(nreplicas, inv(Tmax), inv(Tmin), :uniform)
-systems = [Ising([L, L]) for _ in 1:nreplicas]
+systems = [IsingSystem([L, L]) for _ in 1:nreplicas]
 pt      = ParallelTempering(betas; seed = seed, rng = MersenneTwister)
 
 for r in 1:nreplicas

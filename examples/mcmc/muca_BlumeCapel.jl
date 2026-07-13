@@ -58,18 +58,21 @@ end
 
 # ## Spin flip
 #
-# We implement a custom `spin_flip!` for the Blume-Capel model that evaluates
-# the two-component observable ``(J\sum s_i s_j,\, \sum s_i^2)`` and passes
+# We implement a custom `spin_flip!` for the Blume-Capel system that evaluates
+# the two-component observable ``(\sum s_i s_j,\, \sum s_i^2)`` and passes
 # it to `accept!` as a tuple — the `CustomEnsemble` routes each component
-# to the correct acceptance weight.
+# to the correct acceptance weight. Both components are exactly the interaction
+# caches (the coupling-free sums the pair and crystal-field terms maintain), and
+# their changes are the first two entries of the delta payload tuple.
 
-function spin_flip!(sys::MCXSpins.AbstractBlumeCapel, alg::AbstractMarkovChainMonteCarlo)
+function spin_flip!(sys::SpinSystem{<:Any, <:Spin{1//1}}, alg::MetropolisHastingsAlgorithm)
     i     = pick_site(alg.rng, length(sys.spins))
     s_new = propose_state(alg.rng, sys, i)
-    dsys  = MCXSpins.delta_sys(sys, i, s_new)
-    H_old = (sys.cached_pair, sys.cached_spin2)
-    H_new = (H_old[1] + dsys.delta_spin * dsys.coupling, H_old[2] + dsys.delta_spin2)
-    accept!(alg, H_new, H_old) && modify!(sys, i, dsys)
+    δs    = MCXSpins.delta_sys(sys, i, s_new)
+    pair, crystal = sys.interactions
+    H_old = (pair.cache.val, crystal.cache.val)
+    H_new = (H_old[1] + δs[1], H_old[2] + δs[2])
+    accept!(alg, H_new, H_old) && modify!(sys, i, s_new, δs)
     return nothing
 end
 
@@ -82,11 +85,11 @@ end
 # through the observable range — keeping every iteration to watch convergence.
 
 if !isfile(lw_file)                                                # hide
-sys = BlumeCapel([L, L])
+sys = BlumeCapelSystem([L, L])
 ens = CustomEnsemble(BoltzmannEnsemble(T = T),
                      MulticanonicalEnsemble(0:1:length(sys.spins)), true)
 rng = Xoshiro(42)
-alg = MarkovChainMonteCarlo(rng, ens)
+alg = MetropolisHastingsAlgorithm(rng, ens)
 
 N_sites = length(sys.spins)
 s2_min, s2_max = 0, N_sites
@@ -106,10 +109,10 @@ for iter in 1:num_iter
     reset!(rt)
     for _ in 1:recording_steps
         spin_flip!(sys, alg)
-        update!(rt, sys.cached_spin2)
+        update!(rt, sys.interactions[2].cache.val)      # Σ s² from the crystal-field cache
     end
     muca_ens = ensemble(alg).spin2
-    update!(muca_ens; mode = :recursive)
+    update_logweight!(muca_ens; mode = :recursive)
     smooth!(muca_ens, (s2_min, s2_max); window = 3)
     H[:, iter]       = muca_ens.histogram.values
     W[:, iter]       = muca_ens.logweight.values

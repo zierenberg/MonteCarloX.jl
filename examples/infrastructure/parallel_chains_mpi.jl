@@ -164,7 +164,7 @@ pmuca_sys = System(0.0)
 beta_bound = beta_ref * 2
 on_root(pmuca) do i
     alg = algorithm(pmuca, i)
-    set!(logweight(alg), E -> -beta_bound * E)
+    set_logweight!(ensemble(alg), E -> -beta_bound * E)
 end
 distribute_logweight!(pmuca)
 
@@ -186,8 +186,8 @@ time_iter = @elapsed for iter in 1:n_iter
     merge_histograms!(pmuca)
     on_root(pmuca) do i
         alg = algorithm(pmuca, i)
-        MonteCarloX.update!(ensemble(alg); mode=:simple)
-        set!(logweight(alg), (E_right, E_max),
+        update_logweight!(ensemble(alg); mode=:simple)
+        set_logweight!(ensemble(alg), (E_right, E_max),
              E -> logweight(alg)(E_right) - beta_bound * (E - E_right))
         next!(prog)
     end

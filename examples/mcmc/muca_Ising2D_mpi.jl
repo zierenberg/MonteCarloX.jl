@@ -39,7 +39,7 @@ backend = init(:MPI)
 alg = Multicanonical(Xoshiro(1000 + rank(backend)), get_centers(exact_logdos))
 pmuca = ParallelMulticanonical(backend, alg)
 
-sys = Ising([L, L])
+sys = IsingSystem([L, L])
 init!(sys, :random, rng=alg.rng)
 
 on_root(pmuca) do
@@ -67,7 +67,7 @@ for iter in 1:n_iter
     merge_histograms!(pmuca)
     
     on_root(pmuca) do
-        MonteCarloX.update!(ensemble(alg); mode=:simple)
+        update_logweight!(ensemble(alg); mode=:simple)
         rmse = rmse_exact(ensemble(alg).logweight)
         push!(mpi_hists, deepcopy(ensemble(alg).histogram))
         push!(mpi_lws, deepcopy(ensemble(alg).logweight))

@@ -11,7 +11,11 @@ using RecipesBase
 # Core abstractions (shared by all algorithms)
 include("abstract_system.jl")
 export  AbstractSystem,
-        init!
+        init!,
+        nsites,
+        local_states,
+        partners,
+        delta_energy
 
 include("ensembles/abstract_ensemble.jl")
 export  AbstractEnsemble,

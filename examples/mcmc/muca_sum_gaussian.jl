@@ -140,7 +140,7 @@ for it in 1:n_iter
     for _ in 1:n_therm;      update!(sys_iter, alg_iter); end
     reset!(alg_iter)
     for _ in 1:n_iter_steps; update!(sys_iter, alg_iter); end
-    MonteCarloX.update!(ensemble(alg_iter); mode = :simple)
+    update_logweight!(ensemble(alg_iter); mode = :simple)
     wl = get_values(lw_iter)[i_left]; wr = get_values(lw_iter)[i_right]
     set!(lw_iter, (first(cs_iter), cs_iter[i_left]), x -> wl + (x - cs_iter[i_left]) * 2.0)
     set!(lw_iter, (cs_iter[i_right], last(cs_iter)), x -> wr - (x - cs_iter[i_right]) * 2.0)

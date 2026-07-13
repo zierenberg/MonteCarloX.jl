@@ -25,7 +25,7 @@ function test_log_density_problems()
         end, "ldp: missing dimension throws\n")
 
     # An uphill move (toward higher density) is always accepted by the MonteCarloX sampler.
-    alg = MarkovChainMonteCarlo(Xoshiro(1), t)
+    alg = MetropolisHastingsAlgorithm(Xoshiro(1), t)
     pass &= check(accept!(alg, [0.0, 0.0, 0.0], [3.0, 0.0, 0.0]), "ldp: usable by MCX accept!\n")
     return pass
 end
