@@ -62,10 +62,12 @@ println("Matrix-coupling Ising:")
 #
 # For the 2D Ising model ``\Delta E \in \{-8,-4,0,4,8\}``, so we can precompute
 # the two non-trivial acceptance probabilities and avoid calling `exp` at every
-# step. This shows how to extend **MonteCarloX.jl** with a custom algorithm by
-# implementing the `accept!` interface.
+# step. This shows how to extend **MonteCarloX.jl** with a custom algorithm:
+# implement `accept!` (here the scalar it receives is the integer ``\Delta E``
+# itself, not a log-ratio — a specialized fast path with no ensemble object)
+# and the corresponding `spin_flip!` method driving the standard hook chain.
 
-mutable struct TableMetropolis{R<:AbstractRNG} <: AbstractMetropolis
+mutable struct TableMetropolis{R<:AbstractRNG} <: AbstractMarkovChainMonteCarlo
     rng      :: R
     p4       :: Float64
     p8       :: Float64
@@ -83,6 +85,15 @@ TableMetropolis(rng::AbstractRNG; β::Real) =
     accepted = rand(alg.rng) < p
     alg.accepted += accepted
     return accepted
+end
+
+@inline function MCXSpins.spin_flip!(sys::MCXSpins.AbstractSpinSystem, alg::TableMetropolis)
+    i = pick_site(alg.rng, length(sys.spins))
+    s_new = propose_state(alg.rng, sys, i)
+    δs = MCXSpins.delta_sys(sys, i, s_new)
+    ΔE = delta_energy(sys, i, s_new, δs)
+    MonteCarloX.accept!(alg, ΔE) && modify!(sys, i, s_new, δs)
+    return nothing
 end
 
 sys_table = IsingSystem([L, L])

@@ -4,7 +4,7 @@ Kinetic Monte Carlo (KMC) simulates continuous-time Markov processes on a discre
 The chain advances in real (or simulation) time according to event rates rather than in discrete attempt-and-accept steps.
 
 This page sets up the vocabulary and API shared by every KMC algorithm in MonteCarloX.
-Concrete algorithms — currently [Gillespie](#gillespie-workflow), with `BKL` / `n-fold way` planned — are documented as sections below until they grow into their own subpages.
+Concrete algorithms — [Gillespie](#gillespie-workflow) and the [n-fold way](#n-fold-way-rejection-free) — are documented as sections below until they grow into their own subpages.
 
 ## How this differs from MCMC
 
@@ -38,7 +38,7 @@ end
 
 ## `step!` vs `advance!`
 - `step!`: one event at a time (full manual control)
-- `advance!`: run until `total_time`, with optional callbacks (`measure!`, `update!`)
+- `advance!`: run until `total_time`, with optional callbacks (`observe!`, `modify!`)
 
 Example with explicit state + event source:
 ```julia
@@ -67,6 +67,53 @@ advance!(alg, sys, 20.0; modify!=modify_cb)
 - time-ordered event queues (`AbstractEventHandlerTime`)
 - callback `rates_at_time(t)`
 
+These are *passive* sources: your `modify!` keeps them current. In addition, MonteCarloX
+ships event **generators** — sources that maintain their own rate ledger from a small model
+interface, the same growing-family pattern as the ensembles:
+
+- [`SiteEvents`](@ref)`(sys, rates)` — sites change their local states (spin systems,
+  contact processes, ecological lattice models). Events are `(i, s_new)`; an event
+  invalidates only the rates of the site and its `partners`. Model interface: `nsites`,
+  `local_states`, `partners`, `modify!`.
+- [`ReactionEvents`](@ref)`(sys, rates)` — reaction channels of a well-mixed network.
+  Events are channel indices; all propensities are re-evaluated after each event. Model
+  interface: `nreactions`, `modify!`.
+
+The rate rule is any callable — intrinsic physics written out, or an induced rule such as
+[`NFoldRates`](@ref):
+
+```julia
+src = ReactionEvents(sys, (s, r) -> r == 1 ? s.k_on * s.A * s.B : s.k_off * s.AB)
+advance!(Gillespie(rng), src, T; observe!)
+```
+
+## n-fold way (rejection-free)
+
+The literature introduces the n-fold way (Bortz–Kalos–Lebowitz, 1975) as an *algorithm*:
+instead of proposing spin flips and rejecting most of them at low temperature, jump directly
+from event to event with Poissonian waiting times. In MonteCarloX it factors accordingly —
+**the n-fold way IS a Gillespie algorithm**: Gillespie's clock over balance-induced
+site-transition rates. [`NFoldRates`](@ref) is that rate rule,
+
+```math
+\text{rate} = \texttt{transition\_rate}(\text{balance},\ \texttt{logweight}(\text{ensemble}, \Delta E)),
+```
+
+the same balance function the Metropolis/Glauber accept step uses in discrete time, read as
+a continuous-time rate. Sampling is the ordinary KMC loop over a `SiteEvents` source:
+
+```julia
+sys = IsingSystem([L, L]; J=1)
+src = SiteEvents(sys, NFoldRates(β=β))       # rejection-free Metropolis dynamics
+advance!(Gillespie(rng), src, total_time;
+         observe! = (s, event, t) -> ...)    # sees the state BEFORE each jump;
+                                             # weight observables by the elapsed time
+```
+
+Time averages equal the ensemble averages of the embedded Metropolis/Glauber chain. Any
+system implementing the site interface works — the same generator drives an ecological
+model with intrinsic rates instead of `NFoldRates`.
+
 ## Low-level building blocks
 - `next_time`: waiting-time sampling (homogeneous or thinning-based)
 - `next_event`: event-index sampling
@@ -74,13 +121,16 @@ advance!(alg, sys, 20.0; modify!=modify_cb)
 
 ## Example map (algorithm ↔ application)
 - **Birth-death dynamics** (`Gillespie`): `examples/stochastic_processes/gillespie_birth_death.ipynb`
-- **Reaction-network dynamics** (`Gillespie`): `examples/stochastic_processes/gillespie_dimerization.ipynb`
+- **Reaction-network dynamics** (`Gillespie` + `ReactionEvents`): `examples/stochastic_processes/gillespie_dimerization.ipynb`
 - **Poisson primitives / low-level event draws**: `examples/stochastic_processes/kmc_poisson.ipynb`
 
 ## API reference
 ```@docs
 AbstractKineticMonteCarlo
 Gillespie
+SiteEvents
+NFoldRates
+ReactionEvents
 next
 step!
 next_time

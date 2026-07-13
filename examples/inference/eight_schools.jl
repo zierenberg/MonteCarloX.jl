@@ -72,7 +72,7 @@ end
 
 function metropolis(logposterior, s0; n = 200_000, warmup = 20_000, seed = 42)
     rng  = Xoshiro(seed)
-    alg  = MarkovChainMonteCarlo(rng, logposterior)
+    alg  = MetropolisHastingsAlgorithm(rng, logposterior)
     step = AdaptiveStep([2.0, 0.4, fill(6.0, length(s0) - 2)...]; target = 0.234)
     s    = copy(s0)
 

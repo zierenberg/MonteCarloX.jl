@@ -80,7 +80,7 @@ end
 
 function metropolis(logposterior; n = 100_000, warmup = 10_000, Δ0 = 1.0, seed = 1)
     rng  = Xoshiro(seed)
-    alg  = MarkovChainMonteCarlo(rng, logposterior)
+    alg  = MetropolisHastingsAlgorithm(rng, logposterior)
     step = AdaptiveStep(Δ0; target = 0.234)             # rough guess; self-corrects
     θ    = [mean(y), std(y)]
 

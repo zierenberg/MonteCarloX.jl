@@ -80,7 +80,7 @@ Companion packages bundle this loop body. For richer spin systems, [`MCXSpins`](
 
 ```julia
 using MonteCarloX, MCXSpins, Random
-sys = Ising([32, 32]; J=1); init!(sys, :random; rng=Xoshiro(1))
+sys = IsingSystem([32, 32]; J=1); init!(sys, :random; rng=Xoshiro(1))
 alg = MetropolisAlgorithm(Xoshiro(1); β=0.44)
 for _ in 1:1_000_000
     spin_flip!(sys, alg)

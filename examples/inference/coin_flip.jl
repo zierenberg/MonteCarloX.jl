@@ -113,7 +113,7 @@ end
 
 function metropolis(logposterior; n = 100_000, warmup = 10_000, Δ0 = 0.2, seed = 1)
     rng  = Xoshiro(seed)
-    alg  = MarkovChainMonteCarlo(rng, logposterior)
+    alg  = MetropolisHastingsAlgorithm(rng, logposterior)
     step = AdaptiveStep(Δ0; target = 0.44)
     θ    = 0.5
 
