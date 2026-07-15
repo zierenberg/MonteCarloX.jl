@@ -79,15 +79,15 @@ end
     XYSpin()
 
 Continuous planar-rotor spins: unit phasors `ComplexF64`. The rotation proposal takes its
-half-width from the update call — `spin_flip!(sys, alg, Δθ)` — so step size stays with the
-update (adaptable per call), not with the system.
+half-width from the update call as a keyword — `spin_flip!(sys, alg; Δθ)` — so step size stays
+with the update (adaptable per call), not with the system.
 """
 struct XYSpin <: SpinType end
 one_state(::XYSpin) = 1.0 + 0.0im
 random_state(rng::AbstractRNG, ::XYSpin) = cis(2π * rand(rng))
 
 # Symmetric rotation proposal of half-width Δθ; cis(angle(…)) keeps the modulus at exactly 1.
-@inline propose_state(rng::AbstractRNG, ::XYSpin, i, s_old::ComplexF64, Δθ::Real) =
+@inline propose_state(rng::AbstractRNG, ::XYSpin, i, s_old::ComplexF64; Δθ::Real) =
     cis(angle(s_old) + Δθ * (2 * rand(rng) - 1))
 
 """

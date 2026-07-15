@@ -63,7 +63,6 @@ println("Nonreciprocal Ising, κ=1:")
 
 function mean_abs_m(κ, T; L=L, warmup=100_000, samples=100_000, seed=seed)
     rng = MersenneTwister(seed)
-    # Nikos definition kappp=lambda/beta
     sys = VisionConeIsingSystem([L, L]; κ=κ*T)
     init!(sys, :up)
     alg = Glauber(rng; β=1/T)

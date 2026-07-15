@@ -18,11 +18,11 @@ function cache_drift(sys)
 end
 
 "delta_energy against recomputed energy differences over random accepted moves."
-function finite_diff_dev(sys, rng, nmoves, prop_args...)
+function finite_diff_dev(sys, rng, nmoves; proposal...)
     dev = 0.0
     for _ in 1:nmoves
         i = rand(rng, 1:length(sys.spins))
-        s_new = propose_state(rng, sys, i, prop_args...)
+        s_new = propose_state(rng, sys, i; proposal...)
         d = delta_energy(sys, i, s_new)
         E0 = energy(sys; full=true)
         MonteCarloX.modify!(sys, i, s_new)
@@ -101,7 +101,7 @@ end
     xysys = XYSystem([8, 8]; J=1.0)
     @test energy(xysys) ≈ -2.0 * 64                # aligned: E = −J·(#bonds) = −2JN
     init!(xysys, :random, rng=rng)
-    @test finite_diff_dev(xysys, MersenneTwister(3), 100, 0.7) < 1e-9   # Δθ = 0.7 proposal
+    @test finite_diff_dev(xysys, MersenneTwister(3), 100; Δθ=0.7) < 1e-9   # Δθ = 0.7 proposal
 
     hsys = HeisenbergSystem([4, 4, 4]; J=1.0)
     @test energy(hsys) ≈ -3.0 * 64

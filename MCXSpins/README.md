@@ -36,7 +36,7 @@ IsingSystem([L, L]; J=1, h=0)                 # periodic lattice
 IsingSystem(graph; J=1)                       # arbitrary graph
 IsingSystem(J_sparse)                         # spin glass / directed couplings
 BlumeCapelSystem([L, L]; J=1, D=0.5, h=0)
-XYSystem([L, L]; J=1)                        # rotation width at the update: spin_flip!(sys, alg, Δθ)
+XYSystem([L, L]; J=1)                        # rotation width at the update: spin_flip!(sys, alg; Δθ)
 HeisenbergSystem([L, L, L]; J=1)
 VisionConeIsingSystem([L, L]; κ=0.5)          # vision cone, no full Hamiltonian
 VisionConeBlumeCapelSystem([L, L]; κ=0.5, D=0.5)

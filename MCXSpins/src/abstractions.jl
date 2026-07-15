@@ -3,8 +3,8 @@
 
 Base type for spin systems. The update functions drive any subtype through the hooks
 
-    propose_state(rng, sys, i, args...) -> new spin state (extra args: proposal parameters,
-                                           e.g. the XY rotation half-width)
+    propose_state(rng, sys, i; proposal...) -> new spin state (keyword proposal parameters,
+                                           e.g. the XY rotation half-width Δθ)
     delta_sys(sys, i, s_new)            -> delta payload (defaults to `nothing`)
     delta_energy(sys, i, s_new, δs)     -> energy change (default ignores the payload)
     modify!(sys, i, s_new, δs)          -> apply change (default ignores the payload)

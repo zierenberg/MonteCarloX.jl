@@ -34,7 +34,7 @@ end
 
 @testset "Continuous spin types" begin
     rng = MersenneTwister(23)
-    s_xy = propose_state(rng, XYSpin(), 1, cis(0.3), 0.5)
+    s_xy = propose_state(rng, XYSpin(), 1, cis(0.3); Δθ=0.5)
     @test abs(abs(s_xy) - 1) < 1e-12                       # unit modulus preserved
     @test abs(angle(s_xy) - 0.3) <= 0.5 + 1e-12            # within the proposal half-width
 
@@ -49,10 +49,10 @@ end
     alg = MetropolisAlgorithm(MersenneTwister(3); β=0.7)
     before = copy(sys.spins)
     for _ in 1:2000
-        spin_flip!(sys, alg, 0.5)
+        spin_flip!(sys, alg; Δθ=0.5)
     end
     @test sys.spins != before
     @test all(s -> abs(abs(s) - 1) < 1e-9, sys.spins)
     @test 0 < acceptance_rate(alg) < 1
-    @test_throws MethodError spin_flip!(sys, alg)          # no width: XY proposal undefined
+    @test_throws UndefKeywordError spin_flip!(sys, alg)   # no Δθ keyword: XY proposal undefined
 end

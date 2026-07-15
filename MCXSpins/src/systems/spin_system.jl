@@ -45,10 +45,10 @@ end
 # three-argument modify!(sys, i, s_new) below remains the raw-state entry point (heat bath,
 # n-fold way, tests) and computes the payload itself.
 
-# Extra proposal arguments (e.g. the XY rotation half-width Δθ) pass through from the
+# Proposal parameters (e.g. the XY rotation half-width Δθ) pass through as keywords from the
 # update call to the spin type's proposal.
-@inline propose_state(rng::AbstractRNG, sys::SpinSystem, i, args...) =
-    propose_state(rng, sys.spintype, i, (@inbounds sys.spins[i]), args...)
+@inline propose_state(rng::AbstractRNG, sys::SpinSystem, i; proposal...) =
+    propose_state(rng, sys.spintype, i, (@inbounds sys.spins[i]); proposal...)
 
 @inline delta_sys(sys::SpinSystem, i, s_new) = delta(sys.interactions, sys.spins, i, s_new)
 
