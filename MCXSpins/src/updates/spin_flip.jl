@@ -13,10 +13,10 @@
 # pick_site. Making the site explicit is what enables deterministic schemes — a typewriter
 # sweep is just `for i in eachindex(sys.spins); spin_flip!(sys, alg, i); end`.
 #
-# Proposal parameters ride as keywords, so the positional site stays unambiguous:
-# spin_flip!(sys, alg; Δθ=0.3) (or spin_flip!(sys, alg, i; Δθ=0.3)) drives the XY rotation of
-# half-width Δθ. They live with the update call, not the system, so they stay adaptable
-# (step-size control) without touching the system.
+# Discrete spins need no proposal parameter. A continuous spin takes a step width at the update
+# call (kept there so it stays adaptable) through its OWN spin_flip! method — e.g. XY's rotation
+# half-width: spin_flip!(sys, alg; Δθ) or spin_flip!(sys, alg, i; Δθ). The width is forwarded to
+# that spin type's propose_state; a discrete propose_state simply takes no extra argument.
 
 # logR assembly shared by spin_flip! and spin_exchange!. linear_logweight(ens) is a
 # compile-time constant, so the branch folds away and the linear path stays allocation-free.
@@ -30,18 +30,26 @@
     end
 end
 
-# Primitive: one local update at a GIVEN site.
-@inline function spin_flip!(sys::AbstractSpinSystem, alg::MetropolisHastingsAlgorithm, site::Integer; proposal...)
-    s_new = propose_state(alg.rng, sys, site; proposal...)
+# Apply a proposed new state at `site` through the shared hooks (delta_sys → accept → modify!).
+@inline function _flip!(sys, alg::MetropolisHastingsAlgorithm, site, s_new)
     δs = delta_sys(sys, site, s_new)
     ΔE = delta_energy(sys, site, s_new, δs)
     _accept_delta!(alg, sys, ΔE) && modify!(sys, site, s_new, δs)
     return nothing
 end
 
-# Wrapper: the common single-flip step at a uniformly drawn site.
-@inline spin_flip!(sys::AbstractSpinSystem, alg::MetropolisHastingsAlgorithm; proposal...) =
-    spin_flip!(sys, alg, pick_site(alg.rng, length(sys.spins)); proposal...)
+# Parameter-free proposal (discrete spins): site primitive + random-site wrapper.
+@inline spin_flip!(sys::AbstractSpinSystem, alg::MetropolisHastingsAlgorithm, site::Integer) =
+    _flip!(sys, alg, site, propose_state(alg.rng, sys, site))
+@inline spin_flip!(sys::AbstractSpinSystem, alg::MetropolisHastingsAlgorithm) =
+    spin_flip!(sys, alg, pick_site(alg.rng, length(sys.spins)))
+
+# XY: the rotation half-width Δθ lives at the update call — same site-primitive/random-wrapper
+# split, with Δθ forwarded to the XY propose_state.
+@inline spin_flip!(sys::SpinSystem{<:Any, <:XYSpin}, alg::MetropolisHastingsAlgorithm, site::Integer; Δθ::Real) =
+    _flip!(sys, alg, site, propose_state(alg.rng, sys, site, Δθ))
+@inline spin_flip!(sys::SpinSystem{<:Any, <:XYSpin}, alg::MetropolisHastingsAlgorithm; Δθ::Real) =
+    spin_flip!(sys, alg, pick_site(alg.rng, length(sys.spins)); Δθ)
 
 # ── Heat bath ─────────────────────────────────────────────────────────────────
 #

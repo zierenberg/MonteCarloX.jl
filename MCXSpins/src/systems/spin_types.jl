@@ -12,10 +12,9 @@ type, and the single-spin proposal. Required interface:
 
     one_state(spintype)                    — reference "all up" state (deterministic init)
     random_state(rng, spintype)            — uniform draw from the local states
-    propose_state(rng, spintype, i, s_old) — Monte Carlo proposal for site `i` given its
-                                             current state (the site index enables
-                                             site-dependent proposals, e.g. dilution or
-                                             frozen sites; the spin types here ignore it)
+    propose_state(rng, spintype, s_old)    — Monte Carlo proposal from the current state
+                                             (continuous spins take a trailing step width,
+                                             e.g. propose_state(rng, ::XYSpin, s_old, Δθ))
 
 Discrete spin types additionally provide `states(spintype)`, a compile-time tuple of all
 local states.
@@ -63,7 +62,7 @@ end
 # Generic proposal for ANY Spin{S}: uniform among the 2S other states with a single rand
 # (skip-current trick: draw from the first n−1 slots, map a collision with s_old to slot n).
 # The state count 2S+1 is a compile-time constant, so this is as good as hand-written cases.
-@inline function propose_state(rng::AbstractRNG, spintype::Spin, i, s_old::Int8)
+@inline function propose_state(rng::AbstractRNG, spintype::Spin, s_old::Int8)
     sts = states(spintype)
     n = length(sts)
     @inbounds s = sts[rand(rng, 1:n-1)]
@@ -73,7 +72,7 @@ end
 # Spin-1/2: flipping is deterministic. The generic path would still burn one rand() per
 # proposal (drawing from 1:1 before the collision branch); skipping the draw is measurable
 # in the tight Ising loop and keeps the rng stream of classic single-flip Ising codes.
-@inline propose_state(::AbstractRNG, ::Spin{1//2}, i, s_old::Int8) = Int8(-s_old)
+@inline propose_state(::AbstractRNG, ::Spin{1//2}, s_old::Int8) = Int8(-s_old)
 
 """
     XYSpin()
@@ -87,7 +86,7 @@ one_state(::XYSpin) = 1.0 + 0.0im
 random_state(rng::AbstractRNG, ::XYSpin) = cis(2π * rand(rng))
 
 # Symmetric rotation proposal of half-width Δθ; cis(angle(…)) keeps the modulus at exactly 1.
-@inline propose_state(rng::AbstractRNG, ::XYSpin, i, s_old::ComplexF64; Δθ::Real) =
+@inline propose_state(rng::AbstractRNG, ::XYSpin, s_old::ComplexF64, Δθ::Real) =
     cis(angle(s_old) + Δθ * (2 * rand(rng) - 1))
 
 """
@@ -104,7 +103,7 @@ one_state(::HeisenbergSpin) = SVector(0.0, 0.0, 1.0)
     r = sqrt(1.0 - z * z)
     return SVector(r * c, r * s, z)
 end
-@inline propose_state(rng::AbstractRNG, spintype::HeisenbergSpin, i, s_old::SVector{3,Float64}) =
+@inline propose_state(rng::AbstractRNG, spintype::HeisenbergSpin, s_old::SVector{3,Float64}) =
     random_state(rng, spintype)
 
 # ── Spin-space inner product: the one hook that makes interactions model-generic ─────────────

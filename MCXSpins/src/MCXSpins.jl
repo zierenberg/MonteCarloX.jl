@@ -20,7 +20,7 @@ lattice), a `SimpleGraph`, or a sparse J_ij matrix:
     HopfieldSystem(patterns)                EdwardsAndersonSystem(dims; rng, dist)
 
 # Interface (required for spin_flip!)
-    propose_state(rng, sys, i; proposal...) -> new spin state
+    propose_state(rng, sys, i, params...) -> new spin state
     delta_sys(sys, i, s_new)            -> delta payload (optional; defaults to nothing)
     delta_energy(sys, i, s_new, δs)     -> energy change
     modify!(sys, i, s_new, δs)          -> apply change

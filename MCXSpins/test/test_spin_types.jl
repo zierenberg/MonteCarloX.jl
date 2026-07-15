@@ -19,14 +19,14 @@ end
     for S in (1//2, 1, 3//2)
         spintype = Spin(S)
         for s_old in states(spintype)
-            draws = [propose_state(rng, spintype, 1, s_old) for _ in 1:300]
+            draws = [propose_state(rng, spintype, s_old) for _ in 1:300]
             @test all(!=(s_old), draws)
             @test Set(draws) == Set(s for s in states(spintype) if s != s_old)
         end
     end
 
     # states(spintype) is a compile-time constant: no tuple is built at runtime
-    alloc_probe(r, st, s) = @allocated propose_state(r, st, 1, s)
+    alloc_probe(r, st, s) = @allocated propose_state(r, st, s)
     st = Spin(3//2)
     alloc_probe(rng, st, Int8(1))
     @test alloc_probe(rng, st, Int8(1)) == 0
@@ -34,7 +34,7 @@ end
 
 @testset "Continuous spin types" begin
     rng = MersenneTwister(23)
-    s_xy = propose_state(rng, XYSpin(), 1, cis(0.3); Δθ=0.5)
+    s_xy = propose_state(rng, XYSpin(), cis(0.3), 0.5)
     @test abs(abs(s_xy) - 1) < 1e-12                       # unit modulus preserved
     @test abs(angle(s_xy) - 0.3) <= 0.5 + 1e-12            # within the proposal half-width
 

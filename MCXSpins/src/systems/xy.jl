@@ -4,7 +4,7 @@
     XYSystem(topology; J=1, h=0)
 
 XY (planar rotor) system −J Σ_{<ij>} cos(θi−θj); a complex `h` is an in-plane field.
-The rotation proposal half-width is an update parameter: `spin_flip!(sys, alg, Δθ)`.
+The rotation proposal half-width is an update keyword: `spin_flip!(sys, alg; Δθ)`.
 """
 function XYSystem(topo::Union{AbstractVector{<:Integer}, SimpleGraph}; J=1, h=0)
     prt = _init_partners(topo)
