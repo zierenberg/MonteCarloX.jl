@@ -1,19 +1,30 @@
 # # Spin systems
 #
-# The MCXSpins spin systems — Ising and Heisenberg — measured against the **prime examples** of other Julia Monte Carlo packages: MonteCarlo.jl and Carlo.jl on 2D Ising, SpinMC.jl on the cubic Heisenberg magnet. 
-# Each package runs a model it showcases as example online; MCX runs the identical physics with its plain generic loop — an `IsingSystem` or `HeisenbergSystem` driven by `spin_flip!` under a `MetropolisAlgorithm` (the MCX code is shown for each). 
+# The MCXSpins spin systems — Ising and Heisenberg — measured against the **prime examples** of other Julia Monte Carlo packages: MonteCarlo.jl and
+# Carlo.jl on 2D Ising, SpinMC.jl on the cubic Heisenberg magnet.  Each package
+# runs a model it showcases as example online; MCX runs the identical physics
+# with its plain generic loop — an `IsingSystem` or `HeisenbergSystem` driven by
+# `spin_flip!` under a `MetropolisAlgorithm` (the MCX code is shown for each). 
 # Both run on the same machine in the same session.
-#
-# Physics is checked against an exact referee wherever one exists (Beale's 2D-Ising log-DOS via `reweight`). 
-# Speed is the **MCX speedup** ``t_\text{reference}/t_\text{MCX}`` per attempted flip — above 1 means MCX is faster; the ratio cancels the machine. The [Benchmarks](@ref) overview collects every speedup. 
-#
+# 
+# Physics is checked against an exact referee wherever one exists (Beale's
+# 2D-Ising log-DOS via `reweight`).  Speed is the **MCX speedup**
+# ``t_\text{reference}/t_\text{MCX}`` per attempted flip — above 1 means MCX is
+# faster; the ratio cancels the machine. The [Benchmarks](@ref) overview
+# collects every speedup.
+# 
+# A dedicated **compiled C program** (`ising_cpu_modes.c`) running the same 2D
+# Ising sets the bare-metal speed ceiling, where MCX is inevitably slower
+# (speedup below 1); the fuller hand-optimized-Julia dissection lives in the
+# MCXSpins top-performance benchmark.
+# 
 # The heavy runs are cached to `docs/src/data/` — delete `bench_*.tsv` and
-# `benchmarks.tsv` there and rerun
-# `julia --project=benchmarks benchmarks/benchmark_all.jl` to regenerate.
+# `benchmarks.tsv` there and rerun `julia --project=benchmarks
+# benchmarks/benchmark_all.jl` to regenerate.
 
 import Pkg; Pkg.activate(joinpath(@__DIR__)); Pkg.instantiate()  #src
 
-using Random, Statistics, Printf, Plots, DelimitedFiles
+using Random, Statistics, Printf, Plots, DelimitedFiles, Markdown
 using StatsBase: weights
 using MonteCarloX, MCXSpins
 
@@ -23,9 +34,9 @@ bench_file(name) = joinpath(datadir, "bench_$(name).tsv")                       
 function recfactor(comparison, case, ref_ns, mcx_ns)                              # hide
     new = !isfile(factors_file)                                                   # hide
     open(factors_file, "a") do io                                                 # hide
-        new && println(io, "comparison\tcase\tcpu\tref_ns_per_flip\tmcx_ns_per_flip\tfactor_mcx")  # hide
+        new && println(io, "comparison\tcase\tcpu\tref_ns_per_flip\tmcx_ns_per_flip\tspeedup_mcx")  # hide
         @printf(io, "%s\t%s\t%s\t%.3f\t%.3f\t%.3f\n",                             # hide
-                comparison, case, Sys.CPU_NAME, ref_ns, mcx_ns, mcx_ns / ref_ns)  # hide
+                comparison, case, Sys.CPU_NAME, ref_ns, mcx_ns, ref_ns / mcx_ns)  # hide
     end                                                                           # hide
 end                                                                               # hide
 quiet(f) = redirect_stdout(() -> redirect_stderr(f, devnull), devnull)            # hide
@@ -35,14 +46,17 @@ nothing                                                                         
 # Two conventions used throughout. Timing is the minimum over interleaved repetitions of a pure update loop, per attempted flip:
 
 ns_per_flip(run, nflips; reps=3) = 1e9 * minimum(@elapsed(run()) for _ in 1:reps) / nflips
+nothing # hide
 
 # and the MCX contender is always the plain generic loop — `IsingSystem` (or `HeisenbergSystem`) driven by `spin_flip!` under a `MetropolisAlgorithm`. The hot loop always runs through the named `mcx_sweep!` below, so `spin_flip!` executes under a function barrier with concretely-typed `sys`/`alg`:
 
 mcx_sweep!(sys, alg, n) = (for _ in 1:n; spin_flip!(sys, alg); end)
+nothing # hide
 
 # Each reference is matched on site-selection: Carlo.jl and SpinMC.jl pick a random site per step (two rng draws), so they meet MCX's default random-site `spin_flip!`; MonteCarlo.jl sweeps sites in typewriter order with a single draw per step, so it is met by the site-taking primitive `spin_flip!(sys, alg, i)` run over `eachindex` — same access pattern, same one draw:
 
 mcx_sweep_seq!(sys, alg, nsweeps) = (for _ in 1:nsweeps, i in eachindex(sys.spins); spin_flip!(sys, alg, i); end)
+nothing # hide
 
 # Both sides draw from the same generator: MCX seeds a `Xoshiro`, which is Julia's default RNG (`Random.default_rng()`, a Xoshiro256++ since Julia 1.7). The reference frameworks use that same default — SpinMC.jl copies `Random.GLOBAL_RNG`, MonteCarlo.jl uses `Random.default_rng()`, Carlo.jl takes an `Xoshiro` context — so the comparison is not skewed by RNG throughput.
 
@@ -75,6 +89,36 @@ function mcx_ising_time_seq(L, β; sweeps=5_000)
     return ns_per_flip(() -> mcx_sweep_seq!(sys, alg, sweeps), sweeps * N)
 end
 nothing # hide
+
+# ## Speed ceiling: compiled C
+#
+# Every framework below pays for generality; the floor is a dedicated **compiled C program**
+# (`MCXSpins/references/ising_cpu_modes.c`) running the identical 2D Ising physics — continuous
+# acceptance, xoshiro RNG, typewriter sweep at β = 0.44 — reporting its own ns/flip. MCX is inevitably slower; the point is to measure how much the generic `spin_flip!`
+# loop costs against bare metal. The C sweeps in typewriter order with one draw per step, so the
+# MCX contender is the sequential sweep (`mcx_ising_time_seq`) — same access pattern, same one draw.
+# The physics is the same Ising already refereed below, so this row is a pure speed ceiling; the C
+# is compiled with the system `cc` only when regenerating:
+
+function c_ceiling(; L=64)                                                        # hide
+    src = joinpath(@__DIR__, "..", "MCXSpins", "references", "ising_cpu_modes.c") # hide
+    bin = joinpath(mktempdir(), "ising_cpu_modes")                                # hide
+    run(`cc -O3 -march=native -std=c11 -o $bin $src -lm`)                         # hide
+    row = split(last(split(readchomp(`$bin cont-std xoshiro 2026`), '\n')))       # hide
+    return parse(Float64, row[6]), -parse(Int, row[8]) / (L * L)   # ns/flip, e/site  # hide
+end                                                                               # hide
+
+if !isfile(bench_file("cceiling"))                                                # hide
+c_ns, c_e = c_ceiling()                                                           # hide
+mcx_ns = mcx_ising_time_seq(64, 0.44)                                             # hide
+recfactor("optimized C kernel (2D Ising 64×64)", "cont/xoshiro", c_ns, mcx_ns)   # hide
+writedlm(bench_file("cceiling"), [["c_ns" "mcx_ns" "c_e_site"]; [c_ns mcx_ns c_e]], '\t')  # hide
+end                                                                               # hide
+
+d = readdlm(bench_file("cceiling"), '\t'; header=true)[1]                         # hide
+Markdown.parse(@sprintf(                                                          # hide
+    "Compiled C **%.2f ns/flip** (e/site = %.3f, the refereed Ising) vs MCX sequential **%.2f ns/flip** → MCX speedup **%.2f×** — the constant cost of the generic `spin_flip!` loop against bare-metal C.",  # hide
+    d[1, 1], d[1, 3], d[1, 2], d[1, 1] / d[1, 2]))                                # hide
 
 # ## MonteCarlo.jl
 #

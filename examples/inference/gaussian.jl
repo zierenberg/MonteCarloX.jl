@@ -26,6 +26,7 @@ y   = rand(rng, Normal(3.0, 1.7), 200)          # truth: μ = 3.0, σ = 1.7
 logprior(θ) = logpdf(Normal(0, 10), θ[1]) + logpdf(LogNormal(0, 1), θ[2])
 loglik(θ)   = sum(logpdf.(Normal(θ[1], θ[2]), y))
 logposterior(θ) = θ[2] > 0 ? logprior(θ) + loglik(θ) : -Inf
+nothing #hide
 
 # ## No conjugate shortcut
 #
@@ -73,6 +74,7 @@ function update!(θ, alg, Δ)
     accepted && (θ .= θ′)
     return accepted
 end
+nothing #hide
 
 # The run splits into two phases, like thermalization then production: a **warm-up** loop
 # that adapts the step size ([`adapt!`](@ref) consumes each `update!`'s accept/reject to
@@ -98,6 +100,7 @@ function metropolis(logposterior; n = 100_000, warmup = 10_000, Δ0 = 1.0, seed 
     end
     return samples, alg
 end
+nothing #hide
 
 samples, alg = metropolis(logposterior)
 (; μ_mc = mean(samples[1, :]), σ_mc = mean(samples[2, :]),
@@ -121,14 +124,14 @@ samples, alg = metropolis(logposterior)
 # 1.4 sampling standard deviations for 200 points), *not* prior influence: the
 # LogNormal(0,1) prior on σ is far too broad to matter against 200 observations.
 # μ and σ are nearly independent here, so the cloud is roughly axis-aligned.
+# Marginal of σ: grid reference (line) vs Metropolis (filled) — importance sampling
+# agrees too (see the numbers above), but at ESS ≈ 200 its histogram is too ragged to plot.
 pjoint = plot(xlabel = "μ", ylabel = "σ", title = "joint posterior p(μ, σ | y)", legend = :topright)
 scatter!(pjoint, samples[1, 1:20:end], samples[2, 1:20:end]; ms = 1.5, alpha = 0.15,
          color = 3, label = "Metropolis")
 contour!(pjoint, μg, σg, w; levels = 6, color = :black, colorbar = false, label = "grid posterior")
 scatter!(pjoint, [3.0], [1.7]; ms = 7, color = :red, marker = :star5, label = "truth")
 
-# Marginal of σ: grid reference (line) vs Metropolis (filled) — importance sampling
-# agrees too (see the numbers above), but at ESS ≈ 200 its histogram is too ragged to plot.
 σmarg = vec(sum(w, dims = 2)); σmarg ./= sum(σmarg) * step(σg)
 pσ = histogram(samples[2, :]; bins = 50, normalize = :pdf, alpha = 0.4, color = 3,
                label = "Metropolis", xlabel = "σ", ylabel = "density", title = "marginal of σ")

@@ -12,9 +12,9 @@ Per-sample log importance weights produced by [`reweight`](@ref):
 
 Stored in log space (offset-free, overflow-safe). The log of the summed weights
 `log_sum_weights = log Σᵢ exp(gᵢ)` is computed once at construction via [`log_sum`](@ref) and
-reused by [`weights`](@ref), [`log_normalization`](@ref) and [`ess`](@ref).
+reused by `weights`, [`log_normalization`](@ref) and [`ess`](@ref).
 
-Use [`weights`](@ref) to obtain the actual (self-normalized) linear weights for use with
+Use `weights` to obtain the actual (self-normalized) linear weights for use with
 StatsBase, e.g. `mean(A, weights(iw))`, `var(A, weights(iw))`.
 """
 struct ImportanceWeights{T<:Real,V<:AbstractVector{T}}

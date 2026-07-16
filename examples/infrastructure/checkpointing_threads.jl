@@ -24,8 +24,8 @@ end
 
 E(sys::System) = 1/4*(sys.x^2 - 2)^2
 
-function update!(sys::System, alg::AbstractMarkovChainMonteCarlo; delta=0.1)
-    x_new = sys.x + delta * randn(alg.rng)
+function update!(sys::System, alg::AbstractMarkovChainMonteCarlo; δ=0.1)
+    x_new = sys.x + δ * randn(alg.rng)
     accept!(alg, E(System(x_new)), E(sys)) && (sys.x = x_new)
 end
 
@@ -40,7 +40,7 @@ n_half  = n_total ÷ 2
 seed = 42
 β    = 2.0
 
-backend = ThreadsBackend()
+backend = init(:threads)
 
 # ## Checkpoint directory
 #
@@ -52,7 +52,7 @@ ckpt_file = joinpath(run_dir, "ckpt.mcx")
 print("Checkpoint file: $(ckpt_file)\n")
 
 # ## Reference run (uninterrupted)
-ref_algs = [Metropolis(Xoshiro(seed + i); β=β) for i in 1:size(backend)]
+ref_algs = [MetropolisAlgorithm(Xoshiro(seed + i); β=β) for i in 1:size(backend)]
 ref_pc   = ParallelChains(backend, ref_algs)
 ref_sys  = [System(0.0) for _ in 1:size(backend)]
 ref_xs   = zeros(Float64, size(backend), n_total)
@@ -73,7 +73,7 @@ println("Reference run: $(size(backend)) chains × $(n_total) samples")
 # full `ParallelChains` object and the vector of systems in one call.
 
 # ### First half
-algs = [Metropolis(Xoshiro(seed + i); β=β) for i in 1:size(backend)]
+algs = [MetropolisAlgorithm(Xoshiro(seed + i); β=β) for i in 1:size(backend)]
 pc   = ParallelChains(backend, algs)
 sys  = [System(0.0) for _ in 1:size(backend)]
 

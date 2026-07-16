@@ -34,7 +34,7 @@ acceptance_probability(balance, logR)   # discrete-time reading → accept!
 transition_rate(balance, logR)          # continuous-time reading → n-fold / kMC rates
 ```
 
-This is why "a probability in one model class becomes a rate in another" is literally the same code: the rejection-free [`NFoldWay`](@ref) in MCXSpins builds its event rates from `transition_rate(balance, logR)`, so it is honestly the rejection-free form of the very same `{Metropolis|Glauber}` dynamics.
+This is why "a probability in one model class becomes a rate in another" is literally the same code: the rejection-free n-fold way (`NFoldRates` under `SiteEvents`) builds its event rates from `transition_rate(balance, logR)`, so it is honestly the rejection-free form of the very same `{Metropolis|Glauber}` dynamics.
 
 ## Constructors
 

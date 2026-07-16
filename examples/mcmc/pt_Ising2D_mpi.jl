@@ -3,13 +3,13 @@
 # Run with:
 # mpiexec -n 4 julia --project=docs docs/src/examples/spin_systems/pt_Ising2D_mpi.jl
 #
-# One MPI rank hosts one replica. The replica exchange protocol coordinates
+# One MPI rank hosts one replica. The replica exchange protocol [Swendsen & Wang 1986; Hukushima & Nemoto 1996] coordinates
 # neighbor swaps via MPI, with energy swap observables passed to the PT
 # coordinator. Only scalar data is exchanged; no full system state is transferred.
 
 # %% #src
 import Pkg                                          #src
-Pkg.activate(joinpath(@__FILE__, "../../../../"))   #src
+Pkg.activate(joinpath(@__DIR__, ".."))              #src
 Pkg.instantiate()                                   #src
 include(joinpath(@__DIR__, "..", "defaults.jl"))    #src
 
@@ -33,12 +33,8 @@ seed = 42
 
 # Sweep helper
 
-function sweep_replica!(sys, alg, L)
-    for _ in 1:(L * L)
-        spin_flip!(sys, alg)
-    end
-    return nothing
-end
+sweep!(sys, alg, n_sweeps) =
+    (for _ in 1:n_sweeps, _ in 1:length(sys.spins); spin_flip!(sys, alg); end)
 
 # Setup
 
@@ -61,9 +57,7 @@ on_root(pt) do
     println("Thermalization...")
 end
 
-for _ in 1:ntherm_init
-    sweep_replica!(sys, alg, L)
-end
+sweep!(sys, alg, ntherm_init)
 
 on_root(pt) do
     println("Starting measurements...")
@@ -73,7 +67,7 @@ end
 
 local_samples = Tuple{Int,Float64}[]
 for meas in 1:nmeasurements
-    sweep_replica!(sys, alg, L)
+    sweep!(sys, alg, 1)
 
     e = energy(sys)
     push!(local_samples, (index(pt), e))
@@ -116,3 +110,13 @@ on_root(pt) do
 end
 
 finalize!(backend)
+# ## References
+#
+# - R. H. Swendsen, J.-S. Wang, *Replica Monte Carlo simulation of spin-glasses*,
+#   Phys. Rev. Lett. **57**, 2607 (1986).
+#   [doi:10.1103/PhysRevLett.57.2607](https://doi.org/10.1103/PhysRevLett.57.2607)
+# - C. J. Geyer, *Markov chain Monte Carlo maximum likelihood*, in Computing Science and Statistics:
+#   Proc. 23rd Symp. on the Interface, p. 156 (1991).
+# - K. Hukushima, K. Nemoto, *Exchange Monte Carlo method and application to spin glass simulations*,
+#   J. Phys. Soc. Jpn. **65**, 1604 (1996).
+#   [doi:10.1143/JPSJ.65.1604](https://doi.org/10.1143/JPSJ.65.1604)

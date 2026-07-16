@@ -1,6 +1,6 @@
 # # Hawkes Process (Self-Exciting Point Process)
 #
-# The Hawkes process is a self-exciting point process where each event
+# The Hawkes process [Hawkes 1971] is a self-exciting point process where each event
 # increases the instantaneous rate, which then decays exponentially:
 #
 # ```math
@@ -16,7 +16,7 @@ using Random, Plots
 using MonteCarloX: next_time
 # ## Simulation
 function hawkes_thinning(τ, λ0, α; T_max=100.0, seed=42)
-    rng     = MersenneTwister(seed)
+    rng     = Xoshiro(seed)
     samples = Float64[]
     while true
         t_now      = isempty(samples) ? 0.0 : samples[end]
@@ -29,6 +29,7 @@ function hawkes_thinning(τ, λ0, α; T_max=100.0, seed=42)
     end
     return samples
 end
+nothing #hide
 # ## Parameters and analytical benchmarks
 τ, λ0, α = 1.0, 0.2, 0.5          # branching ratio α/τ = 0.5 < 1 (stationary regime)
 λ_ana  = λ0 / (1 - α/τ)           # mean intensity
@@ -56,3 +57,12 @@ p2 = histogram(dt; bins=30, normalize=:pdf, alpha=0.6, color=:crimson,
 plot!(p2, t_plot, λ_ana .* exp.(-λ_ana .* t_plot);
       color=:green, ls=:dash, lw=2, label="Exp(λ_ana) — reference")
 plot(p1, p2; layout=(2, 1), size=(700, 520))
+
+# ## References
+#
+# - A. G. Hawkes, *Spectra of some self-exciting and mutually exciting point processes*,
+#   Biometrika **58**, 83 (1971).
+#   [doi:10.1093/biomet/58.1.83](https://doi.org/10.1093/biomet/58.1.83)
+# - Y. Ogata, *On Lewis' simulation method for point processes* (thinning),
+#   IEEE Trans. Inf. Theory **27**, 23 (1981).
+#   [doi:10.1109/TIT.1981.1056305](https://doi.org/10.1109/TIT.1981.1056305)

@@ -1,7 +1,7 @@
 # # Reversible Dimerization with Gillespie Algorithm
 #
 # This example demonstrates continuous-time stochastic simulation of a
-# reversible dimerization reaction using the Gillespie algorithm:
+# reversible dimerization reaction using the Gillespie algorithm [Gillespie 1976, 1977]:
 #
 # ```math
 # A + B \underset{k_\text{off}}{\stackrel{k_\text{on}}{\rightleftharpoons}} AB
@@ -41,6 +41,7 @@ function MonteCarloX.modify!(sys::ReversibleDimerModel, event::Int, t)
     end
     return sys
 end
+nothing #hide
 
 # ## Parameters
 #
@@ -73,7 +74,7 @@ reaction_rates(sys::ReversibleDimerModel, t) = [
 ]
 
 sys1  = ReversibleDimerModel(30, 20, 0, 0.01, 0.5)
-alg1  = Gillespie(MersenneTwister(23))
+alg1  = Gillespie(Xoshiro(23))
 meas1 = make_measurements()
 
 measure!(meas1, sys1, alg1.time)        ## record initial state
@@ -101,7 +102,7 @@ propensity(sys::ReversibleDimerModel, r::Int) =
 
 sys2  = ReversibleDimerModel(30, 20, 0, 0.01, 0.5)
 src   = ReactionEvents(sys2, propensity)
-alg2  = Gillespie(MersenneTwister(23))
+alg2  = Gillespie(Xoshiro(23))
 meas2 = make_measurements()
 
 measure!(meas2, sys2, alg2.time)
@@ -149,3 +150,12 @@ equilibrium_ratio(meas) =
 println("Mass-action ratio — handwritten: ", round(equilibrium_ratio(meas1); digits=4),
         "  generator: ",                     round(equilibrium_ratio(meas2); digits=4),
         "  exact: ",                         round(sys1.k_on / sys1.k_off;   digits=4))
+
+# ## References
+#
+# - D. T. Gillespie, *A general method for numerically simulating the stochastic time evolution of
+#   coupled chemical reactions*, J. Comput. Phys. **22**, 403 (1976).
+#   [doi:10.1016/0021-9991(76)90041-3](https://doi.org/10.1016/0021-9991(76)90041-3)
+# - D. T. Gillespie, *Exact stochastic simulation of coupled chemical reactions*,
+#   J. Phys. Chem. **81**, 2340 (1977).
+#   [doi:10.1021/j100540a008](https://doi.org/10.1021/j100540a008)

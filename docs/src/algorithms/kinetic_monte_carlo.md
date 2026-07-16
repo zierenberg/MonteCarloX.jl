@@ -131,6 +131,7 @@ Gillespie
 SiteEvents
 NFoldRates
 ReactionEvents
+EventRateTree
 next
 step!
 next_time

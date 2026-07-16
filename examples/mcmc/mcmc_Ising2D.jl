@@ -2,7 +2,7 @@
 #
 # This example gives an overview of the standard Markov-chain Monte Carlo (MCMC)
 # algorithms for the 2D Ising model with Hamiltonian
-# ``H = -J\sum_{\langle ij\rangle} s_i s_j``: Metropolis, Heat Bath, and Glauber.
+# ``H = -J\sum_{\langle ij\rangle} s_i s_j``: Metropolis [Metropolis et al. 1953], Heat Bath [Geman & Geman 1984], and Glauber [Glauber 1963].
 # We cover three topics: (1) system implementations and their runtime, (2) the
 # sampling algorithms themselves, and (3) validation against the exact solution.
 #
@@ -35,17 +35,17 @@ seed = 42;
 #
 # We benchmark a single `spin_flip!` step for each.
 
-alg_bench = Metropolis(Xoshiro(seed); β=β)
+alg_bench = MetropolisAlgorithm(Xoshiro(seed); β=β)
 
 sys_lattice = IsingSystem([L, L])
-init!(sys_lattice, :random, rng=MersenneTwister(seed))
+init!(sys_lattice, :random, rng=Xoshiro(seed))
 
 sys_graph  = IsingSystem(Graphs.SimpleGraphs.grid([L, L]; periodic=true))
-init!(sys_graph,  :random, rng=MersenneTwister(seed))
+init!(sys_graph,  :random, rng=Xoshiro(seed))
 
 grid_graph = Graphs.SimpleGraphs.grid([L, L]; periodic=true)
 sys_matrix = IsingSystem(SparseMatrixCSC{Float64,Int}(adjacency_matrix(grid_graph)))
-init!(sys_matrix, :random, rng=MersenneTwister(seed))
+init!(sys_matrix, :random, rng=Xoshiro(seed))
 
 println("Lattice Ising (NTuple neighbors):")
 @btime spin_flip!($sys_lattice, $alg_bench)
@@ -125,6 +125,7 @@ function run_chain!(sys, alg)
               avg_E = mean(energies) / N,
               avg_M = mean(abs.(mags)) / N)
 end
+nothing #hide
 
 # ## Validation helper
 #
@@ -161,6 +162,7 @@ function plot_algorithms(results, labels)
           label="Exact", color=:black, lw=2, ls=:dash)
     return plot(p_ts, p_dist; layout=(1,2), size=(980,320), margin=4Plots.mm)
 end
+nothing #hide
 
 # ## Metropolis
 #
@@ -169,8 +171,8 @@ end
 # for spin systems: simple, general, and efficient.
 
 sys_meta = IsingSystem([L, L])
-init!(sys_meta, :random, rng=MersenneTwister(seed))
-res_meta = run_chain!(sys_meta, Metropolis(MersenneTwister(seed); β=β))
+init!(sys_meta, :random, rng=Xoshiro(seed))
+res_meta = run_chain!(sys_meta, MetropolisAlgorithm(Xoshiro(seed); β=β))
 
 plot_algorithms([res_meta], ["Metropolis"])
 
@@ -182,8 +184,8 @@ plot_algorithms([res_meta], ["Metropolis"])
 # times than Metropolis at low temperatures.
 
 sys_hb = IsingSystem([L, L])
-init!(sys_hb, :random, rng=MersenneTwister(seed))
-res_hb = run_chain!(sys_hb, HeatBath(MersenneTwister(seed); β=β))
+init!(sys_hb, :random, rng=Xoshiro(seed))
+res_hb = run_chain!(sys_hb, HeatBathAlgorithm(Xoshiro(seed); β=β))
 
 plot_algorithms([res_hb], ["HeatBath"])
 
@@ -195,8 +197,8 @@ plot_algorithms([res_hb], ["HeatBath"])
 # rate rather than the exact conditional distribution.
 
 sys_gla = IsingSystem([L, L])
-init!(sys_gla, :random, rng=MersenneTwister(seed))
-res_gla = run_chain!(sys_gla, Glauber(MersenneTwister(seed); β=β))
+init!(sys_gla, :random, rng=Xoshiro(seed))
+res_gla = run_chain!(sys_gla, GlauberAlgorithm(Xoshiro(seed); β=β))
 
 plot_algorithms([res_gla], ["Glauber"])
 
@@ -216,3 +218,14 @@ println("  Exact      : ", round(mean(get_centers(exact_logdos) .* P_exact); dig
 println("  Metropolis : ", round(res_meta.avg_E; digits=3))
 println("  HeatBath   : ", round(res_hb.avg_E;   digits=3))
 println("  Glauber    : ", round(res_gla.avg_E;   digits=3))
+
+# ## References
+#
+# - N. Metropolis, A. W. Rosenbluth, M. N. Rosenbluth, A. H. Teller, E. Teller,
+#   *Equation of state calculations by fast computing machines*, J. Chem. Phys. **21**, 1087 (1953).
+#   [doi:10.1063/1.1699114](https://doi.org/10.1063/1.1699114)
+# - R. J. Glauber, *Time-dependent statistics of the Ising model*, J. Math. Phys. **4**, 294 (1963).
+#   [doi:10.1063/1.1703954](https://doi.org/10.1063/1.1703954)
+# - S. Geman, D. Geman, *Stochastic relaxation, Gibbs distributions, and the Bayesian restoration
+#   of images* (heat-bath / Gibbs sampler), IEEE Trans. PAMI **6**, 721 (1984).
+#   [doi:10.1109/TPAMI.1984.4767596](https://doi.org/10.1109/TPAMI.1984.4767596)

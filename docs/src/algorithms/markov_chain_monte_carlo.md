@@ -29,7 +29,7 @@ The consequences are concrete:
 
 - **Bayesian inference and statistical mechanics share an interface.** `MetropolisAlgorithm(rng, BoltzmannEnsemble(β=1.0))` and `MetropolisAlgorithm(rng, FunctionEnsemble(logposterior))` differ only in the ensemble.
 - **Replica exchange is an ensemble swap.** Two algorithms hold two ensembles; a successful exchange moves the ensembles, not the configurations.
-- **Adaptive methods are ensembles that learn.** Multicanonical and Wang-Landau are not new algorithms; they are `MetropolisHastingsAlgorithm` (Metropolis balance) with an adaptive ensemble whose `update!` reshapes `logweight` from accumulated histograms.
+- **Adaptive methods are ensembles that learn.** Multicanonical and Wang-Landau are not new algorithms; they are `MetropolisHastingsAlgorithm` (Metropolis balance) with an adaptive ensemble whose `update_logweight!` reshapes `logweight` from accumulated histograms.
 - **Metropolis vs Glauber is a balance-function choice.** The two differ only in the `BalanceFunction` slot; the same balance also supplies continuous-time rates via `transition_rate` (see [Metropolis, Glauber, and the balance function](metropolis.md)).
 
 ## Targets, chains, and the acceptance rule
@@ -65,7 +65,7 @@ Built-in ensembles:
 | `MulticanonicalEnsemble(bins)` | tabulated ``W(x)`` over bins | no | Flat-histogram sampling across barriers |
 | `WangLandauEnsemble(bins)` | tabulated ``W(x)``, modified on every visit | no | On-the-fly density-of-states estimation |
 
-Adaptive ensembles also expose `update!(ens, ...)`, which reshapes `logweight` from accumulated data.
+Adaptive ensembles also expose `update_logweight!(ens, ...)`, which reshapes `logweight` from accumulated data.
 See [Multicanonical](multicanonical.md) and Wang-Landau for the update rules.
 
 ### The linearity trait
@@ -202,6 +202,7 @@ For correlation diagnostics, the [measurements](../infrastructure/measurements.m
 ```@docs
 AbstractMarkovChainMonteCarlo
 MetropolisHastingsAlgorithm
+HeatBathAlgorithm
 AbstractEnsemble
 linear_logweight
 logweight(ens::AbstractEnsemble)
@@ -211,7 +212,6 @@ accept!
 acceptance_rate
 reset!(alg::MetropolisHastingsAlgorithm)
 steps
-update!(ens::AbstractEnsemble, args...)
 ```
 
 ## See also

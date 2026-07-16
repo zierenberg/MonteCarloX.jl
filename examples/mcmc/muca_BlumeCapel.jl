@@ -1,6 +1,7 @@
 # # Multicanonical Sampling of the Blume-Capel Model
 #
-# Illustration of multicanonical sampling in only part of the Hamiltonian.
+# Illustration of multicanonical sampling in only part of the Hamiltonian
+# [Zierenberg, Fytas & Janke 2015].
 # Specifically, the Hamiltonian of the Blume-Capel model reads
 # ```math
 #    H = -J\sum_{ij}s_i s_j + \Delta\sum_i s_i^2
@@ -18,11 +19,11 @@ hist_file = joinpath(datadir, "muca_BlumeCapel_histogram.tsv")     # hide
 lw_file   = joinpath(datadir, "muca_BlumeCapel_logweight.tsv")     # hide
 diag_file = joinpath(datadir, "muca_BlumeCapel_diagnostics.tsv")   # hide
 
-L                    = 8
-T                    = 0.9
-num_iter             = 20
-thermalization_steps = 10_000
-recording_steps      = 1_000_000
+L                     = 8
+T                     = 0.9
+num_iter              = 20
+thermalization_sweeps = 200        # one sweep = one attempted flip per site
+recording_sweeps      = 16_000
 nothing # hide
 
 # ## Custom ensemble
@@ -55,6 +56,7 @@ end
 
 @inline reset_histogram!(alg::AbstractMarkovChainMonteCarlo) =
     reset_histogram!(MonteCarloX.ensemble(alg))
+nothing # hide
 
 # ## Spin flip
 #
@@ -75,6 +77,7 @@ function spin_flip!(sys::SpinSystem{<:Any, <:Spin{1//1}}, alg::MetropolisHasting
     accept!(alg, H_new, H_old) && modify!(sys, i, s_new, δs)
     return nothing
 end
+nothing #hide
 
 # ## Multicanonical iteration
 #
@@ -83,6 +86,19 @@ end
 # iterations for more stable convergence than the trivial ``W -= \log H`` rule. We
 # smooth the weights, and track acceptance, histogram flatness, and round trips
 # through the observable range — keeping every iteration to watch convergence.
+
+# One sweep is one attempted flip per site; the function barriers keep the hot loops
+# specialized. The recording variant tracks Σ s² round trips through the crystal-field
+# cache after every flip.
+
+sweep!(sys, alg, n_sweeps) =
+    (for _ in 1:n_sweeps, _ in 1:length(sys.spins); spin_flip!(sys, alg); end)
+function record_sweeps!(sys, alg, rt, n_sweeps)
+    for _ in 1:n_sweeps, _ in 1:length(sys.spins)
+        spin_flip!(sys, alg)
+        update!(rt, sys.interactions[2].cache.val)      ## Σ s² from the crystal-field cache
+    end
+end
 
 if !isfile(lw_file)                                                # hide
 sys = BlumeCapelSystem([L, L])
@@ -103,14 +119,11 @@ flatness_log  = zeros(num_iter)
 roundtrip_log = zeros(num_iter)
 
 for iter in 1:num_iter
-    for _ in 1:thermalization_steps; spin_flip!(sys, alg); end
+    sweep!(sys, alg, thermalization_sweeps)
     reset!(alg)
     reset_histogram!(alg)
     reset!(rt)
-    for _ in 1:recording_steps
-        spin_flip!(sys, alg)
-        update!(rt, sys.interactions[2].cache.val)      # Σ s² from the crystal-field cache
-    end
+    record_sweeps!(sys, alg, rt, recording_sweeps)
     muca_ens = ensemble(alg).spin2
     update_logweight!(muca_ens; mode = :recursive)
     smooth!(muca_ens, (s2_min, s2_max); window = 3)
@@ -168,3 +181,14 @@ for it in 1:num_iter
 end
 
 plot(ph, pw; layout = (1, 2), size = (960, 320), margin = 4Plots.mm)
+
+# ## References
+#
+# - J. Zierenberg, N. G. Fytas, W. Janke, *Parallel multicanonical study of the three-dimensional
+#   Blume-Capel model*, Phys. Rev. E **91**, 032126 (2015).
+#   [doi:10.1103/PhysRevE.91.032126](https://doi.org/10.1103/PhysRevE.91.032126)
+# - M. Blume, *Theory of the first-order magnetic phase change in UO₂*, Phys. Rev. **141**, 517 (1966).
+#   [doi:10.1103/PhysRev.141.517](https://doi.org/10.1103/PhysRev.141.517)
+# - H. W. Capel, *On the possibility of first-order phase transitions in Ising systems of triplet
+#   ions with zero-field splitting*, Physica **32**, 966 (1966).
+#   [doi:10.1016/0031-8914(66)90027-9](https://doi.org/10.1016/0031-8914(66)90027-9)

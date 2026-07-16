@@ -58,6 +58,7 @@ mutable struct SumGaussianRVs
 end
 
 sum_rvs(sys::SumGaussianRVs) = sys.sum_rvs
+nothing #hide
 
 # Each update proposes a move for one randomly chosen variable, filtered first by
 # the Gaussian prior (Metropolis-within-Gibbs) and then accepted by the sampling
@@ -77,6 +78,7 @@ function update!(sys::SumGaussianRVs, alg::AbstractMarkovChainMonteCarlo; δ = 0
         alg.steps += 1
     end
 end
+nothing #hide
 
 # ## Running the samplers
 #
@@ -89,13 +91,13 @@ end
 
 if !isfile(dist_file)                                          # hide
 ## direct sampling
-direct_samples = [sum(μ .+ σ .* randn(MersenneTwister(i), N)) for i in 1:n_direct]
+direct_samples = [sum(μ .+ σ .* randn(Xoshiro(i), N)) for i in 1:n_direct]
 dist_direct    = normalize(fit(Histogram, direct_samples, bins_sum); mode = :pdf).weights
 
 ## importance sampling at several β
 function run_metropolis(β)
-    sys  = SumGaussianRVs(MersenneTwister(23), N; μ = μ, σ = σ)
-    alg  = Metropolis(MersenneTwister(42); β = β)
+    sys  = SumGaussianRVs(Xoshiro(23), N; μ = μ, σ = σ)
+    alg  = MetropolisAlgorithm(Xoshiro(42); β = β)
     meas = Measurements([:sum => sum_rvs => fit(Histogram, [], bins_sum)], interval = 1)
     for _ in 1:n_therm; update!(sys, alg); end
     for i in 1:n_metro; update!(sys, alg); measure!(meas, sys, i); end
@@ -103,17 +105,20 @@ function run_metropolis(β)
 end
 is_dists = [run_metropolis(β) for β in βs]
 
+## function barrier for the hot loops: one "sweep" = one configuration update
+sweep!(sys, alg, n; kwargs...) = (for _ in 1:n; update!(sys, alg; kwargs...); end)
+
 ## multicanonical with flat weights
-sys_muca0 = SumGaussianRVs(MersenneTwister(23), N; μ = μ, σ = σ)
-alg_muca0 = Multicanonical(MersenneTwister(100), bins_sum; init = 0.0)
-for _ in 1:n_therm; update!(sys_muca0, alg_muca0); end
+sys_muca0 = SumGaussianRVs(Xoshiro(23), N; μ = μ, σ = σ)
+alg_muca0 = MulticanonicalAlgorithm(Xoshiro(100), bins_sum; init = 0.0)
+sweep!(sys_muca0, alg_muca0, n_therm)
 reset!(alg_muca0)
-for _ in 1:n_muca; update!(sys_muca0, alg_muca0); end
+sweep!(sys_muca0, alg_muca0, n_muca)
 dist_flat = density(alg_muca0.ensemble.histogram.values)
 
 ## multicanonical initialised with the known log-PDF plus linear boundary tails
-sys_known = SumGaussianRVs(MersenneTwister(42), N; μ = μ, σ = σ)
-alg_known = Multicanonical(MersenneTwister(42), bins_sum)
+sys_known = SumGaussianRVs(Xoshiro(42), N; μ = μ, σ = σ)
+alg_known = MulticanonicalAlgorithm(Xoshiro(42), bins_sum)
 lw        = logweight(alg_known)
 cs        = get_centers(lw)
 set!(lw, (first(cs), last(cs)), x -> -logpdf(pdf_sum, x))
@@ -121,14 +126,14 @@ x_left, x_right = -3 * std_sum, +3 * std_sum
 set!(lw, (first(cs), x_left),  x -> lw(x_left)  + (x - x_left)  * 2.0)
 set!(lw, (x_right,  last(cs)), x -> lw(x_right) - (x - x_right) * 2.0)
 lw_init = copy(get_values(lw))
-for _ in 1:n_therm; update!(sys_known, alg_known; δ = 0.1); end
+sweep!(sys_known, alg_known, n_therm; δ = 0.1)
 reset!(alg_known)
-for _ in 1:n_muca_known; update!(sys_known, alg_known; δ = 0.1); end
+sweep!(sys_known, alg_known, n_muca_known; δ = 0.1)
 dist_known = density(alg_known.ensemble.histogram.values)
 
 ## multicanonical iteration from flat weights
-sys_iter = SumGaussianRVs(MersenneTwister(42), N; μ = μ, σ = σ)
-alg_iter = Multicanonical(MersenneTwister(42), bins_sum)
+sys_iter = SumGaussianRVs(Xoshiro(42), N; μ = μ, σ = σ)
+alg_iter = MulticanonicalAlgorithm(Xoshiro(42), bins_sum)
 lw_iter  = logweight(alg_iter)
 cs_iter  = get_centers(lw_iter)
 i_left   = searchsortedfirst(cs_iter, first(bins_sum) + std_sum)
@@ -137,9 +142,9 @@ iter_hist   = zeros(length(centers_sum), n_iter)
 iter_lw     = zeros(length(centers_sum), n_iter)
 iter_accept = zeros(n_iter)
 for it in 1:n_iter
-    for _ in 1:n_therm;      update!(sys_iter, alg_iter); end
+    sweep!(sys_iter, alg_iter, n_therm)
     reset!(alg_iter)
-    for _ in 1:n_iter_steps; update!(sys_iter, alg_iter); end
+    sweep!(sys_iter, alg_iter, n_iter_steps)
     update_logweight!(ensemble(alg_iter); mode = :simple)
     wl = get_values(lw_iter)[i_left]; wr = get_values(lw_iter)[i_right]
     set!(lw_iter, (first(cs_iter), cs_iter[i_left]), x -> wl + (x - cs_iter[i_left]) * 2.0)

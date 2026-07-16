@@ -13,7 +13,7 @@ covers both readings of a Markov chain:
 
 - the accept/reject engine [`MetropolisHastingsAlgorithm`](@ref) (Metropolis, Glauber, Multicanonical,
   Wang-Landau, …), which carries an `ensemble`, a `balance`, and `steps`/`accepted` counters;
-- direct conditional samplers such as [`HeatBath`](@ref), which carry an `ensemble` and `steps`
+- direct conditional samplers such as [`HeatBathAlgorithm`](@ref), which carry an `ensemble` and `steps`
   but no accept step (no `accepted` counter).
 
 The accept/reject interface (`accept!`, `acceptance_rate`) therefore lives on the concrete

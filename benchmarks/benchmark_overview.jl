@@ -34,7 +34,7 @@ nothing                                                                         
 #
 # Range of the MCX speedup over the temperatures / cases of each protocol.
 # External frameworks carry scheduler, measurement, and proposal machinery, so MCX's lean local-update loop runs several times faster.
-# How close MCX gets to a hand-optimized, framework-free kernel is measured separately in the MCXSpins top-performance benchmark.
+# The one exception is the compiled-C row (speedup below 1): a bare-metal kernel with no framework at all is the speed ceiling, where MCX's generality inevitably costs a constant factor. The fuller hand-optimized-Julia dissection lives in the MCXSpins top-performance benchmark.
 
 if isfile(factors_file)                                                           # hide
 tbl = readdlm(factors_file, '\t'; header=true)[1]                                 # hide
@@ -59,6 +59,6 @@ end                                                                             
 Markdown.parse(String(take!(io)))                                                 # hide
 end                                                                               # hide
 
-# Higher is faster: MCX outpaces every framework on its own prime example.
+# Higher is faster: MCX outpaces every framework on its own prime example, and trails only the bare-metal compiled-C ceiling.
 # The detail page shows that this speed buys generic, model-agnostic sampling: the same `spin_flip!` loop drives Ising and Heisenberg (and every other MCXSpins model) without specialization.
 nothing                                                                           # hide

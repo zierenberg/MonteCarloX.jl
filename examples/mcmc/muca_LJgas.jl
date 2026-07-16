@@ -6,7 +6,7 @@
 # energy histogram is bimodal with a suppressed barrier region. MUCA flattens this
 # histogram, enabling efficient sampling of both the gas and droplet phases.
 #
-# Reference: Zierenberg & Janke, Phys. Rev. E (2015).
+# The droplet condensation–evaporation muca-in-total-energy scheme follows [Zierenberg & Janke 2015].
 
 using Random, StatsBase, Plots, DelimitedFiles
 using MonteCarloX, MCXSoftMatter
@@ -44,6 +44,7 @@ function sweep!(sys, alg, dx_short, dx_long)
     translate!(sys, alg, dx_long)
     return nothing
 end
+nothing #hide
 
 # ## Multicanonical iteration
 #
@@ -60,7 +61,7 @@ dx_short = 0.1
 dx_long  = mean(sys.env.L) / 4
 
 E_min, E_max = e_min * N, e_max * N
-alg = Multicanonical(Xoshiro(42), E_min - N:dE:E_max + N; warn_overwrite = false)
+alg = MulticanonicalAlgorithm(Xoshiro(42), E_min - N:dE:E_max + N; warn_overwrite = false)
 ens = ensemble(alg)
 rt  = Roundtrips(E_min, E_max)
 set_logweight!(ens, E -> -E / T_max)
@@ -135,3 +136,12 @@ for it in 1:num_iter
     plot!(pw, EN, W[:, it] .- W[1, it]; lw = 2, color = cols[it])
 end
 plot(ph, pw; layout = (1, 2), size = (960, 320), margin = 4Plots.mm)
+
+# ## References
+#
+# - J. Zierenberg, W. Janke, *Exploring different regimes in finite-size scaling of the droplet
+#   condensation-evaporation transition*, Phys. Rev. E **92**, 012134 (2015).
+#   [doi:10.1103/PhysRevE.92.012134](https://doi.org/10.1103/PhysRevE.92.012134)
+# - J. E. Lennard-Jones, *On the determination of molecular fields. II. From the equation of state
+#   of a gas*, Proc. R. Soc. Lond. A **106**, 463 (1924).
+#   [doi:10.1098/rspa.1924.0082](https://doi.org/10.1098/rspa.1924.0082)

@@ -277,7 +277,9 @@ The combination "flatness > 0.8 AND at least two roundtrips" is a reasonable con
 ```@docs
 MulticanonicalAlgorithm
 MulticanonicalEnsemble
-update!(e::MulticanonicalEnsemble; mode::Symbol)
+WangLandauAlgorithm
+set_logweight!
+update_logweight!
 visited_range
 extend!
 smooth!

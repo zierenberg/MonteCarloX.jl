@@ -45,6 +45,7 @@ data = (heads = 61, flips = 100)
 logprior(θ)     = logpdf(Beta(2, 2), θ)
 loglik(θ)       = data.heads * log(θ) + (data.flips - data.heads) * log1p(-θ)
 logposterior(θ) = logprior(θ) + loglik(θ)       # numerator only — unnormalized
+nothing #hide
 
 # This particular prior/likelihood pair is *conjugate*: the posterior is again a
 # Beta distribution, ``\text{Beta}(2+h,\,2+(n-h))``. That gives us an exact answer
@@ -107,6 +108,7 @@ function update!(θ, alg, Δ)
     accepted = 0.0 < θ′ < 1.0 && accept!(alg, θ′, θ)
     return (accepted ? θ′ : θ), accepted
 end
+nothing #hide
 
 # Same two-phase shape as the other examples — a warm-up loop that adapts the step size,
 # then a frozen sampling loop; the 1-D acceptance target is the higher `0.44`.
@@ -131,6 +133,7 @@ function metropolis(logposterior; n = 100_000, warmup = 10_000, Δ0 = 0.2, seed 
     end
     return samples, alg
 end
+nothing #hide
 
 draws_mcmc, alg = metropolis(logposterior)
 (; method = "metropolis", mean = mean(draws_mcmc), acceptance = round(acceptance_rate(alg); digits = 2))
