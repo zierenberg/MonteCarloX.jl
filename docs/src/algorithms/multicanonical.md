@@ -46,7 +46,7 @@ The `Multicanonical(rng, bins)` constructor wraps a `MulticanonicalEnsemble` in 
 
 ## Weight refinement
 
-`update!(ens::MulticanonicalEnsemble; mode)` refines the tabulated weights from the accumulated histogram. Two modes:
+`update_logweight!(ens::MulticanonicalEnsemble; mode)` refines the tabulated weights from the accumulated histogram. Two modes:
 
 ### `:simple` — Berg-Neuhaus
 
@@ -95,7 +95,7 @@ for iter in 1:n_iter
         # propose a move; compute arg_new and arg_old (the ensemble argument, e.g. reaction coordinate), then:
         accept!(alg, arg_new, arg_old) && commit!(...)
     end
-    MonteCarloX.update!(ensemble(alg); mode = iter <= 5 ? :simple : :recursive)
+    update_logweight!(ensemble(alg); mode = iter <= 5 ? :simple : :recursive)
     reset!(alg)                     # zero histogram + accept counters
 end
 
@@ -125,7 +125,7 @@ for iter in 1:n_iter
     end
     merge_histograms!(pmuca)                                # accumulate into root
     on_root(pmuca) do i
-        MonteCarloX.update!(ensemble(algorithm(pmuca, i)); mode=:recursive)
+        update_logweight!(ensemble(algorithm(pmuca, i)); mode=:recursive)
     end
     distribute_logweight!(pmuca)                            # broadcast refined W
     with_parallel(pmuca) do alg; reset!(alg); end
@@ -170,7 +170,7 @@ for iter in 1:30
             spins[i] = !spins[i]        # revert
         end
     end
-    MonteCarloX.update!(ensemble(alg); mode = iter <= 3 ? :simple : :recursive)
+    update_logweight!(ensemble(alg); mode = iter <= 3 ? :simple : :recursive)
     reset!(alg)
 end
 
@@ -188,7 +188,7 @@ For a real system, `MCXSpins.spin_flip!(sys, alg)` dispatches on `alg::AbstractM
 using MonteCarloX, MCXSpins, Random
 
 rng  = Xoshiro(1)
-sys  = Ising([32, 32]; J=1)
+sys  = IsingSystem([32, 32]; J=1)
 init!(sys, :hot; rng=rng)
 
 N    = length(sys.spins)
@@ -199,7 +199,7 @@ for iter in 1:40
     for _ in 1:200_000
         spin_flip!(sys, alg)
     end
-    MonteCarloX.update!(ensemble(alg); mode = iter <= 5 ? :simple : :recursive)
+    update_logweight!(ensemble(alg); mode = iter <= 5 ? :simple : :recursive)
     reset!(alg)
 end
 ```
@@ -233,11 +233,11 @@ ens = CustomEnsemble(
     BoltzmannEnsemble(β = 0.3),
     MulticanonicalEnsemble(0:1:length(sys.spins)),
 )
-alg = MarkovChainMonteCarlo(rng, ens)
+alg = MetropolisHastingsAlgorithm(rng, ens)
 
 # accept! receives a tuple of sub-energies; only the muca piece is refined later
 accept!(alg, (H_pair_new, H_spin2_new), (H_pair_old, H_spin2_old))
-MonteCarloX.update!(ens.spin2; mode = :recursive)
+update_logweight!(ens.spin2; mode = :recursive)
 ```
 
 The composite ensemble pattern generalizes: any number of ensembles can be combined, the state passed to `accept!` is a tuple matching the components' inputs, and each component is refined independently.
@@ -275,9 +275,11 @@ The combination "flatness > 0.8 AND at least two roundtrips" is a reasonable con
 ## API reference
 
 ```@docs
-Multicanonical
+MulticanonicalAlgorithm
 MulticanonicalEnsemble
-update!(e::MulticanonicalEnsemble; mode::Symbol)
+WangLandauAlgorithm
+set_logweight!
+update_logweight!
 visited_range
 extend!
 smooth!

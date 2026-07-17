@@ -35,6 +35,18 @@ for (root, dirs, files) in walkdir(example_dir)
     end
 end
 
+# The benchmark pages: same Literate pipeline, heavy runs cached in docs/src/data (the
+# reference packages and the C compiler are only needed when regenerating — never at docs
+# build). The overview is the landing page; benchmark_all is the spin-systems subpage.
+for f in ("benchmark_overview.jl", "benchmark_all.jl")
+    Literate.markdown(joinpath(@__DIR__, "..", "benchmarks", f), generated_dir; documenter = true)
+end
+
+# Parallelism is taught inline: muca_Ising2D and pt_Ising2D carry precomputed threads/MPI
+# sections (their caches live in docs/src/data). The standalone `*_mpi.jl` / `*_threads.jl`
+# scripts stay as full downloadable templates and are deliberately NOT rendered here (the
+# walkdir above skips them), so users can copy and run them as-is on a cluster.
+
 # --- Documenter ---
 strict_docs = get(ENV, "DOCS_STRICT", "false") == "true"
 draft_docs  = get(ENV, "DOCS_DRAFT",  "false") == "true"
@@ -84,14 +96,14 @@ makedocs(;
         ],
         "Examples" => [
             "Markov Chain Monte Carlo" => [
-                "Ising 2D (importance sampling)"      => "generated/importance_Ising2D.md",
-                "Ising 2D (parallel tempering)"       => "generated/pt_Ising2D.md",
-                "Ising 2D (multicanonical)"           => "generated/muca_Ising2D.md",
-                "Blume-Capel (multicanonical)"        => "generated/muca_BlumeCapel.md",
-                "LJ gas (multicanonical)"             => "generated/muca_LJgas.md",
-                "Ornstein-Uhlenbeck (multicanonical)" => "generated/muca_OU.md",
-                "Sum of Gaussians (multicanonical)"   => "generated/muca_sum_gaussian.md",
-                "Ising 2D (checkpointing)"            => "generated/checkpoint_Ising2D.md",
+                "Standard MCMC algorithms (Ising 2D)" => "generated/mcmc_Ising2D.md",
+                "Glauber (nonreciprocal Ising 2D)"    => "generated/glauber_nonreciprocal_Ising2D.md",
+                "Parallel Tempering (Ising 2D)"       => "generated/pt_Ising2D.md",
+                "Multicanonical (Ising 2D)"           => "generated/muca_Ising2D.md",
+                "Multicanonical (Blume-Capel)"        => "generated/muca_BlumeCapel.md",
+                "Multicanonical (LJ gas)"             => "generated/muca_LJgas.md",
+                "Multicanonical (Ornstein-Uhlenbeck)" => "generated/muca_OU.md",
+                "Multicanonical (sum of Gaussians)"   => "generated/muca_sum_gaussian.md",
             ],
             "Kinetic Monte Carlo" => [
                 "Birth-Death (Gillespie)"             => "generated/gillespie_birth_death.md",
@@ -109,7 +121,12 @@ makedocs(;
             ],
             "Infrastructure" => [
                 "Checkpointing"                       => "generated/checkpointing.md",
+                "Checkpointing (Ising 2D)"            => "generated/checkpoint_Ising2D.md",
             ],
+        ],
+        "Benchmarks" => [
+            "Overview"      => "generated/benchmark_overview.md",
+            "Spin systems"  => "generated/benchmark_all.md",
         ],
     ],
     sitename = "MonteCarloX",

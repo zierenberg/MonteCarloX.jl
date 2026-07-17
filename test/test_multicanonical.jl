@@ -10,12 +10,12 @@ function test_multicanonical_accept_and_reset()
     lw = BinnedObject(bins, 0.0)
 
     # default RNG constructor
-    alg_default = Multicanonical(lw)
+    alg_default = MulticanonicalAlgorithm(lw)
     pass &= check(alg_default.rng === Random.GLOBAL_RNG, "default RNG is GLOBAL_RNG\n")
 
     # flat weights: acceptance rate should be 1.0
     rng = MersenneTwister(42)
-    alg = Multicanonical(rng, lw)
+    alg = MulticanonicalAlgorithm(rng, lw)
 
     step = 0.1
     function update!(x::Float64, alg::AbstractMarkovChainMonteCarlo)::Float64
@@ -56,12 +56,12 @@ function test_multicanonical_weight_update()
 
     bins = 0.0:1.0:4.0
     lw = BinnedObject(bins, 0.0)
-    alg = Multicanonical(rng, lw)
+    alg = MulticanonicalAlgorithm(rng, lw)
 
     # in-place weight update from histogram
     w_before = copy(ensemble(alg).logweight.values)
     ensemble(alg).histogram.values .= [0.2, 0.8, 1.1, 2.5]
-    pass &= check(update!(ensemble(alg)) === nothing, "update! returns nothing\n")
+    pass &= check(update_logweight!(ensemble(alg)) === nothing, "update! returns nothing\n")
 
     expected = copy(w_before)
     for i in eachindex(expected)
@@ -80,7 +80,7 @@ function test_multicanonical_weight_update()
     end
 
     # unsupported mode throws
-    threw = try; update!(ensemble(alg); mode=:notavail); false; catch err; err isa ArgumentError; end
+    threw = try; update_logweight!(ensemble(alg); mode=:notavail); false; catch err; err isa ArgumentError; end
     pass &= check(threw, "unsupported mode throws\n")
 
     return pass
@@ -88,11 +88,11 @@ end
 
 function test_multicanonical_set_logweight()
     bins = 0.0:1.0:6.0
-    alg = Multicanonical(MulticanonicalEnsemble(bins))
+    alg = MulticanonicalAlgorithm(MulticanonicalEnsemble(bins))
     pass = true
 
     # set! on ensemble synchronizes d_logweight
-    set!(ensemble(alg), (1.0, 4.0), x -> 10.0 + x)
+    set_logweight!(ensemble(alg), (1.0, 4.0), x -> 10.0 + x)
     ens = ensemble(alg)
     for k in 1:length(ens.d_logweight)
         pass &= check(ens.d_logweight[k] ≈ ens.logweight.values[k+1] - ens.logweight.values[k],
@@ -101,21 +101,21 @@ function test_multicanonical_set_logweight()
 
     # set! on BinnedObject directly (via logweight accessor) also works
     fill!(ensemble(alg).logweight.values, 0.0)
-    pass &= check(set!(logweight(alg), (1.0, 4.0), x -> 10.0 + x) === nothing, "set! returns nothing\n")
+    pass &= check(set_logweight!(ensemble(alg), (1.0, 4.0), x -> 10.0 + x) === nothing, "set! returns nothing\n")
     expected = [0.0, 11.5, 12.5, 13.5, 0.0, 0.0]
     pass &= check(all(isapprox.(ensemble(alg).logweight.values, expected)), "set! restricted range\n")
 
     # set! on full range
-    set!(logweight(alg), 0.0:1.0:6.0, x -> -x^2)
+    set_logweight!(ensemble(alg), 0.0:1.0:6.0, x -> -x^2)
     centers = get_centers(ensemble(alg).histogram)
     pass &= check(all(isapprox.(ensemble(alg).logweight.values, -centers.^2)), "set! full range values\n")
 
     # out-of-range set! throws
-    threw = try; set!(logweight(alg), (100.0, 200.0), x -> x); false; catch err; err isa ArgumentError; end
+    threw = try; set_logweight!(ensemble(alg), (100.0, 200.0), x -> x); false; catch err; err isa ArgumentError; end
     pass &= check(threw, "out-of-range set! throws\n")
 
     # suppressed acceptance via extreme weights
-    set!(logweight(alg), (1.0, 6.0), w -> -100.0)
+    set_logweight!(ensemble(alg), (1.0, 6.0), w -> -100.0)
     pass &= check(accept!(alg, 2.0, 0.0) == false, "suppressed acceptance\n")
 
     return pass
@@ -209,7 +209,7 @@ function test_extend()
     bins = 0:1:5  # centers at 0,1,2,3,4,5
     ens = MulticanonicalEnsemble(BinnedObject(bins, 0.0); record_visits=false)
     # set! via ensemble to keep d_logweight synchronized
-    set!(ens, 0:1:5, x -> x >= 3 ? Float64(x - 2) : 0.0)
+    set_logweight!(ens, 0:1:5, x -> x >= 3 ? Float64(x - 2) : 0.0)
 
     extend!(ens, :low; anchor=3, slope=-0.5)
     # lw(3) = 1.0, so lw(x) = 1.0 + (-0.5)*(x - 3) for x <= 3
@@ -224,7 +224,7 @@ function test_extend()
 
     # --- discrete binning, :high ---
     ens2 = MulticanonicalEnsemble(BinnedObject(bins, 0.0); record_visits=false)
-    set!(ens2, 0:1:5, x -> x <= 3 ? Float64(x) : 0.0)
+    set_logweight!(ens2, 0:1:5, x -> x <= 3 ? Float64(x) : 0.0)
 
     extend!(ens2, :high; anchor=3, slope=0.5)
     # lw(3) = 3.0, so lw(x) = 3.0 + 0.5*(x - 3) for x >= 3
@@ -237,7 +237,7 @@ function test_extend()
     # --- continuous binning, :low ---
     bins_c = 0.0:1.0:6.0  # 7 edges -> 6 bins, centers at 0.5, 1.5, 2.5, 3.5, 4.5, 5.5
     ens_c = MulticanonicalEnsemble(BinnedObject(bins_c, 0.0); record_visits=false)
-    set!(ens_c, 0.0:1.0:6.0, x -> x >= 3.5 ? Float64(x - 2.5) : 0.0)
+    set_logweight!(ens_c, 0.0:1.0:6.0, x -> x >= 3.5 ? Float64(x - 2.5) : 0.0)
 
     extend!(ens_c, :low; anchor=3.5, slope=-0.5)
     # lw(3.5) = 1.0, so lw(x) = 1.0 + (-0.5)*(x - 3.5) for x <= 3.5
@@ -251,7 +251,7 @@ function test_extend()
 
     # --- limit keyword, :low ---
     ens_lim = MulticanonicalEnsemble(BinnedObject(bins, 0.0); record_visits=false)
-    set!(ens_lim, 0:1:5, x -> x >= 3 ? Float64(x - 2) : 0.0)
+    set_logweight!(ens_lim, 0:1:5, x -> x >= 3 ? Float64(x - 2) : 0.0)
     extend!(ens_lim, :low; anchor=3, slope=-0.5, limit=1)
     lw_lim = ens_lim.logweight
     # bins at 0 is beyond limit — untouched
@@ -265,7 +265,7 @@ function test_extend()
 
     # --- limit keyword, :high ---
     ens_lim2 = MulticanonicalEnsemble(BinnedObject(bins, 0.0); record_visits=false)
-    set!(ens_lim2, 0:1:5, x -> x <= 3 ? Float64(x) : 0.0)
+    set_logweight!(ens_lim2, 0:1:5, x -> x <= 3 ? Float64(x) : 0.0)
     extend!(ens_lim2, :high; anchor=3, slope=0.5, limit=4)
     lw_lim2 = ens_lim2.logweight
     # bins below anchor untouched
@@ -290,7 +290,7 @@ function test_smooth()
     bins = 0:1:4  # discrete binning: centers at 0,1,2,3,4; 4 d_logweight entries
     ens = MulticanonicalEnsemble(BinnedObject(bins, 0.0); record_visits=false, warn_overwrite=false)
     # set logweight: [0, 0, 10, 0, 0] → d_logweight: [0, 10, -10, 0]
-    set!(ens, 0:1:4, x -> x == 2 ? 10.0 : 0.0)
+    set_logweight!(ens, 0:1:4, x -> x == 2 ? 10.0 : 0.0)
 
     smooth!(ens, (0, 4); window=3)
     # d_logweight before: [0, 10, -10, 0]
@@ -320,7 +320,7 @@ function test_smooth_window()
     bins = 0:1:4
     ens = MulticanonicalEnsemble(BinnedObject(bins, 0.0); record_visits=false, smooth_window=3)
     # set raw d_logweight: [0, 10, -10, 0]
-    set!(ens, 0:1:4, x -> x == 2 ? 10.0 : 0.0)
+    set_logweight!(ens, 0:1:4, x -> x == 2 ? 10.0 : 0.0)
     # d_logweight should be [0, 10, -10, 0]
     pass &= check(ens.d_logweight[1] ≈ 0.0, "raw d_logweight[1] preserved\n")
     pass &= check(ens.d_logweight[2] ≈ 10.0, "raw d_logweight[2] preserved\n")
@@ -364,13 +364,13 @@ function test_recursive_weight_update()
 
     # first iteration: uniform-ish histogram
     ens.histogram.values .= [10.0, 20.0, 30.0, 20.0, 10.0]
-    update!(ens; mode=:recursive)
+    update_logweight!(ens; mode=:recursive)
     pass &= check(all(isfinite.(ens.log_cumweight)), "log_cumweight initialized\n")
     w1 = copy(ens.logweight.values)
 
     # second iteration: biased histogram (walker stuck at high end)
     ens.histogram.values .= [0.0, 0.0, 5.0, 50.0, 100.0]
-    update!(ens; mode=:recursive)
+    update_logweight!(ens; mode=:recursive)
     w2 = copy(ens.logweight.values)
 
     # the recursive update should preserve shape in unvisited region better
@@ -379,7 +379,7 @@ function test_recursive_weight_update()
 
     # third iteration: now bias the other way
     ens.histogram.values .= [100.0, 50.0, 5.0, 0.0, 0.0]
-    update!(ens; mode=:recursive)
+    update_logweight!(ens; mode=:recursive)
     w3 = copy(ens.logweight.values)
     pass &= check(all(isfinite.(w3)), "all weights finite after third recursive update\n")
 
@@ -399,12 +399,12 @@ function test_recursive_weight_correction()
     ens = MulticanonicalEnsemble(bins; warn_overwrite=false)
 
     # set non-trivial initial weights
-    set!(ens, 0:1:2, x -> Float64(x))
+    set_logweight!(ens, 0:1:2, x -> Float64(x))
     # logweight = [0, 1, 2], d_logweight = [1, 1]
 
     # flat histogram under these weights means density of states is NOT flat
     ens.histogram.values .= [100.0, 100.0, 100.0]
-    update!(ens; mode=:recursive)
+    update_logweight!(ens; mode=:recursive)
 
     # with flat histogram and initial d_lw = [1, 1], the measured d_lw_ideal is:
     # d_lw_actual + log(H[k]) - log(H[k+1]) = 1 + 0 = 1 for both transitions
@@ -420,7 +420,7 @@ function test_visited_range()
 
     bins = 0:1:10
     rng = MersenneTwister(42)
-    alg = Multicanonical(rng, bins)
+    alg = MulticanonicalAlgorithm(rng, bins)
     ens = ensemble(alg)
 
     # initially empty
@@ -464,7 +464,7 @@ function test_warn_overwrite_toggle()
 
     # accumulate some precision
     ens.histogram.values .= [10.0, 20.0, 30.0, 20.0, 10.0]
-    update!(ens; mode=:recursive)
+    update_logweight!(ens; mode=:recursive)
     pass &= check(ens.log_cumweight[1] > -Inf, "precision accumulated\n")
 
     # extend! should NOT warn when warn_overwrite=false

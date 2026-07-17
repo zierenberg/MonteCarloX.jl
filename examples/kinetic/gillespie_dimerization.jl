@@ -1,7 +1,7 @@
 # # Reversible Dimerization with Gillespie Algorithm
 #
 # This example demonstrates continuous-time stochastic simulation of a
-# reversible dimerization reaction using the Gillespie algorithm:
+# reversible dimerization reaction using the Gillespie algorithm [Gillespie 1976, 1977]:
 #
 # ```math
 # A + B \underset{k_\text{off}}{\stackrel{k_\text{on}}{\rightleftharpoons}} AB
@@ -10,14 +10,20 @@
 # The Gillespie algorithm samples exact trajectories of the chemical master
 # equation by drawing the time to the next reaction event from an exponential
 # distribution and selecting the reaction channel proportionally to its rate.
+#
+# We implement the same simulation twice: first **handwritten**, where the
+# propensities are handed to `step!` as a plain rate function, and then with
+# the core **`ReactionEvents`** generator, which maintains the propensities in
+# a persistent ledger behind the same loop.
 
 using Random, StatsBase, Plots
 using MonteCarloX
 
 # ## System definition
 #
-# The system state tracks molecule counts of three species. Two reaction
-# channels are defined: association (A + B → AB) and dissociation (AB → A + B).
+# The system holds only the molecule counts and rate constants — pure state, no
+# rate bookkeeping. Both versions share it: `modify!` fires a reaction channel
+# (association A + B → AB, dissociation AB → A + B).
 
 mutable struct ReversibleDimerModel <: AbstractSystem
     A    :: Int
@@ -27,13 +33,7 @@ mutable struct ReversibleDimerModel <: AbstractSystem
     k_off :: Float64
 end
 
-## propensities: rates at which each reaction fires
-reaction_rates(sys::ReversibleDimerModel, t) = [
-    sys.k_on  * sys.A * sys.B,   ## association
-    sys.k_off * sys.AB,           ## dissociation
-]
-
-function modify!(sys::ReversibleDimerModel, event::Int, t)
+function MonteCarloX.modify!(sys::ReversibleDimerModel, event::Int, t)
     if event == 1 && sys.A > 0 && sys.B > 0
         sys.A -= 1;  sys.B -= 1;  sys.AB += 1
     elseif event == 2 && sys.AB > 0
@@ -41,53 +41,91 @@ function modify!(sys::ReversibleDimerModel, event::Int, t)
     end
     return sys
 end
+nothing #hide
 
-# ## Parameters and initialisation
+# ## Parameters
 #
-# We start with 30 molecules each of A and B and no dimers. The on-rate
+# We start with 30 molecules of A, 20 of B, and no dimers. The on-rate
 # ``k_\text{on} = 0.01`` and off-rate ``k_\text{off} = 0.5`` set the
-# equilibrium dimer fraction.
+# equilibrium dimer fraction. Both runs record the counts every 0.5 time units.
 
-sys = ReversibleDimerModel(30, 20, 0, 0.01, 0.5)
-alg = Gillespie(MersenneTwister(23))
-T   = 200.0
-
-println("Initial state: A=$(sys.A),  B=$(sys.B),  AB=$(sys.AB)")
-println("k_on = $(sys.k_on),  k_off = $(sys.k_off)")
-
-# ## Simulation
-#
-# `step!` draws the next event time from the Gillespie distribution and
-# returns the event index. Measurements are recorded **before** `modify!`
-# so that each sample reflects the state during the inter-event interval.
-
+T = 200.0
 measurement_times = collect(0.0:0.5:T)
-measurements = Measurements([
+make_measurements() = Measurements([
     :A  => (s -> s.A)  => Int[],
     :B  => (s -> s.B)  => Int[],
     :AB => (s -> s.AB) => Int[],
 ], measurement_times)
 
-measure!(measurements, sys, alg.time)   ## record initial state
+# ## Version 1: handwritten rate function
+#
+# The propensities are a plain function of the state, rebuilt from scratch at
+# every step and handed to `step!` as a rate function of time (a `Function` is
+# a valid event source; the time argument is unused here but allows explicitly
+# time-dependent rates). Nothing is maintained between events — at the cost of
+# evaluating and allocating the full propensity vector for every single one.
+# Measurements are recorded **before** `modify!` fires the channel, so each
+# sample reflects the state during the inter-event interval.
 
-while alg.time <= T
-    t_new, event = step!(alg, t -> reaction_rates(sys, t))
-    measure!(measurements, sys, t_new)  ## before modify!
-    modify!(sys, event, t_new)
+## propensities: rates at which each reaction fires
+reaction_rates(sys::ReversibleDimerModel, t) = [
+    sys.k_on  * sys.A * sys.B,   ## association
+    sys.k_off * sys.AB,          ## dissociation
+]
+
+sys1  = ReversibleDimerModel(30, 20, 0, 0.01, 0.5)
+alg1  = Gillespie(Xoshiro(23))
+meas1 = make_measurements()
+
+measure!(meas1, sys1, alg1.time)        ## record initial state
+while alg1.time <= T
+    t_new, event = step!(alg1, t -> reaction_rates(sys1, t))
+    measure!(meas1, sys1, t_new)        ## before modify!
+    modify!(sys1, event, t_new)         ## fire the channel
 end
 
-println("Final time   : ", round(alg.time; digits=2))
-println("Final state  : A=$(sys.A),  B=$(sys.B),  AB=$(sys.AB)")
-println("Total events : ", alg.steps)
+println("Handwritten : A=$(sys1.A), B=$(sys1.B), AB=$(sys1.AB) after $(alg1.steps) events")
+
+# ## Version 2: the `ReactionEvents` generator
+#
+# `ReactionEvents` maintains the propensities in a persistent ledger instead of
+# rebuilding them per event. The system plugs in through the reaction
+# interface — `nreactions` plus a per-channel rate rule — and the generator's
+# *own* `modify!` fires the channel on the system and re-evaluates the rule.
+# The loop is the same standard KMC pair `step!`/`modify!`.
+
+MonteCarloX.nreactions(::ReversibleDimerModel) = 2
+
+## mass action again, now as a per-channel rule
+propensity(sys::ReversibleDimerModel, r::Int) =
+    r == 1 ? sys.k_on * sys.A * sys.B : sys.k_off * sys.AB
+
+sys2  = ReversibleDimerModel(30, 20, 0, 0.01, 0.5)
+src   = ReactionEvents(sys2, propensity)
+alg2  = Gillespie(Xoshiro(23))
+meas2 = make_measurements()
+
+measure!(meas2, sys2, alg2.time)
+while alg2.time <= T
+    t_new, event = step!(alg2, src)
+    measure!(meas2, sys2, t_new)
+    modify!(src, event, t_new)
+end
+
+println("Generator   : A=$(sys2.A), B=$(sys2.B), AB=$(sys2.AB) after $(alg2.steps) events")
+
+# Under the shared seed both loops draw identical waiting times and channels —
+# the generator performs exactly the bookkeeping written out above, so the two
+# trajectories coincide event by event.
 
 # ## Trajectory
 #
 # The system reaches a dynamic equilibrium in which molecules continuously
 # associate and dissociate. The sum A + B + 2·AB is conserved throughout.
 
-A_t  = measurements[:A].data
-B_t  = measurements[:B].data
-AB_t = measurements[:AB].data
+A_t  = meas2[:A].data
+B_t  = meas2[:B].data
+AB_t = meas2[:AB].data
 
 plot(measurement_times, A_t;  lw=2, label="A",
      xlabel="Time", ylabel="Count",
@@ -105,16 +143,19 @@ plot!(measurement_times, AB_t; lw=2, label="AB")
 t_eq  = T / 4   ## discard first quarter as transient
 i_eq  = searchsortedfirst(measurement_times, t_eq)
 
-A_eq  = mean(A_t[i_eq:end])
-B_eq  = mean(B_t[i_eq:end])
-AB_eq = mean(AB_t[i_eq:end])
+equilibrium_ratio(meas) =
+    mean(meas[:AB].data[i_eq:end]) /
+    (mean(meas[:A].data[i_eq:end]) * mean(meas[:B].data[i_eq:end]))
 
-ratio_sim   = AB_eq / (A_eq * B_eq)
-ratio_exact = sys.k_on / sys.k_off
+println("Mass-action ratio — handwritten: ", round(equilibrium_ratio(meas1); digits=4),
+        "  generator: ",                     round(equilibrium_ratio(meas2); digits=4),
+        "  exact: ",                         round(sys1.k_on / sys1.k_off;   digits=4))
 
-println("Time-averaged counts (t > $(t_eq)):")
-println("  ⟨A⟩  = ", round(A_eq;  digits=3))
-println("  ⟨B⟩  = ", round(B_eq;  digits=3))
-println("  ⟨AB⟩ = ", round(AB_eq; digits=3))
-println("Mass-action ratio — simulation: ", round(ratio_sim;   digits=4),
-                          "  exact: ",      round(ratio_exact; digits=4))
+# ## References
+#
+# - D. T. Gillespie, *A general method for numerically simulating the stochastic time evolution of
+#   coupled chemical reactions*, J. Comput. Phys. **22**, 403 (1976).
+#   [doi:10.1016/0021-9991(76)90041-3](https://doi.org/10.1016/0021-9991(76)90041-3)
+# - D. T. Gillespie, *Exact stochastic simulation of coupled chemical reactions*,
+#   J. Phys. Chem. **81**, 2340 (1977).
+#   [doi:10.1021/j100540a008](https://doi.org/10.1021/j100540a008)

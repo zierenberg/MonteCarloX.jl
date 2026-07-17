@@ -1,7 +1,6 @@
 using MonteCarloX
 using Random
 using StatsBase
-using StaticArrays
 using Test
 
 mutable struct ExplicitSourceTestSystem
@@ -172,7 +171,7 @@ function test_advance_time_event_queue_progress()
     add!(q, (2.5, 2))
 
     seen = Int[]
-    t_final = advance!(alg, q, 3.0; measure! = (handler, event, t) -> push!(seen, event))
+    t_final = advance!(alg, q, 3.0; observe! = (handler, event, t) -> push!(seen, event))
 
     pass = true
     pass &= check(t_final == Inf, "queue t_final == Inf\n")
@@ -190,7 +189,7 @@ function test_kmc_advance_with_explicit_rates_callback()
     measured_N = Int[]
     modified_N_before = Int[]
 
-    measure_cb = (state, event, t) -> push!(measured_N, state.N)
+    observe_cb = (state, event, t) -> push!(measured_N, state.N)
     function modify_cb(state, event, t)
         push!(modified_N_before, state.N)
         if event == 1
@@ -205,7 +204,7 @@ function test_kmc_advance_with_explicit_rates_callback()
         alg,
         sys,
         30.0;
-        measure! = measure_cb,
+        observe! = observe_cb,
         modify! = modify_cb,
     )
 
@@ -247,16 +246,20 @@ end
 function test_kmc_next_event_special_cases()
     pass = true
 
-    # MVector path
-    rates = MVector{2, Float64}(0.3, 0.7)
+    # two-rate fast path (single rand, single branch — for any AbstractVector)
+    rates = [0.3, 0.7]
     rng_a = MersenneTwister(19)
     rng_b = MersenneTwister(19)
     draw_ref = rand(rng_b) * (rates[1] + rates[2]) < rates[1] ? 1 : 2
-    draw_mvec = next_event(rng_a, rates)
-    pass &= check(draw_mvec == draw_ref, "MVector matches manual draw\n")
+    draw_two = next_event(rng_a, rates)
+    pass &= check(draw_two == draw_ref, "two-rate fast path matches manual draw\n")
 
-    pass &= check(next_event(MersenneTwister(20), MVector{2, Float64}(1.0, 0.0)) == 1, "MVector deterministic event 1\n")
-    pass &= check(next_event(MersenneTwister(21), MVector{2, Float64}(0.0, 1.0)) == 2, "MVector deterministic event 2\n")
+    pass &= check(next_event(MersenneTwister(20), [1.0, 0.0]) == 1, "two-rate deterministic event 1\n")
+    pass &= check(next_event(MersenneTwister(21), [0.0, 1.0]) == 2, "two-rate deterministic event 2\n")
+    # single rate: event 1 without consuming a draw
+    rng_c = MersenneTwister(22)
+    pass &= check(next_event(rng_c, [2.5]) == 1 && rand(rng_c) == rand(MersenneTwister(22)),
+                  "single-rate event consumes no rand\n")
 
     # empty handler
     simple_empty = ListEventRateSimple{Int}(Int[], Float64[], 0.0, -1)
@@ -293,7 +296,7 @@ end
 function test_kmc_zero_rate_advance()
     alg = Gillespie(MersenneTwister(2029))
     seen = Any[]
-    t_adv = advance!(alg, [0.0], 10.0; measure! = (r, e, t) -> push!(seen, e))
+    t_adv = advance!(alg, [0.0], 10.0; observe! = (r, e, t) -> push!(seen, e))
 
     pass = true
     pass &= check(t_adv == Inf, "advance! zero rate t == Inf\n")
@@ -334,7 +337,7 @@ function test_kmc_time_event_handler_paths()
     alg2 = Gillespie(MersenneTwister(4041))
     observed = Tuple{Int, Float64}[]
 
-    t_final = advance!(alg2, queue2, 10.0; t0 = 1.0, measure! = (q, e, t) -> push!(observed, (e, t)))
+    t_final = advance!(alg2, queue2, 10.0; t0 = 1.0, observe! = (q, e, t) -> push!(observed, (e, t)))
     pass &= check(t_final == Inf, "advance queue t_final == Inf\n")
     pass &= check(alg2.steps == 2, "advance queue steps == 2\n")
     pass &= check(length(observed) == 1, "advance queue one event observed\n")

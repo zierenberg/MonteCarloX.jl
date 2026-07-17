@@ -18,7 +18,7 @@ using MonteCarloX
 λ = 1.2
 T = 10.0
 
-alg = Gillespie(MersenneTwister(7))
+alg = Gillespie(Xoshiro(7))
 arrivals = Float64[]
 
 while alg.time < T
@@ -38,7 +38,7 @@ println("Mean inter-arrival — exact      : ", round(1/λ;                 digi
 
 println("\nBenchmark: step! interface")
 @btime begin
-    alg = Gillespie(MersenneTwister(7))
+    alg = Gillespie(Xoshiro(7))
     arr = Float64[]
     while alg.time < $T
         t_new, _ = step!(alg, [$λ])
@@ -48,7 +48,7 @@ end
 
 println("Benchmark: raw randexp")
 @btime begin
-    rng = MersenneTwister(7)
+    rng = Xoshiro(7)
     t   = 0.0
     arr = Float64[]
     while t < $T
@@ -72,7 +72,7 @@ end
 rate_fn(t)       = [0.6 + 0.3*sin(t),  0.7 + 0.2*cos(t)]
 rate_max         = [1.0, 1.0]           ## dominating rates per channel
 
-alg    = Gillespie(MersenneTwister(21))
+alg    = Gillespie(Xoshiro(21))
 T      = 20.0
 counts = zeros(Int, 2)
 event_times = Float64[]
@@ -110,3 +110,12 @@ plot!(p2, t_grid, [r[2] for r in rate_fn.(t_grid)]; lw=2, label="λ₂(t)")
 vline!(p2, event_times[findall(x -> x == 1, counts)]; alpha=0.15, color=:gray, label="")
 
 plot(p1, p2; layout=(1,2), size=(900, 280), margin=5Plots.mm)
+
+# ## References
+#
+# - P. A. W. Lewis, G. S. Shedler, *Simulation of nonhomogeneous Poisson processes by thinning*,
+#   Naval Res. Logist. Quart. **26**, 403 (1979).
+#   [doi:10.1002/nav.3800260304](https://doi.org/10.1002/nav.3800260304)
+# - Y. Ogata, *On Lewis' simulation method for point processes*,
+#   IEEE Trans. Inf. Theory **27**, 23 (1981).
+#   [doi:10.1109/TIT.1981.1056305](https://doi.org/10.1109/TIT.1981.1056305)

@@ -17,19 +17,15 @@
 
 # %% #src
 import Pkg
-Pkg.activate(joinpath(@__FILE__, "../../../../"))
+Pkg.activate(joinpath(@__DIR__, ".."))
 Pkg.instantiate()
 include(joinpath(@__DIR__, "..", "defaults.jl"))
 
 using Random, Statistics, StatsBase
 using MonteCarloX, MCXSpins, MPI
 
-function sweep_replica!(sys, alg, L)
-    for _ in 1:(L * L)
-        spin_flip!(sys, alg)
-    end
-    return nothing
-end
+sweep!(sys, alg, n_sweeps) =
+    (for _ in 1:n_sweeps, _ in 1:length(sys.spins); spin_flip!(sys, alg); end)
 
 function merge_samples_by_index(all_rank_samples::Vector{<:AbstractVector{<:Tuple{<:Integer,<:Real}}}, nindices::Int)
     merged = [Float64[] for _ in 1:nindices]
@@ -68,10 +64,10 @@ function main()
     nreplicas >= 2 || throw(ArgumentError("MPI PT requires at least 2 ranks"))
 
     betas = set_betas(nreplicas, inv(Tmax), inv(Tmin), :uniform)
-    pt = ParallelTempering(betas; seed=seed, rng=MersenneTwister, backend=backend)
+    pt = ParallelTempering(betas; seed=seed, rng=Xoshiro, backend=backend)
     alg = algorithm(pt)
 
-    sys = Ising([L, L])
+    sys = IsingSystem([L, L])
     init!(sys, :random; rng=alg.rng)
 
     on_root(pt) do
@@ -81,9 +77,7 @@ function main()
         println("════════════════════════════════════════")
     end
 
-    for _ in 1:ntherm_init
-        sweep_replica!(sys, alg, L)
-    end
+    sweep!(sys, alg, ntherm_init)
 
     local_samples = Tuple{Int,Float64}[]
     sweeps_after_exchange = fill(base_post_exchange_sweeps, nreplicas)
@@ -92,7 +86,7 @@ function main()
     exchange_counter = 0
 
     for meas in 1:nmeasurements
-        sweep_replica!(sys, alg, L)
+        sweep!(sys, alg, 1)
         e = energy(sys)
         push!(local_samples, (index(pt), e))
 
@@ -152,11 +146,11 @@ function main()
         end
 
         println("\nMean energy comparison (measured vs exact):")
+        logdos = logdos_exact_ising2D(L)
+        E_exact = get_centers(logdos)
         for (i, β) in enumerate(betas)
             samples = energy_samples[i]
-            dist_exact = distribution_exact_ising2D(L, β)
-            E_exact = get_centers(dist_exact)
-            mean_exact = sum(E_exact .* dist_exact.values)
+            mean_exact = mean(E_exact, weights(reweight(logdos, -β .* E_exact)))
             mean_measured = isempty(samples) ? NaN : mean(samples)
             delta_mean = abs(mean_measured - mean_exact)
             println("  beta[$i] = $(round(β, digits=4)): ",
@@ -171,3 +165,13 @@ function main()
 end
 
 main()
+# ## References
+#
+# - R. H. Swendsen, J.-S. Wang, *Replica Monte Carlo simulation of spin-glasses*,
+#   Phys. Rev. Lett. **57**, 2607 (1986).
+#   [doi:10.1103/PhysRevLett.57.2607](https://doi.org/10.1103/PhysRevLett.57.2607)
+# - C. J. Geyer, *Markov chain Monte Carlo maximum likelihood*, in Computing Science and Statistics:
+#   Proc. 23rd Symp. on the Interface, p. 156 (1991).
+# - K. Hukushima, K. Nemoto, *Exchange Monte Carlo method and application to spin glass simulations*,
+#   J. Phys. Soc. Jpn. **65**, 1604 (1996).
+#   [doi:10.1143/JPSJ.65.1604](https://doi.org/10.1143/JPSJ.65.1604)

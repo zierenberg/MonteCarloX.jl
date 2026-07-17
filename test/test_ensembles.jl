@@ -13,8 +13,8 @@ function test_abstract_ensemble_constructor()
     threw = try; logweight(ens, 1.0); false; catch err; err isa ArgumentError; end
     pass &= check(threw, "logweight(BadEnsemble, x) throws\n")
 
-    threw = try; update!(ens); false; catch err; err isa ArgumentError; end
-    pass &= check(threw, "update!(BadEnsemble) throws\n")
+    threw = try; update_logweight!(ens); false; catch err; err isa MethodError; end
+    pass &= check(threw, "update_logweight!(BadEnsemble) throws\n")
 
     # check default implementations of should_record_visit and record_visit!
     pass &= check(MonteCarloX.should_record_visit(ens) == false, "should_record_visit(BadEnsemble) returns false\n")

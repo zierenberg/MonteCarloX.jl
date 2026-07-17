@@ -51,3 +51,13 @@ function Base.setindex!(event_handler::ListEventRateSimple, rate::Float64, index
         event_handler.check_sum = 0
     end
 end
+
+# Recompute the cached sum of a list-based handler's ProbabilityWeights from scratch —
+# incremental rate updates accumulate float drift in `list_rate.sum` (both list handlers
+# trigger this periodically via their `check_sum` counters).
+function reset_sum_rate(event_handler::AbstractEventHandlerRate)
+    event_handler.list_rate.sum = 0.0
+    for i = 1:length(event_handler.list_rate)
+        @inbounds event_handler.list_rate.sum += event_handler.list_rate[i]
+    end
+end

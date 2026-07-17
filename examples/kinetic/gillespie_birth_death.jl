@@ -35,17 +35,18 @@ function MonteCarloX.modify!(sys::BirthDeathProcess, event::Int, t)
     sys.rates[2] = sys.μ * sys.N
     return nothing
 end
+nothing #hide
 
 # ## Single trajectory
 #
 # We run a single simulation at ``\lambda = 0.42``, ``\mu = 0.40`` — a
 # slightly super-critical regime — and record the population every 0.5 time
-# units. `advance!` handles the event loop internally, calling `measure!`
+# units. `advance!` handles the event loop internally, calling `observe!`
 # before each state update and stopping when the total time is reached or
 # all rates vanish (extinction: ``N = 0``).
 
 sys = BirthDeathProcess(10, 0.42, 0.40)
-alg = Gillespie(MersenneTwister(42))
+alg = Gillespie(Xoshiro(42))
 T   = 100.0
 
 measurements = Measurements(
@@ -55,7 +56,7 @@ measurements = Measurements(
 measure!(measurements, sys, alg.time)
 
 advance!(alg, sys, T;
-    measure! = (sys, event, t) -> measure!(measurements, sys, t),
+    observe! = (sys, event, t) -> measure!(measurements, sys, t),
 )
 
 pop = measurements[:population].data
@@ -75,14 +76,14 @@ plot(collect(0.0:0.5:T)[1:length(pop)], pop; lw=2, label="λ=0.42, μ=0.40",
 
 function run_birth_death(N0, λ, μ, T; seed=1)
     sys  = BirthDeathProcess(N0, λ, μ)
-    alg  = Gillespie(MersenneTwister(seed))
+    alg  = Gillespie(Xoshiro(seed))
     meas = Measurements(
         [:N => (s -> s.N) => Float64[]],
         collect(0.0:0.5:T),
     )
     measure!(meas, sys, alg.time)
     advance!(alg, sys, T;
-        measure! = (sys, event, t) -> measure!(meas, sys, t),
+        observe! = (sys, event, t) -> measure!(meas, sys, t),
     )
     measure!(meas, sys, T)
     return meas
@@ -110,3 +111,12 @@ p
 # The sub-critical trajectory (``\lambda = 0.35``) goes extinct early;
 # the super-critical ones (``\lambda \geq 0.45``) grow exponentially.
 # At ``\lambda = \mu = 0.40`` the process is critical and drifts slowly.
+
+# ## References
+#
+# - D. T. Gillespie, *A general method for numerically simulating the stochastic time evolution of
+#   coupled chemical reactions*, J. Comput. Phys. **22**, 403 (1976).
+#   [doi:10.1016/0021-9991(76)90041-3](https://doi.org/10.1016/0021-9991(76)90041-3)
+# - D. T. Gillespie, *Exact stochastic simulation of coupled chemical reactions*,
+#   J. Phys. Chem. **81**, 2340 (1977).
+#   [doi:10.1021/j100540a008](https://doi.org/10.1021/j100540a008)

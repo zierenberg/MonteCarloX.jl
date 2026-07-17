@@ -12,9 +12,9 @@ Per-sample log importance weights produced by [`reweight`](@ref):
 
 Stored in log space (offset-free, overflow-safe). The log of the summed weights
 `log_sum_weights = log Σᵢ exp(gᵢ)` is computed once at construction via [`log_sum`](@ref) and
-reused by [`weights`](@ref), [`log_normalization`](@ref) and [`ess`](@ref).
+reused by `weights`, [`log_normalization`](@ref) and [`ess`](@ref).
 
-Use [`weights`](@ref) to obtain the actual (self-normalized) linear weights for use with
+Use `weights` to obtain the actual (self-normalized) linear weights for use with
 StatsBase, e.g. `mean(A, weights(iw))`, `var(A, weights(iw))`.
 """
 struct ImportanceWeights{T<:Real,V<:AbstractVector{T}}
@@ -31,6 +31,7 @@ Base.length(iw::ImportanceWeights) = length(iw.logw)
 
 """
     reweight(args, source, target=ConstantEnsemble()) -> ImportanceWeights
+    reweight(args, source => target)
 
 Log importance weights that reweight samples drawn under `source` to expectations under
 `target`, evaluated on the recorded `args` — the coordinate each ensemble's `logweight`
@@ -45,8 +46,12 @@ unbiased density, e.g. the density of states from a multicanonical run.
 mechanics (`BoltzmannEnsemble`, `MulticanonicalEnsemble`) and Bayesian inference
 (`FunctionEnsemble` of a log-posterior).
 
+Argument-order convention: ENSEMBLE pairs follow the flow order, source → target — also
+available as the self-documenting Pair form `reweight(args, source => target)`. (State
+pairs, e.g. in `accept!`, follow the acceptance-ratio order — numerator first — instead.)
+
 ```julia
-w      = reweight(energies, BoltzmannEnsemble(β=0.40), BoltzmannEnsemble(β=0.44))
+w      = reweight(energies, BoltzmannEnsemble(β=0.40) => BoltzmannEnsemble(β=0.44))
 mean_E = mean(energies, weights(w))
 logZ   = log_normalization(w)          # log(Z_target / Z_source)
 neff   = ess(w)
@@ -57,6 +62,33 @@ function reweight(args, source, target=ConstantEnsemble())
     t = _as_ensemble(target)
     logw = [logweight(t, a) - logweight(s, a) for a in args]
     return ImportanceWeights(logw)
+end
+reweight(args, (source, target)::Pair) = reweight(args, source, target)
+
+"""
+    reweight(logdensity::BinnedObject, logw::AbstractVector) -> ImportanceWeights
+
+Per-bin importance weights from a binned log-density (e.g. a log-DOS) and an additional
+log-weight aligned with `get_centers(logdensity)`: `gᵢ = logdensity.values[i] + logw[i]`.
+Bins with non-finite log-density (`NaN` or `-Inf`, marking empty or forbidden bins)
+receive zero weight.
+
+The canonical distribution and mean energy at inverse temperature `β` from an exact
+log-DOS read
+
+```julia
+logdos = logdos_exact_ising2D(L)
+E      = get_centers(logdos)
+P      = weights(reweight(logdos, -β .* E))   # P(E), sums to 1
+mean_E = mean(E, P)
+```
+"""
+function reweight(logdensity::BinnedObject, logw::AbstractVector)
+    length(logw) == length(logdensity.values) ||
+        throw(DimensionMismatch("logw must match the number of bins"))
+    g = [isfinite(lg) ? lg + lw : -Inf for (lg, lw) in zip(logdensity.values, logw)]
+    any(isfinite, g) || throw(ArgumentError("log-density has no finite entries"))
+    return ImportanceWeights(g)
 end
 
 """

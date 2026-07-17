@@ -12,9 +12,9 @@ function test_checkpoint_restore_importance_sampling()
     pass = true
 
     for (name, alg) in [
-        ("MarkovChainMonteCarlo", MarkovChainMonteCarlo(MersenneTwister(1), x -> -0.5x^2)),
-        ("Metropolis",         Metropolis(MersenneTwister(2); β=0.5)),
-        ("HeatBath",   HeatBath(MersenneTwister(3); β=0.5)),
+        ("MarkovChainMonteCarlo", MetropolisHastingsAlgorithm(MersenneTwister(1), x -> -0.5x^2)),
+        ("Metropolis",         MetropolisAlgorithm(MersenneTwister(2); β=0.5)),
+        ("HeatBath",   HeatBathAlgorithm(MersenneTwister(3); β=0.5)),
     ]
         alg.steps = 100
         hasproperty(alg, :accepted) && (alg.accepted = 42)
@@ -39,7 +39,7 @@ function test_checkpoint_restore_ensembles()
     pass = true
 
     # Multicanonical ensemble: logweight + histogram
-    alg_muca = Multicanonical(MersenneTwister(2), 0:10)
+    alg_muca = MulticanonicalAlgorithm(MersenneTwister(2), 0:10)
     ens_muca = ensemble(alg_muca)
     ens_muca.logweight.values .= 0:10
     ens_muca.histogram.values .= 2 .* (0:10)
@@ -51,7 +51,7 @@ function test_checkpoint_restore_ensembles()
     finalize!(ckpt)
 
     # WangLandau ensemble: logweight + logf
-    alg_wl = WangLandau(MersenneTwister(3), 0:5; logf=2.0)
+    alg_wl = WangLandauAlgorithm(MersenneTwister(3), 0:5; logf=2.0)
     ens_wl = ensemble(alg_wl)
     ens_wl.logweight.values .= [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     ens_wl.logf = 1.5
@@ -82,7 +82,7 @@ end
 
 function test_checkpoint_override()
     rng = MersenneTwister(7)
-    alg = MarkovChainMonteCarlo(rng, x -> -x^2)
+    alg = MetropolisHastingsAlgorithm(rng, x -> -x^2)
 
     file = _tmp_checkpoint_file("override")
     ckpt = init_checkpoint(file, (alg=alg, sweep=0))
@@ -100,7 +100,7 @@ end
 function test_deterministic_restart()
     # Reference: single uninterrupted run of 2000 steps
     rng_ref = MersenneTwister(42)
-    alg_ref = MarkovChainMonteCarlo(rng_ref, x -> -0.5x^2)
+    alg_ref = MetropolisHastingsAlgorithm(rng_ref, x -> -0.5x^2)
     x_ref   = 0.0
     step    = 1.0
     samples_ref = Float64[]
@@ -112,7 +112,7 @@ function test_deterministic_restart()
 
     # Checkpointed run: 1000 steps -> checkpoint -> restore -> 1000 more
     rng_chk = MersenneTwister(42)
-    alg_chk = MarkovChainMonteCarlo(rng_chk, x -> -0.5x^2)
+    alg_chk = MetropolisHastingsAlgorithm(rng_chk, x -> -0.5x^2)
     x_chk   = 0.0
     for _ in 1:1000
         x_new = x_chk + randn(alg_chk.rng) * step
@@ -127,7 +127,7 @@ function test_deterministic_restart()
                                    steps=alg_chk.steps, accepted=alg_chk.accepted, sweep=1000))
 
     ckpt2 = restore_checkpoint(file)
-    alg_chk = MarkovChainMonteCarlo(ckpt2.rng, x -> -0.5x^2)
+    alg_chk = MetropolisHastingsAlgorithm(ckpt2.rng, x -> -0.5x^2)
     alg_chk.steps    = ckpt2.steps
     alg_chk.accepted = ckpt2.accepted
     x_chk   = ckpt2.x

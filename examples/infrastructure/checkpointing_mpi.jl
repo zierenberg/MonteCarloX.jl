@@ -28,10 +28,11 @@ end
 
 E(sys::System) = 1/4*(sys.x^2 - 2)^2
 
-function update!(sys::System, alg::AbstractMarkovChainMonteCarlo; delta=0.1)
-    x_new = sys.x + delta * randn(alg.rng)
+function update!(sys::System, alg::AbstractMarkovChainMonteCarlo; δ=0.1)
+    x_new = sys.x + δ * randn(alg.rng)
     accept!(alg, E(System(x_new)), E(sys)) && (sys.x = x_new)
 end
+nothing #hide
 
 # ## Parameters
 const CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"
@@ -54,7 +55,7 @@ ckpt_file = joinpath(run_dir, "ckpt_rank$(rank(backend)).mcx")
 print("Rank $(rank(backend))) with checkpoint file: $(ckpt_file)\n")
 
 # ## Reference run (uninterrupted)
-ref_alg = Metropolis(Xoshiro(seed + rank(backend) + 1); β=β)
+ref_alg = MetropolisAlgorithm(Xoshiro(seed + rank(backend) + 1); β=β)
 ref_pc  = ParallelChains(backend, ref_alg)
 ref_sys = System(0.0)
 ref_xs  = Vector{Float64}(undef, n_total)
@@ -78,7 +79,7 @@ end
 # a fresh backend on restore (MPI communicators are not serializable).
 
 # ### First half
-alg = Metropolis(Xoshiro(seed + rank(backend) + 1); β=β)
+alg = MetropolisAlgorithm(Xoshiro(seed + rank(backend) + 1); β=β)
 pc  = ParallelChains(backend, alg)
 sys = System(0.0)
 

@@ -1,6 +1,6 @@
 # # Hierarchical Models — the Eight Schools
 #
-# A coaching program was tested in eight schools. Each school reports an estimated
+# A coaching program was tested in eight schools [Rubin 1981]. Each school reports an estimated
 # effect ``y_j`` with a known standard error ``\sigma_j`` — but the estimates are
 # noisy and scattered. How much should we believe any single school?
 #
@@ -48,6 +48,7 @@ function logposterior(s)
     lp += sum(logpdf.(Normal.(θ, σ), y))                        # effects → data
     return lp
 end
+nothing #hide
 
 # ## Only MCMC survives here
 #
@@ -69,10 +70,11 @@ function update!(s, alg, Δ)
     accepted && (s[k] = s_new[k])
     return accepted
 end
+nothing #hide
 
 function metropolis(logposterior, s0; n = 200_000, warmup = 20_000, seed = 42)
     rng  = Xoshiro(seed)
-    alg  = MarkovChainMonteCarlo(rng, logposterior)
+    alg  = MetropolisHastingsAlgorithm(rng, logposterior)
     step = AdaptiveStep([2.0, 0.4, fill(6.0, length(s0) - 2)...]; target = 0.234)
     s    = copy(s0)
 
@@ -90,6 +92,7 @@ function metropolis(logposterior, s0; n = 200_000, warmup = 20_000, seed = 42)
     end
     return samples, alg
 end
+nothing #hide
 
 s0 = [mean(y); log(std(y)); copy(y)]
 samples, alg = metropolis(logposterior, s0)
@@ -140,7 +143,7 @@ plot(panels...; layout = (2, 4), size = (1100, 450), margin = 3Plots.mm)
 # Ten dimensions is where the random walk starts to hurt. Component-wise Metropolis
 # accepts often, but each accepted move shifts a single coordinate a little — the chain
 # *diffuses*, and successive samples stay correlated for a long time. **Hamiltonian
-# Monte Carlo** (HMC) proposes differently: augment the parameters ``s`` with a momentum
+# Monte Carlo** (HMC) [Duane et al. 1987; Neal 2011] proposes differently: augment the parameters ``s`` with a momentum
 # ``p \sim \mathcal{N}(0, I)`` and treat
 #
 # ```math
@@ -159,7 +162,7 @@ plot(panels...; layout = (2, 4), size = (1100, 450), margin = 3Plots.mm)
 #   code in the model, none in MonteCarloX.
 # - **The accept step is plain Metropolis.** Leapfrog conserves ``H`` only up to
 #   integration error; accepting with probability ``\min(1, e^{H_0 - H})`` corrects it
-#   exactly. That is a [`Metropolis`](@ref MonteCarloX.Metropolis) judgement at ``\beta = 1`` on the energy
+#   exactly. That is a `MetropolisAlgorithm` judgement at ``\beta = 1`` on the energy
 #   ``H`` — the same `accept!` that judged the spin flip and the random walk.
 # - **The step size is adapted the same way.** The same [`AdaptiveStep`](@ref) drives
 #   ``\epsilon`` toward HMC's optimal acceptance rate of ``\approx 0.65``.
@@ -184,17 +187,18 @@ function hmc_update!(s, alg, ϵ; L = 20)
         p  .+= 0.5ϵ .* g                             # half momentum kick
     end
     H = -lp + 0.5 * sum(abs2, p)
-    accepted = accept!(alg, H - H0)                  # Metropolis at β = 1 on H
+    accepted = accept!(alg, H0 - H)                  # Metropolis on H: logR = −ΔH = H0 − H
     accepted && (s .= s′)
     return accepted
 end
+nothing #hide
 
 # The driver has the same two-phase shape as every run in this series — warm-up with
 # adaptation, freeze, sample:
 
 function hmc(logposterior, s0; n = 2_000, warmup = 500, seed = 42)
     rng  = Xoshiro(seed)
-    alg  = Metropolis(rng; β = 1.0)                  # judges ΔH, an energy difference
+    alg  = MetropolisAlgorithm(rng; β = 1.0)                  # judges ΔH, an energy difference
     step = AdaptiveStep(0.1; target = 0.65)
     s    = copy(s0)
 
@@ -212,6 +216,7 @@ function hmc(logposterior, s0; n = 2_000, warmup = 500, seed = 42)
     end
     return samples, alg
 end
+nothing #hide
 
 samples_hmc, alg_hmc = hmc(logposterior, s0)
 μ_hmc = samples_hmc[1, :]
@@ -242,3 +247,14 @@ samples_hmc, alg_hmc = hmc(logposterior, s0)
 # with ``z_j \sim \mathcal{N}(0,1)`` — a change of the *target*, not the sampler.
 # Transforms, gradients, and drivers around a log-density are generic; spelling them out
 # by hand here marks exactly the seam where a future MCXInference layer would generalize.
+
+# ## References
+#
+# - D. B. Rubin, *Estimation in parallel randomized experiments* (the "eight schools" data),
+#   J. Educ. Stat. **6**, 377 (1981).
+#   [doi:10.3102/10769986006004377](https://doi.org/10.3102/10769986006004377)
+# - S. Duane, A. D. Kennedy, B. J. Pendleton, D. Roweth, *Hybrid Monte Carlo*,
+#   Phys. Lett. B **195**, 216 (1987).
+#   [doi:10.1016/0370-2693(87)91197-X](https://doi.org/10.1016/0370-2693(87)91197-X)
+# - R. M. Neal, *MCMC using Hamiltonian dynamics*, in Handbook of Markov Chain Monte Carlo,
+#   Chapman & Hall/CRC (2011). [arXiv:1206.1901](https://arxiv.org/abs/1206.1901)

@@ -1,6 +1,6 @@
 # # Contact Process on a Network
 #
-# The contact process is a continuous-time Markov process modeling infection
+# The contact process [Harris 1974] is a continuous-time Markov process modeling infection
 # spread on a network. Each node is either inactive (healthy) or active
 # (infected). Active nodes recover at rate `mu`, while inactive nodes get
 # infected by active neighbors at rate `lambda * (active_neighbors / degree)`.
@@ -48,6 +48,7 @@ function MonteCarloX.modify!(sys::ContactProcess, event::Int, t)
     end
     return nothing
 end
+nothing #hide
 
 # ## Parameters
 #
@@ -70,7 +71,7 @@ measure_times = collect(0.0:dt_step:T);
 # ## Run simulation
 
 sys = ContactProcess(N, p, mu, lambda, h; initial="empty", seed=42)
-alg = Gillespie(MersenneTwister(42))
+alg = Gillespie(Xoshiro(42))
 
 measurements = Measurements(
     [:activity => (s -> sum(s.neurons)) => Float64[]],
@@ -104,3 +105,11 @@ p = plot(times, activity/N; lw=2, label="Activity",
 rho_mf = (lambda-mu-h + sqrt(4*h*lambda + (lambda-mu-h)^2)) / (2*lambda)
 hline!(p, [rho_mf]; color=:red, linestyle=:dash, label="MF prediction")
 p
+
+# ## References
+#
+# - T. E. Harris, *Contact interactions on a lattice*, Ann. Probab. **2**, 969 (1974).
+#   [doi:10.1214/aop/1176996493](https://doi.org/10.1214/aop/1176996493)
+# - D. T. Gillespie, *Exact stochastic simulation of coupled chemical reactions*,
+#   J. Phys. Chem. **81**, 2340 (1977).
+#   [doi:10.1021/j100540a008](https://doi.org/10.1021/j100540a008)

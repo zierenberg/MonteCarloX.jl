@@ -1,82 +1,67 @@
 # ── General spin_flip! ───────────────────────────────────────────────────────
 #
-# Default implementation for any AbstractSpinSystem that provides:
-#   propose_state(rng, sys, i) → new spin state
-#   delta_sys(sys, i, s_new)   → local move delta payload
-#   delta_energy(sys, i, dsys) → energy change
-#   modify!(sys, i, dsys)      → apply change
+# One local update for any AbstractSpinSystem through the standard hooks (propose_state →
+# delta_sys → delta_energy → accept! → modify!). The accept step assembles the core
+# primitive's argument LOCALLY: a linear ensemble (Boltzmann) uses the O(1) local ΔE
+# (accept!(alg, logR)); a nonlinear ensemble (multicanonical, Wang-Landau) reads the
+# absolute energies around the move (accept!(alg, E_new, E_old) — also drives visit
+# recording). No core wrapper: logR assembly is caller business, and energy stays a
+# package-level concept.
 #
-# Models may override for efficiency when needed.
+# The single-site update is the primitive: spin_flip!(sys, alg, i) updates site i. The common
+# Monte Carlo step spin_flip!(sys, alg) is the thin wrapper that draws a uniform site with
+# pick_site. Making the site explicit is what enables deterministic schemes — a typewriter
+# sweep is just `for i in eachindex(sys.spins); spin_flip!(sys, alg, i); end`.
+#
+# Discrete spins need no proposal parameter. A continuous spin takes a step width at the update
+# call (kept there so it stays adaptable) through its OWN spin_flip! method — e.g. XY's rotation
+# half-width: spin_flip!(sys, alg; Δθ) or spin_flip!(sys, alg, i; Δθ). The width is forwarded to
+# that spin type's propose_state; a discrete propose_state simply takes no extra argument.
 
-@inline function spin_flip!(sys::AbstractSpinSystem, alg::AbstractMetropolis)
-    i = pick_site(alg.rng, length(sys.spins))
-    s_new = propose_state(alg.rng, sys, i)
-    dsys = delta_sys(sys, i, s_new)
-    ΔE = delta_energy(sys, i, dsys)
-    accept!(alg, ΔE) && modify!(sys, i, dsys)
+# logR assembly shared by spin_flip! and spin_exchange!. linear_logweight(ens) is a
+# compile-time constant, so the branch folds away and the linear path stays allocation-free.
+@inline function _accept_delta!(alg::MetropolisHastingsAlgorithm, sys, ΔE)
+    ens = ensemble(alg)
+    if linear_logweight(ens)
+        return accept!(alg, logweight(ens, ΔE))
+    else
+        E_old = energy(sys)
+        return accept!(alg, E_old + ΔE, E_old)
+    end
+end
+
+# Apply a proposed new state at `site` through the shared hooks (delta_sys → accept → modify!).
+@inline function _flip!(sys, alg::MetropolisHastingsAlgorithm, site, s_new)
+    δs = delta_sys(sys, site, s_new)
+    ΔE = delta_energy(sys, site, s_new, δs)
+    _accept_delta!(alg, sys, ΔE) && modify!(sys, site, s_new, δs)
     return nothing
 end
 
-@inline function spin_flip!(sys::AbstractSpinSystem, alg::AbstractMarkovChainMonteCarlo)
-    i = pick_site(alg.rng, length(sys.spins))
-    s_new = propose_state(alg.rng, sys, i)
-    dsys = delta_sys(sys, i, s_new)
-    ΔE = delta_energy(sys, i, dsys)
-    E_old = energy(sys)
-    accept!(alg, E_old + ΔE, E_old) && modify!(sys, i, dsys)
+# Parameter-free proposal (discrete spins): site primitive + random-site wrapper.
+@inline spin_flip!(sys::AbstractSpinSystem, alg::MetropolisHastingsAlgorithm, site::Integer) =
+    _flip!(sys, alg, site, propose_state(alg.rng, sys, site))
+@inline spin_flip!(sys::AbstractSpinSystem, alg::MetropolisHastingsAlgorithm) =
+    spin_flip!(sys, alg, pick_site(alg.rng, length(sys.spins)))
+
+# XY: the rotation half-width Δθ lives at the update call — same site-primitive/random-wrapper
+# split, with Δθ forwarded to the XY propose_state.
+@inline spin_flip!(sys::SpinSystem{<:Any, <:XYSpin}, alg::MetropolisHastingsAlgorithm, site::Integer; Δθ::Real) =
+    _flip!(sys, alg, site, propose_state(alg.rng, sys, site, Δθ))
+@inline spin_flip!(sys::SpinSystem{<:Any, <:XYSpin}, alg::MetropolisHastingsAlgorithm; Δθ::Real) =
+    spin_flip!(sys, alg, pick_site(alg.rng, length(sys.spins)); Δθ)
+
+# ── Heat bath ─────────────────────────────────────────────────────────────────
+#
+# The conditional itself is the core Gibbs primitive `resample!` (generic over the site
+# interface — no logweight in this package). Same site-primitive/random-wrapper split as
+# above: the primitive decides, this update applies (raw-state modify!).
+
+@inline function spin_flip!(sys::SpinSystem{<:Any, <:Spin}, alg::HeatBathAlgorithm, site::Integer)
+    s_new = resample!(alg, sys, site)
+    s_new === nothing || modify!(sys, site, s_new)
     return nothing
 end
 
-# ── Ising: specialized path skipping propose_state ──────────────────────────
-
-@inline function spin_flip!(sys::AbstractIsing, alg::AbstractMetropolis)
-    i = pick_site(alg.rng, length(sys.spins))
-    dsys = local_pair_interactions(sys, i)
-    ΔE = delta_energy(sys, i, dsys)
-    accept!(alg, ΔE) && modify!(sys, i, dsys)
-    return nothing
-end
-
-@inline function spin_flip!(sys::AbstractIsing, alg::AbstractMarkovChainMonteCarlo)
-    i = pick_site(alg.rng, length(sys.spins))
-    dsys = local_pair_interactions(sys, i)
-    ΔE = delta_energy(sys, i, dsys)
-    E_old = energy(sys)
-    accept!(alg, E_old + ΔE, E_old) && modify!(sys, i, dsys)
-    return nothing
-end
-
-@inline function spin_flip!(sys::AbstractIsing, alg::AbstractHeatBath)
-    i = pick_site(alg.rng, length(sys.spins))
-    s_old = sys.spins[i]
-    lpi = local_pair_interactions(sys, i)
-    ΔE = delta_energy(sys, i, lpi)
-    p_plus = logistic(alg.β * float(s_old) * ΔE)
-    s_new = rand(alg.rng) < p_plus ? Int8(1) : Int8(-1)
-    s_new != s_old && modify!(sys, i, lpi)
-    alg.steps += 1
-    return nothing
-end
-
-# ── BlumeCapel: HeatBath (enumerates 3 states) ──────────────────────────────
-
-@inline function spin_flip!(sys::AbstractBlumeCapel, alg::AbstractHeatBath)
-    i = pick_site(alg.rng, length(sys.spins))
-    coupling = neighbor_sum(sys, i)
-    h_i = Float64(_site_field(sys.h, i))
-
-    e1 = coupling + h_i + float(sys.Δ)
-    e2 = 0.0
-    e3 = -coupling - h_i + float(sys.Δ)
-
-    w1 = exp(-alg.β * e1)
-    w2 = exp(-alg.β * e2)
-    w3 = exp(-alg.β * e3)
-    z = w1 + w2 + w3
-
-    r = rand(alg.rng) * z
-    s_new = r < w1 ? Int8(-1) : (r < (w1 + w2) ? Int8(0) : Int8(1))
-    s_new != sys.spins[i] && modify!(sys, i, delta_sys(sys, i, s_new))
-    alg.steps += 1
-    return nothing
-end
+@inline spin_flip!(sys::SpinSystem{<:Any, <:Spin}, alg::HeatBathAlgorithm) =
+    spin_flip!(sys, alg, pick_site(alg.rng, length(sys.spins)))

@@ -8,7 +8,7 @@ using Test
 function test_step_size_targets_acceptance()
     pass = true
     rng  = Xoshiro(1)
-    alg  = MarkovChainMonteCarlo(rng, x -> -x^2 / 2)     # standard normal, up to a constant
+    alg  = MetropolisHastingsAlgorithm(rng, x -> -x^2 / 2)     # standard normal, up to a constant
 
     step = AdaptiveStep(8.0; target = 0.4)            # start much too large
     θ    = 0.0
@@ -60,7 +60,7 @@ end
 function test_two_phase_adaptation()
     pass = true
     rng  = Xoshiro(1)
-    alg  = MarkovChainMonteCarlo(rng, θ -> -0.5 * sum(abs2, θ))
+    alg  = MetropolisHastingsAlgorithm(rng, θ -> -0.5 * sum(abs2, θ))
     step = AdaptiveStep(3.0; target = 0.234)
     θ    = [0.0, 0.0]
 

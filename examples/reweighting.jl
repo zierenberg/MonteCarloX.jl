@@ -4,7 +4,7 @@
 #     julia --project=examples examples/reweighting.jl                 # run + (interactive) plots
 #     julia --project=examples examples/reweighting.jl docs/src/data   # also write TSV summaries
 #
-# Reweighting turns samples recorded under one ensemble into expectations under
+# Reweighting [Ferrenberg & Swendsen 1988] turns samples recorded under one ensemble into expectations under
 # another (importance sampling after the fact). Three cases, each validated
 # against the exact 2D-Ising density of states (Beale 1996):
 #   1. single-histogram (Metropolis) reweighting to nearby β
@@ -55,6 +55,7 @@ function exact_avgE(β)
     w  = exp.(lw .- m)
     return sum(Es_f .* w) / sum(w) / N
 end
+nothing #hide
 
 # reweight recorded energies from `source` to a Boltzmann target at β → ⟨E⟩/N
 avgE(energies, source, β) =
@@ -68,15 +69,22 @@ writetsv("reweighting_exact_avgE.tsv", ("beta", "avgE_exact"),
 # A canonical chain at β0 records energies; reweighting reaches nearby β, but the
 # effective sample size collapses away from β0.
 
-β0    = 0.30
-sys_c = Ising([L, L]); init!(sys_c, :random, rng = Xoshiro(seed))
-alg_c = Metropolis(Xoshiro(seed); β = β0)
-for _ in 1:(sweeps_therm * N); spin_flip!(sys_c, alg_c); end
-meas_c = Measurements([:E => energy => Float64[]], interval = N)
-for i in 1:(sweeps_prod * N)
-    spin_flip!(sys_c, alg_c)
-    measure!(meas_c, sys_c, i)
+# One sweep = one attempted flip per site; function barriers keep the hot loops specialized.
+sweep!(sys, alg, n_sweeps) =
+    (for _ in 1:n_sweeps, _ in 1:length(sys.spins); spin_flip!(sys, alg); end)
+function measured_sweeps!(sys, alg, meas, n_sweeps)
+    for s in 1:n_sweeps
+        sweep!(sys, alg, 1)
+        measure!(meas, sys, s)
+    end
 end
+
+β0    = 0.30
+sys_c = IsingSystem([L, L]); init!(sys_c, :random, rng = Xoshiro(seed))
+alg_c = MetropolisAlgorithm(Xoshiro(seed); β = β0)
+sweep!(sys_c, alg_c, sweeps_therm)
+meas_c = Measurements([:E => energy => Float64[]], interval = 1)
+measured_sweeps!(sys_c, alg_c, meas_c, sweeps_prod)
 energies_c = meas_c[:E].data
 
 # a thinned sample of the recorded energies, so the docs page can run the actual
@@ -99,20 +107,17 @@ scatter!(p1, βwin, E_sh; ms = 3, color = 1, label = "reweighted")
 # One multicanonical run flattens the energy histogram, so its samples span the
 # whole spectrum and reweight to any β.
 
-sys_m = Ising([L, L]); init!(sys_m, :random, rng = Xoshiro(seed))
-alg_m = Multicanonical(Xoshiro(seed), Es)
+sys_m = IsingSystem([L, L]); init!(sys_m, :random, rng = Xoshiro(seed))
+alg_m = MulticanonicalAlgorithm(Xoshiro(seed), Es)
 for _ in 1:muca_iter
-    for _ in 1:(sweeps_therm * N); spin_flip!(sys_m, alg_m); end
+    sweep!(sys_m, alg_m, sweeps_therm)
     reset!(alg_m)
-    for _ in 1:(muca_sweeps * N);  spin_flip!(sys_m, alg_m); end
-    update!(ensemble(alg_m); mode = :simple)
+    sweep!(sys_m, alg_m, muca_sweeps)
+    update_logweight!(ensemble(alg_m); mode = :simple)
 end
 reset!(alg_m)
-meas_m = Measurements([:E => energy => Float64[]], interval = N)
-for i in 1:(sweeps_prod * N)
-    spin_flip!(sys_m, alg_m)
-    measure!(meas_m, sys_m, i)
-end
+meas_m = Measurements([:E => energy => Float64[]], interval = 1)
+measured_sweeps!(sys_m, alg_m, meas_m, sweeps_prod)
 energies_m = meas_m[:E].data
 
 source_m = ensemble(alg_m)
@@ -148,3 +153,15 @@ scatter!(p3, Es[nz], logg_est[nz]; ms = 3, color = 4, label = "reweighted")
 
 # %% (interactive) overview
 plot(p1, p2, p3; layout = (1, 3), size = (1200, 320), margin = 5Plots.mm)
+
+# ## References
+#
+# - A. M. Ferrenberg, R. H. Swendsen, *New Monte Carlo technique for studying phase transitions*
+#   (histogram reweighting), Phys. Rev. Lett. **61**, 2635 (1988).
+#   [doi:10.1103/PhysRevLett.61.2635](https://doi.org/10.1103/PhysRevLett.61.2635)
+# - B. A. Berg, T. Neuhaus, *Multicanonical ensemble: a new approach to simulate first-order
+#   phase transitions*, Phys. Rev. Lett. **68**, 9 (1992).
+#   [doi:10.1103/PhysRevLett.68.9](https://doi.org/10.1103/PhysRevLett.68.9)
+# - P. D. Beale, *Exact distribution of energies in the two-dimensional Ising model*,
+#   Phys. Rev. Lett. **76**, 78 (1996).
+#   [doi:10.1103/PhysRevLett.76.78](https://doi.org/10.1103/PhysRevLett.76.78)

@@ -1,15 +1,18 @@
-# # Importance Sampling of the 2D Ising Model
+# # Standard MCMC Algorithms for the 2D Ising Model
 #
-# This example demonstrates importance sampling for the 2D Ising model with
-# Hamiltonian ``H = -J\sum_{\langle ij\rangle} s_i s_j``. We cover three topics:
-# (1) system implementations and their runtime, (2) sampling algorithms, and
-# (3) validation against the exact solution.
+# This example gives an overview of the standard Markov-chain Monte Carlo (MCMC)
+# algorithms for the 2D Ising model with Hamiltonian
+# ``H = -J\sum_{\langle ij\rangle} s_i s_j``: Metropolis [Metropolis et al. 1953], Heat Bath [Geman & Geman 1984], and Glauber [Glauber 1963].
+# We cover three topics: (1) system implementations and their runtime, (2) the
+# sampling algorithms themselves, and (3) validation against the exact solution.
+#
+# (Importance sampling proper — reweighting samples drawn from one distribution to
+# estimate another — is a distinct technique; see the reweighting example.)
+import Pkg; Pkg.activate(joinpath(@__DIR__, "..")); Pkg.instantiate()  #src
 
 using Random, StatsBase, Plots, BenchmarkTools
 using MonteCarloX, MCXSpins
 using Graphs, SparseArrays
-
-
 
 therm_sweeps     = 1_000;
 prod_sweeps      = 10_000;
@@ -18,7 +21,7 @@ measure_interval = 10;
 # ## Parameters
 
 L    = 8;
-β    = 0.3;
+β    = 0.44;
 seed = 42;
 
 # ## System implementations
@@ -26,23 +29,23 @@ seed = 42;
 # **MonteCarloX.jl** provides several ways to represent the 2D Ising model,
 # trading generality for performance:
 #
-# - `Ising([L,L])`: periodic hypercubic lattice with NTuple neighbors (fastest)
-# - `Ising([L,L]; periodic=false)`: arbitrary graph, Vector neighbors
-# - `Ising(J_matrix)`: sparse coupling matrix, arbitrary topology
+# - `IsingSystem([L,L])`: periodic hypercubic lattice with NTuple neighbors (fastest)
+# - `IsingSystem(graph)`: arbitrary graph, Vector neighbors
+# - `IsingSystem(J)`: sparse coupling matrix, arbitrary topology
 #
 # We benchmark a single `spin_flip!` step for each.
 
-alg_bench = Metropolis(Xoshiro(seed); β=β)
+alg_bench = MetropolisAlgorithm(Xoshiro(seed); β=β)
 
-sys_lattice = Ising([L, L])
-init!(sys_lattice, :random, rng=MersenneTwister(seed))
+sys_lattice = IsingSystem([L, L])
+init!(sys_lattice, :random, rng=Xoshiro(seed))
 
-sys_graph  = Ising([L, L]; periodic=false)
-init!(sys_graph,  :random, rng=MersenneTwister(seed))
+sys_graph  = IsingSystem(Graphs.SimpleGraphs.grid([L, L]; periodic=true))
+init!(sys_graph,  :random, rng=Xoshiro(seed))
 
 grid_graph = Graphs.SimpleGraphs.grid([L, L]; periodic=true)
-sys_matrix = Ising(SparseMatrixCSC{Float64,Int}(adjacency_matrix(grid_graph)))
-init!(sys_matrix, :random, rng=MersenneTwister(seed))
+sys_matrix = IsingSystem(SparseMatrixCSC{Float64,Int}(adjacency_matrix(grid_graph)))
+init!(sys_matrix, :random, rng=Xoshiro(seed))
 
 println("Lattice Ising (NTuple neighbors):")
 @btime spin_flip!($sys_lattice, $alg_bench)
@@ -59,10 +62,12 @@ println("Matrix-coupling Ising:")
 #
 # For the 2D Ising model ``\Delta E \in \{-8,-4,0,4,8\}``, so we can precompute
 # the two non-trivial acceptance probabilities and avoid calling `exp` at every
-# step. This shows how to extend **MonteCarloX.jl** with a custom algorithm by
-# implementing the `accept!` interface.
+# step. This shows how to extend **MonteCarloX.jl** with a custom algorithm:
+# implement `accept!` (here the scalar it receives is the integer ``\Delta E``
+# itself, not a log-ratio — a specialized fast path with no ensemble object)
+# and the corresponding `spin_flip!` method driving the standard hook chain.
 
-mutable struct TableMetropolis{R<:AbstractRNG} <: AbstractMetropolis
+mutable struct TableMetropolis{R<:AbstractRNG} <: AbstractMarkovChainMonteCarlo
     rng      :: R
     p4       :: Float64
     p8       :: Float64
@@ -82,7 +87,16 @@ TableMetropolis(rng::AbstractRNG; β::Real) =
     return accepted
 end
 
-sys_table = Ising([L, L])
+@inline function MCXSpins.spin_flip!(sys::MCXSpins.AbstractSpinSystem, alg::TableMetropolis)
+    i = pick_site(alg.rng, length(sys.spins))
+    s_new = propose_state(alg.rng, sys, i)
+    δs = MCXSpins.delta_sys(sys, i, s_new)
+    ΔE = delta_energy(sys, i, s_new, δs)
+    MonteCarloX.accept!(alg, ΔE) && modify!(sys, i, s_new, δs)
+    return nothing
+end
+
+sys_table = IsingSystem([L, L])
 init!(sys_table, :random, rng=Xoshiro(seed))
 alg_table = TableMetropolis(Xoshiro(seed); β=β)
 
@@ -111,11 +125,12 @@ function run_chain!(sys, alg)
               avg_E = mean(energies) / N,
               avg_M = mean(abs.(mags)) / N)
 end
+nothing #hide
 
 # ## Validation helper
 #
 # The exact energy distribution follows the Boltzmann weights applied to the
-# exact density of states (Beale 1996). `plot_importance_sampling` overlays
+# exact density of states (Beale 1996). `plot_algorithms` overlays
 # the sampled histograms of all algorithms against this reference.
 
 exact_logdos          = logdos_exact_ising2D(L)
@@ -129,7 +144,7 @@ E_exact  = get_centers(exact_logdos)
 P_exact  = zeros(length(log_w))
 P_exact[mask] = exp.(log_w[mask] .- log_Z)
 
-function plot_importance_sampling(results, labels)
+function plot_algorithms(results, labels)
     p_ts   = plot(xlabel="Measurement step", ylabel="Energy",
                   title="Time series", legend=:topright)
     p_dist = plot(xlabel="Energy", ylabel="Probability",
@@ -147,6 +162,7 @@ function plot_importance_sampling(results, labels)
           label="Exact", color=:black, lw=2, ls=:dash)
     return plot(p_ts, p_dist; layout=(1,2), size=(980,320), margin=4Plots.mm)
 end
+nothing #hide
 
 # ## Metropolis
 #
@@ -154,11 +170,11 @@ end
 # probability ``\min(1, e^{-\beta\Delta E})``. It is the standard workhorse
 # for spin systems: simple, general, and efficient.
 
-sys_meta = Ising([L, L])
-init!(sys_meta, :random, rng=MersenneTwister(seed))
-res_meta = run_chain!(sys_meta, Metropolis(MersenneTwister(seed); β=β))
+sys_meta = IsingSystem([L, L])
+init!(sys_meta, :random, rng=Xoshiro(seed))
+res_meta = run_chain!(sys_meta, MetropolisAlgorithm(Xoshiro(seed); β=β))
 
-plot_importance_sampling([res_meta], ["Metropolis"])
+plot_algorithms([res_meta], ["Metropolis"])
 
 # ## Heat Bath
 #
@@ -167,11 +183,11 @@ plot_importance_sampling([res_meta], ["Metropolis"])
 # single spin given its neighbours. It tends to have shorter autocorrelation
 # times than Metropolis at low temperatures.
 
-sys_hb = Ising([L, L])
-init!(sys_hb, :random, rng=MersenneTwister(seed))
-res_hb = run_chain!(sys_hb, HeatBath(MersenneTwister(seed); β=β))
+sys_hb = IsingSystem([L, L])
+init!(sys_hb, :random, rng=Xoshiro(seed))
+res_hb = run_chain!(sys_hb, HeatBathAlgorithm(Xoshiro(seed); β=β))
 
-plot_importance_sampling([res_hb], ["HeatBath"])
+plot_algorithms([res_hb], ["HeatBath"])
 
 # ## Glauber
 #
@@ -180,11 +196,11 @@ plot_importance_sampling([res_hb], ["HeatBath"])
 # with more than two spin states, where Glauber uses a linearised transition
 # rate rather than the exact conditional distribution.
 
-sys_gla = Ising([L, L])
-init!(sys_gla, :random, rng=MersenneTwister(seed))
-res_gla = run_chain!(sys_gla, Glauber(MersenneTwister(seed); β=β))
+sys_gla = IsingSystem([L, L])
+init!(sys_gla, :random, rng=Xoshiro(seed))
+res_gla = run_chain!(sys_gla, GlauberAlgorithm(Xoshiro(seed); β=β))
 
-plot_importance_sampling([res_gla], ["Glauber"])
+plot_algorithms([res_gla], ["Glauber"])
 
 # ## Comparison
 #
@@ -192,7 +208,7 @@ plot_importance_sampling([res_gla], ["Glauber"])
 # them confirms that the choice of algorithm does not affect the physics,
 # only the efficiency.
 
-plot_importance_sampling(
+plot_algorithms(
     [res_meta, res_hb, res_gla],
     ["Metropolis", "HeatBath", "Glauber"]
 )
@@ -202,3 +218,14 @@ println("  Exact      : ", round(mean(get_centers(exact_logdos) .* P_exact); dig
 println("  Metropolis : ", round(res_meta.avg_E; digits=3))
 println("  HeatBath   : ", round(res_hb.avg_E;   digits=3))
 println("  Glauber    : ", round(res_gla.avg_E;   digits=3))
+
+# ## References
+#
+# - N. Metropolis, A. W. Rosenbluth, M. N. Rosenbluth, A. H. Teller, E. Teller,
+#   *Equation of state calculations by fast computing machines*, J. Chem. Phys. **21**, 1087 (1953).
+#   [doi:10.1063/1.1699114](https://doi.org/10.1063/1.1699114)
+# - R. J. Glauber, *Time-dependent statistics of the Ising model*, J. Math. Phys. **4**, 294 (1963).
+#   [doi:10.1063/1.1703954](https://doi.org/10.1063/1.1703954)
+# - S. Geman, D. Geman, *Stochastic relaxation, Gibbs distributions, and the Bayesian restoration
+#   of images* (heat-bath / Gibbs sampler), IEEE Trans. PAMI **6**, 721 (1984).
+#   [doi:10.1109/TPAMI.1984.4767596](https://doi.org/10.1109/TPAMI.1984.4767596)

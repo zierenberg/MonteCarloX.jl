@@ -14,9 +14,9 @@ using MonteCarloX
 using MCXSpins
 
 rng = MersenneTwister(123)
-sys = Ising([16, 16], J=1.0, periodic=true)
+sys = IsingSystem([16, 16]; J=1.0)          # −J Σ_{<ij>} σσ on a periodic 16×16 lattice
 init!(sys, :random, rng=rng)
-alg = Metropolis(rng; β=0.44)
+alg = MetropolisAlgorithm(rng; β=0.44)
 
 for _ in 1:100_000
     spin_flip!(sys, alg)
@@ -25,6 +25,17 @@ end
 println("E  = ", energy(sys))
 println("|M| = ", magnetization(sys))
 ```
+
+In `MCXSpins` a system is a spin type plus a tuple of interaction terms — the one-liner
+above is sugar for
+
+```julia
+sys = SpinSystem(Spin(1//2), (PairInteraction(1.0, partners),))
+```
+
+so new models are composed from existing terms (`PairInteraction`,
+`PairInteractionMatrix`, `ExternalField`, `CrystalField`, …) rather than written from
+scratch.
 
 ## What a custom model package should implement
 At minimum:

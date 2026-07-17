@@ -8,34 +8,39 @@ using Test
 function test_mcmc_constructors()
     pass = true
 
-    # MarkovChainMonteCarlo with FunctionEnsemble
+    # MetropolisHastingsAlgorithm engine with a FunctionEnsemble
     rng = MersenneTwister(42)
     logdensity(x) = -0.5 * x^2
-    alg = MarkovChainMonteCarlo(rng, logdensity)
+    alg = MetropolisHastingsAlgorithm(rng, logdensity)
     pass &= check(alg.rng === rng, "rng stored\n")
     pass &= check(alg.ensemble === FunctionEnsemble(logdensity), "ensemble stored\n")
     pass &= check(ensemble(alg) isa FunctionEnsemble, "ensemble accessor\n")
     pass &= check(logweight(alg) === logdensity, "logweight accessor\n")
+    pass &= check(balance(alg) === MetropolisBalance(), "default balance is Metropolis\n")
     pass &= check(MonteCarloX.should_record_visit(ensemble(alg)) == false, "no visit recording\n")
     pass &= check(MonteCarloX.record_visit!(ensemble(alg), 1.0) === nothing, "record_visit! is no-op\n")
 
-    # Metropolis convenience constructor with BoltzmannEnsemble
+    # MetropolisAlgorithm convenience constructor with BoltzmannEnsemble
     β = 0.75
-    met = Metropolis(MersenneTwister(500); β=β)
+    met = MetropolisAlgorithm(MersenneTwister(500); β=β)
     pass &= check(ensemble(met) isa BoltzmannEnsemble, "BoltzmannEnsemble created\n")
+    pass &= check(balance(met) === MetropolisBalance(), "MetropolisAlgorithm uses Metropolis balance\n")
     pass &= check(met.steps == 0, "Metropolis steps == 0\n")
     pass &= check(met.accepted == 0, "Metropolis accepted == 0\n")
 
-    # Glauber
-    glauber = Glauber(MersenneTwister(777); β=0.8)
+    # GlauberAlgorithm — same engine, Glauber balance
+    glauber = GlauberAlgorithm(MersenneTwister(777); β=0.8)
+    pass &= check(glauber isa MetropolisHastingsAlgorithm, "Glauber builds MetropolisHastingsAlgorithm\n")
+    pass &= check(balance(glauber) === GlauberBalance(), "GlauberAlgorithm uses Glauber balance\n")
     pass &= check(glauber.rng isa MersenneTwister, "Glauber rng stored\n")
     pass &= check(glauber.steps == 0, "Glauber steps == 0\n")
     pass &= check(glauber.accepted == 0, "Glauber accepted == 0\n")
 
-    # HeatBath
-    hb = HeatBath(MersenneTwister(778); β=0.8)
+    # HeatBathAlgorithm now carries an ensemble (no raw β field)
+    hb = HeatBathAlgorithm(MersenneTwister(778); β=0.8)
+    pass &= check(hb isa AbstractMarkovChainMonteCarlo, "HeatBath is MCMC (under the umbrella)\n")
     pass &= check(hb.rng isa MersenneTwister, "HeatBath rng stored\n")
-    pass &= check(hb.β == 0.8, "HeatBath beta stored\n")
+    pass &= check(ensemble(hb) isa BoltzmannEnsemble && ensemble(hb).beta == 0.8, "HeatBath ensemble beta stored\n")
     pass &= check(hb.steps == 0, "HeatBath steps == 0\n")
 
     return pass
@@ -43,12 +48,13 @@ end
 
 function test_glauber_acceptance()
     rng = MersenneTwister(777)
-    glauber = Glauber(rng; β=0.8)
+    glauber = GlauberAlgorithm(rng; β=0.8)
 
-    # strongly favorable move should almost always be accepted
+    # strongly favorable move (large positive logR) should almost always be accepted
+    logR = logweight(ensemble(glauber), -8.0)      # -β·ΔE with ΔE = -8 ⇒ logR ≈ +6.4
     accepted = 0
     for _ in 1:1_000
-        accepted += accept!(glauber, -8.0)
+        accepted += accept!(glauber, logR)
     end
 
     pass = true
@@ -65,7 +71,7 @@ function test_mcmc_1d_gaussian()
     mu = 1.0; sigma = 1.0
     logweight(x) = -0.5 * ((x - mu) / sigma)^2
 
-    alg = MarkovChainMonteCarlo(rng, logweight)
+    alg = MetropolisHastingsAlgorithm(rng, logweight)
 
     bins = -10.0:0.1:10.0
     measurements = Measurements([
@@ -74,7 +80,7 @@ function test_mcmc_1d_gaussian()
     ], interval=10)
 
     step = sigma
-    function update(x::Float64, alg::MarkovChainMonteCarlo)::Float64
+    function update(x::Float64, alg::MetropolisHastingsAlgorithm)::Float64
         x_new = x + randn(alg.rng) * step
         if accept!(alg, x_new, x)
             return x_new
@@ -132,14 +138,14 @@ function test_mcmc_2d_gaussian()
     mu = [1.0, 2.0]
     logweight(x) = -0.5 * ((x[1] - mu[1])^2 + (x[2] - mu[2])^2)
 
-    alg = MarkovChainMonteCarlo(rng, logweight)
+    alg = MetropolisHastingsAlgorithm(rng, logweight)
 
     measurements = Measurements([
         :x => (s -> s[1]) => Float64[],
         :y => (s -> s[2]) => Float64[]
     ], interval=1)
 
-    function update(x::Vector{Float64}, alg::MarkovChainMonteCarlo)::Vector{Float64}
+    function update(x::Vector{Float64}, alg::MetropolisHastingsAlgorithm)::Vector{Float64}
         x_new = x + randn(alg.rng, length(x))
         if accept!(alg, x_new, x)
             return x_new
@@ -186,16 +192,17 @@ function test_metropolis_temperature()
 
         energy(x) = x^2
 
-        alg = Metropolis(rng; β=β)
+        alg = MetropolisAlgorithm(rng; β=β)
 
         measurements = Measurements([
             :timeseries => (x -> x) => Float64[]
         ], interval=1)
 
-        function update(x::Float64, alg::Metropolis)::Float64
+        function update(x::Float64, alg::MetropolisHastingsAlgorithm)::Float64
             x_new = x + randn(alg.rng) * 0.5
             delta_E = energy(x_new) - energy(x)
-            if accept!(alg, delta_E)
+            # linear fast path: caller forms logR = logweight(ensemble, ΔE)
+            if accept!(alg, logweight(ensemble(alg), delta_E))
                 return x_new
             else
                 return x
@@ -228,10 +235,10 @@ function test_mcmc_proposal_invariance()
 
     # narrow proposal
     rng_a = MersenneTwister(400)
-    alg_a = MarkovChainMonteCarlo(rng_a, logweight)
+    alg_a = MetropolisHastingsAlgorithm(rng_a, logweight)
     measurements_a = Measurements([:timeseries => (x -> x) => Float64[]], interval=1)
 
-    function update_a(x::Float64, alg::MarkovChainMonteCarlo)::Float64
+    function update_a(x::Float64, alg::MetropolisHastingsAlgorithm)::Float64
         x_new = x + randn(alg.rng) * 0.5
         accept!(alg, x_new, x) ? x_new : x
     end
@@ -244,10 +251,10 @@ function test_mcmc_proposal_invariance()
 
     # wide proposal
     rng_b = MersenneTwister(400)
-    alg_b = MarkovChainMonteCarlo(rng_b, logweight)
+    alg_b = MetropolisHastingsAlgorithm(rng_b, logweight)
     measurements_b = Measurements([:timeseries => (x -> x) => Float64[]], interval=1)
 
-    function update_b(x::Float64, alg::MarkovChainMonteCarlo)::Float64
+    function update_b(x::Float64, alg::MetropolisHastingsAlgorithm)::Float64
         x_new = x + randn(alg.rng) * 2.0
         accept!(alg, x_new, x) ? x_new : x
     end

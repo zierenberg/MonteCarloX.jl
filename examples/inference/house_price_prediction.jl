@@ -12,10 +12,9 @@
 using Random, Statistics, Distributions, Plots
 using MonteCarloX
 
-
-
 n_steps  = 100_000
 burn_in  = 10_000
+nothing #hide
 
 # ## Synthetic data
 #
@@ -25,7 +24,7 @@ burn_in  = 10_000
 
 β0_true, β1_true, σ_true = 50_000.0, 1_500.0, 15_000.0   ## USD, USD/m², USD
 
-rng = MersenneTwister(42)
+rng = Xoshiro(42)
 n   = 50
 x   = Float64.(rand(rng, 90:460, n))
 y   = β0_true .+ β1_true .* x .+ σ_true .* randn(rng, n)
@@ -55,6 +54,7 @@ end
 
 logprior(θ)     = logpdf(prior_β0, θ[1]) + logpdf(prior_β1, θ[2]) + logpdf(prior_logσ, θ[3])
 logposterior(θ) = logprior(θ) + loglikelihood(θ)
+nothing #hide
 
 # ## Metropolis sampling
 #
@@ -63,8 +63,8 @@ logposterior(θ) = logprior(θ) + loglikelihood(θ)
 # the log-posterior ratio and updates the acceptance counter automatically.
 
 function run_metropolis(logposterior; seed=2026, Δ=0.05)
-    rng     = MersenneTwister(seed)
-    alg     = MarkovChainMonteCarlo(rng, logposterior)
+    rng     = Xoshiro(seed)
+    alg     = MetropolisHastingsAlgorithm(rng, logposterior)
     θ       = [rand(rng, prior_β0), rand(rng, prior_β1), rand(rng, prior_logσ)]
     samples = [Float64[] for _ in 1:3]
     for _ in 1:burn_in
@@ -138,6 +138,7 @@ function marginal_panel(s, truth, xlabel, title; ticks=nothing)
     vline!(p, [truth]; lw=2, ls=:dash, color=:black, label="truth")
     return p
 end
+nothing #hide
 
 t3(s) = round.(range(quantile(s, 0.01), quantile(s, 0.99); length=3); digits=0)
 

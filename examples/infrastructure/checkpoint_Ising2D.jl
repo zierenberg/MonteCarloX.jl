@@ -31,8 +31,8 @@ checkpoint_base = get(
 )
 checkpoint_file = checkpoint_base * ".mcx"
 
-sys = Ising([L, L])
-alg = Metropolis(Xoshiro(2026); β=beta)
+sys = IsingSystem([L, L])
+alg = MetropolisAlgorithm(Xoshiro(2026); β=beta)
 ckpt = init_checkpoint(checkpoint_file, (sys=sys, alg=alg, sweep=0))
 
 function run_sweeps!(sys, alg, sweep_start::Int, sweep_stop::Int;
@@ -54,6 +54,7 @@ function run_sweeps!(sys, alg, sweep_start::Int, sweep_stop::Int;
     end
     return nothing
 end
+nothing #hide
 
 # -----------------------------------------------------------------------------
 # Loop 1: run and create checkpoints (simulated preemption)

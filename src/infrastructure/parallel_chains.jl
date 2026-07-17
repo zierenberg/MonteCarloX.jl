@@ -9,8 +9,6 @@ parallelism strategy:
 - `ParallelChains{MPIBackend}`: one algorithm per MPI rank, MPI communication.
 """
 
-using MPI
-
 struct ParallelChains{B, A}
     backend::B
     alg::A # This is either a vector of algorithms (Threads) or a single algorithm (MPI)

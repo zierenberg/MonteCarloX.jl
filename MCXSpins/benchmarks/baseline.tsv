@@ -1,0 +1,7 @@
+date	commit	julia	cpu	sweeps	case	mode	rng	ns_per_flip	factor
+2026-07-13	198a544	1.12.6	apple-m1	100000	local Ising 64x64	table	xoshiro	4.370	1.000
+2026-07-13	198a544	1.12.6	apple-m1	100000	MCX ising 64x64	table	xoshiro	9.820	2.247
+2026-07-13	198a544	1.12.6	apple-m1	100000	MCX ising 64x64	table	mt	11.263	2.578
+2026-07-13	198a544	1.12.6	apple-m1	100000	MCX ising 64x64	cont	xoshiro	14.866	3.402
+2026-07-13	198a544	1.12.6	apple-m1	100000	MCX ising 64x64	cont	mt	19.302	4.417
+2026-07-13	198a544	1.12.6	apple-m1	100000	MCX blume_capel 48x48	cont	xoshiro	29.157	6.672

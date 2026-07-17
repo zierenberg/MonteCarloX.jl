@@ -2,7 +2,7 @@
 #
 # The previous examples had likelihoods we could write in closed form. Here the model
 # is a *mechanism*: a system of differential equations describing how an epidemic
-# spreads. We observe noisy case counts over time and infer the rates that drive the
+# spreads [Kermack & McKendrick 1927]. We observe noisy case counts over time and infer the rates that drive the
 # dynamics. What is new is that **evaluating the likelihood runs a simulation** — every
 # proposed parameter requires solving the ODE — so the target is expensive but
 # otherwise just another `logposterior` function.
@@ -36,6 +36,7 @@ tobs  = 0.0:0.5:15.0
 
 # Solve the ODE for rates `θ` and return the infected curve at the observation times.
 solve_I(θ) = solve(ODEProblem(sir!, u0, tspan, θ), Tsit5(); saveat = tobs)[2, :]
+nothing #hide
 
 # ## Synthetic data
 #
@@ -50,6 +51,7 @@ rng   = Xoshiro(1)
 truth = [1.5, 0.4]                          # β = 1.5, γ = 0.4  (basic reproduction R₀ ≈ 3.75)
 N     = 1000                                # population size
 data  = rand.(rng, Poisson.(N .* solve_I(truth)))
+nothing #hide
 
 # ## Model
 #
@@ -60,6 +62,7 @@ data  = rand.(rng, Poisson.(N .* solve_I(truth)))
 logprior(θ) = logpdf(LogNormal(log(1.5), 0.5), θ[1]) + logpdf(LogNormal(log(0.5), 0.5), θ[2])
 loglik(θ)   = sum(logpdf.(Poisson.(N .* max.(solve_I(θ), 1e-12)), data))
 logposterior(θ) = all(θ .> 0) ? logprior(θ) + loglik(θ) : -Inf
+nothing #hide
 
 # ## Metropolis
 #
@@ -75,10 +78,11 @@ function update!(θ, alg, Δ)
     accepted && (θ .= θ′)
     return accepted
 end
+nothing #hide
 
 function metropolis(logposterior; n = 10_000, warmup = 2_000, Δ0 = [0.1, 0.04], seed = 1)
     rng  = Xoshiro(seed)
-    alg  = MarkovChainMonteCarlo(rng, logposterior)
+    alg  = MetropolisHastingsAlgorithm(rng, logposterior)
     step = AdaptiveStep(Δ0; target = 0.234)
     θ    = [1.5, 0.5]
 
@@ -96,6 +100,7 @@ function metropolis(logposterior; n = 10_000, warmup = 2_000, Δ0 = [0.1, 0.04],
     end
     return samples, alg
 end
+nothing #hide
 
 if !isfile(samples_file)                                       # hide
 samples, alg = metropolis(logposterior)
@@ -136,3 +141,9 @@ plot(pfit, ppost; layout = (1, 2), size = (900, 340), margin = 4Plots.mm)
 # Bayesian computation): keep parameter draws whose *simulated* data resemble the
 # observed data under some distance, reusing MonteCarloX's Gillespie tools as the
 # simulator. Same posterior target, a likelihood replaced by a simulate-and-compare step.
+
+# ## References
+#
+# - W. O. Kermack, A. G. McKendrick, *A contribution to the mathematical theory of epidemics*,
+#   Proc. R. Soc. Lond. A **115**, 700 (1927).
+#   [doi:10.1098/rspa.1927.0118](https://doi.org/10.1098/rspa.1927.0118)

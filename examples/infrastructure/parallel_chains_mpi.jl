@@ -34,8 +34,8 @@ end
 E(x::Real) = 1/4*(x^2 - 2)^2
 E(sys::System) = E(sys.x)
 
-function update!(sys::System, alg::AbstractMarkovChainMonteCarlo; delta=0.1)
-    x_new = sys.x + delta * randn(alg.rng)
+function update!(sys::System, alg::AbstractMarkovChainMonteCarlo; δ=0.1)
+    x_new = sys.x + δ * randn(alg.rng)
     accept!(alg, E(x_new), E(sys)) && (sys.x = x_new)
 end
 
@@ -62,7 +62,7 @@ betas_pt = set_betas(size(backend), 0.1, beta_ref, :geometric)
 # Merging samples from all chains does NOT fix this — you just get a
 # biased mixture of trapped chains.
 
-pc_alg = Metropolis(Xoshiro(1000 + rank(backend) + 1); β=beta_ref)
+pc_alg = MetropolisAlgorithm(Xoshiro(1000 + rank(backend) + 1); β=beta_ref)
 pc     = ParallelChains(backend, pc_alg)
 pc_sys = System(0.0)
 
@@ -102,7 +102,7 @@ end
 # changes over time, each rank's samples cover many ladder indices — we
 # store them in a ragged per-ladder vector and gather to root for plots.
 
-pt_alg = Metropolis(Xoshiro(2000 + rank(backend) + 1); β=betas_pt[rank(backend) + 1])
+pt_alg = MetropolisAlgorithm(Xoshiro(2000 + rank(backend) + 1); β=betas_pt[rank(backend) + 1])
 pt     = ParallelTempering(backend, pt_alg)
 pt_sys = System(0.0)
 
@@ -155,7 +155,7 @@ end
 # Each rank runs a multicanonical sampler; after each iteration we merge
 # histograms to root, refine the logweight on root, and distribute the
 # new logweight back to all ranks.
-pmuca_alg = Multicanonical(Xoshiro(3000 + rank(backend) + 1), Ebins)
+pmuca_alg = MulticanonicalAlgorithm(Xoshiro(3000 + rank(backend) + 1), Ebins)
 pmuca     = ParallelMulticanonical(backend, pmuca_alg)
 pmuca_sys = System(0.0)
 
@@ -164,7 +164,7 @@ pmuca_sys = System(0.0)
 beta_bound = beta_ref * 2
 on_root(pmuca) do i
     alg = algorithm(pmuca, i)
-    set!(logweight(alg), E -> -beta_bound * E)
+    set_logweight!(ensemble(alg), E -> -beta_bound * E)
 end
 distribute_logweight!(pmuca)
 
@@ -176,18 +176,18 @@ time_iter = @elapsed for iter in 1:n_iter
     with_parallel(pmuca) do alg
         sys = pmuca_sys
         for _ in 1:n_burn_in
-            for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
+            for _ in 1:n_sweep; update!(sys, alg, δ=0.05); end
         end
         reset!(alg)
         for j in 1:Int(round(n_samples / n_iter * iter))
-            for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
+            for _ in 1:n_sweep; update!(sys, alg, δ=0.05); end
         end
     end
     merge_histograms!(pmuca)
     on_root(pmuca) do i
         alg = algorithm(pmuca, i)
-        MonteCarloX.update!(ensemble(alg); mode=:simple)
-        set!(logweight(alg), (E_right, E_max),
+        update_logweight!(ensemble(alg); mode=:simple)
+        set_logweight!(ensemble(alg), (E_right, E_max),
              E -> logweight(alg)(E_right) - beta_bound * (E - E_right))
         next!(prog)
     end
@@ -200,7 +200,7 @@ pmuca_Es_local = zeros(Float64, n_samples)
 time_prod = @elapsed with_parallel(pmuca) do alg
     sys = pmuca_sys
     for j in 1:n_samples
-        for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
+        for _ in 1:n_sweep; update!(sys, alg, δ=0.05); end
         pmuca_xs_local[j] = sys.x
         pmuca_Es_local[j] = E(sys)
     end
@@ -303,6 +303,21 @@ if is_root(backend)
         Ebins       = Ebins)
 
     savefig(p, "parallel_chains_mpi.png")
+    nothing #hide
 end
 
 finalize!(backend)
+# ## References
+#
+# - R. H. Swendsen, J.-S. Wang, *Replica Monte Carlo simulation of spin-glasses*
+#   (parallel tempering), Phys. Rev. Lett. **57**, 2607 (1986).
+#   [doi:10.1103/PhysRevLett.57.2607](https://doi.org/10.1103/PhysRevLett.57.2607)
+# - K. Hukushima, K. Nemoto, *Exchange Monte Carlo method and application to spin glass simulations*,
+#   J. Phys. Soc. Jpn. **65**, 1604 (1996).
+#   [doi:10.1143/JPSJ.65.1604](https://doi.org/10.1143/JPSJ.65.1604)
+# - B. A. Berg, T. Neuhaus, *Multicanonical ensemble: a new approach to simulate first-order
+#   phase transitions*, Phys. Rev. Lett. **68**, 9 (1992).
+#   [doi:10.1103/PhysRevLett.68.9](https://doi.org/10.1103/PhysRevLett.68.9)
+# - J. Zierenberg, M. Marenz, W. Janke, *Scaling properties of a parallel implementation of the
+#   multicanonical algorithm*, Comput. Phys. Commun. **184**, 1155 (2013).
+#   [doi:10.1016/j.cpc.2012.12.006](https://doi.org/10.1016/j.cpc.2012.12.006)

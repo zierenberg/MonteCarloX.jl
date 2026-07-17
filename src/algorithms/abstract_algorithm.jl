@@ -8,22 +8,18 @@ abstract type AbstractAlgorithm end
 """
     AbstractMarkovChainMonteCarlo <: AbstractAlgorithm
 
-Base type for accept/reject Markov chain Monte Carlo algorithms (Metropolis,
-Glauber, Multicanonical, Wang-Landau, Replica exchange, …).
-Carries an `ensemble`, `steps`, and `accepted` counters.
+Umbrella type for all Markov-chain Monte Carlo algorithms. This is the whole category, so it
+covers both readings of a Markov chain:
+
+- the accept/reject engine [`MetropolisHastingsAlgorithm`](@ref) (Metropolis, Glauber, Multicanonical,
+  Wang-Landau, …), which carries an `ensemble`, a `balance`, and `steps`/`accepted` counters;
+- direct conditional samplers such as [`HeatBathAlgorithm`](@ref), which carry an `ensemble` and `steps`
+  but no accept step (no `accepted` counter).
+
+The accept/reject interface (`accept!`, `acceptance_rate`) therefore lives on the concrete
+`MetropolisHastingsAlgorithm`, not here, so conditional samplers do not inherit a meaningless counter.
 """
 abstract type AbstractMarkovChainMonteCarlo <: AbstractAlgorithm end
-
-"""
-    AbstractHeatBath <: AbstractAlgorithm
-
-Base type for heat-bath / conditional MCMC algorithms.
-Conceptually MCMC; kept as a sibling of [`AbstractMarkovChainMonteCarlo`](@ref)
-because it lacks the accept/reject + ensemble interface (no `accepted` counter,
-draws directly from local conditionals). A future refactor may introduce a
-shared intermediate supertype.
-"""
-abstract type AbstractHeatBath <: AbstractAlgorithm end
 
 """
     AbstractKineticMonteCarlo <: AbstractAlgorithm
@@ -43,8 +39,22 @@ function steps(alg::AbstractAlgorithm)
 end
 
 @inline steps(alg::AbstractMarkovChainMonteCarlo) = getfield(alg, :steps)
-@inline steps(alg::AbstractHeatBath) = getfield(alg, :steps)
 @inline steps(alg::AbstractKineticMonteCarlo) = getfield(alg, :steps)
+
+"""
+    ensemble(alg::AbstractMarkovChainMonteCarlo)
+
+Return the ensemble object carried by an MCMC algorithm — the object whose `logweight` defines
+the acceptance.
+"""
+@inline ensemble(alg::AbstractMarkovChainMonteCarlo) = getfield(alg, :ensemble)
+
+"""
+    logweight(alg::AbstractMarkovChainMonteCarlo)
+
+Return the algorithm's ensemble as a logweight callable. Equivalent to `logweight(ensemble(alg))`.
+"""
+@inline logweight(alg::AbstractMarkovChainMonteCarlo) = logweight(ensemble(alg))
 
 function Base.:(==)(a::T, b::T) where {T<:AbstractAlgorithm}
     all(getfield(a, f) == getfield(b, f) for f in fieldnames(T))

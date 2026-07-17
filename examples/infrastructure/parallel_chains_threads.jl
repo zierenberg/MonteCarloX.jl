@@ -34,8 +34,8 @@ end
 E(x::Real) = 1/4*(x^2 - 2)^2
 E(sys::System) = E(sys.x)
 
-function update!(sys::System, alg::AbstractMarkovChainMonteCarlo; delta=0.1)
-    x_new = sys.x + delta * randn(alg.rng)
+function update!(sys::System, alg::AbstractMarkovChainMonteCarlo; δ=0.1)
+    x_new = sys.x + δ * randn(alg.rng)
     accept!(alg, E(x_new), E(sys)) && (sys.x = x_new)
 end
 
@@ -51,7 +51,7 @@ n_burn_in = CI_MODE ? 10 : 500
 n_sweep   = CI_MODE ? 10 : 100
 n_iter    = CI_MODE ? 2 : 6
 
-backend  = ThreadsBackend()
+backend  = init(:threads)
 beta_ref = 10.0
 betas_pt = set_betas(size(backend), 0.1, beta_ref, :geometric)
 
@@ -62,7 +62,7 @@ betas_pt = set_betas(size(backend), 0.1, beta_ref, :geometric)
 # Merging samples from all chains does NOT fix this — you just get a
 # biased mixture of trapped chains.
 
-pc_algs = [Metropolis(Xoshiro(1000 + i); β=beta_ref) for i in 1:size(backend)]
+pc_algs = [MetropolisAlgorithm(Xoshiro(1000 + i); β=beta_ref) for i in 1:size(backend)]
 pc      = ParallelChains(backend, pc_algs)
 pc_sys  = [System(0.0) for i in 1:size(backend)]
 
@@ -102,7 +102,7 @@ end
 # the barrier freely; exchanges propagate this to the cold replica,
 # producing correct bimodal sampling even at high beta.
 
-pt_algs = [Metropolis(Xoshiro(2000 + i); β=betas_pt[i]) for i in 1:size(backend)]
+pt_algs = [MetropolisAlgorithm(Xoshiro(2000 + i); β=betas_pt[i]) for i in 1:size(backend)]
 pt      = ParallelTempering(backend, pt_algs)
 pt_sys  = [System(0.0) for _ in 1:size(pt)]
 
@@ -154,7 +154,7 @@ end
 # Each chain runs a multicanonical sampler; after each iteration we merge
 # histograms to root, refine the logweight on root, and distribute the
 # new logweight back to all chains.
-pmuca_algs = [Multicanonical(Xoshiro(3000 + i), Ebins) for i in 1:size(backend)]
+pmuca_algs = [MulticanonicalAlgorithm(Xoshiro(3000 + i), Ebins) for i in 1:size(backend)]
 pmuca      = ParallelMulticanonical(backend, pmuca_algs)
 pmuca_sys  = [System(0.0) for i in 1:size(backend)]
 
@@ -176,11 +176,11 @@ time_iter = @elapsed for iter in 1:n_iter
         alg = algorithm(pmuca, i)
         sys = pmuca_sys[i]
         for _ in 1:n_burn_in
-            for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
+            for _ in 1:n_sweep; update!(sys, alg, δ=0.05); end
         end
         reset!(alg)
         for j in 1:Int(round(n_samples / n_iter * iter))
-            for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
+            for _ in 1:n_sweep; update!(sys, alg, δ=0.05); end
         end
     end
     merge_histograms!(pmuca)
@@ -200,7 +200,7 @@ pmuca_Es = zeros(Float64, size(pmuca), n_samples)
 time_prod = @elapsed with_parallel(pmuca) do i, alg
     sys = pmuca_sys[i]
     for j in 1:n_samples
-        for _ in 1:n_sweep; update!(sys, alg, delta=0.05); end
+        for _ in 1:n_sweep; update!(sys, alg, δ=0.05); end
         pmuca_xs[i, j] = sys.x
         pmuca_Es[i, j] = E(sys)
     end
@@ -299,3 +299,18 @@ p = make_comparison_plot(;
     Ebins       = Ebins)
 
 savefig(p, "parallel_chains_threads.png")
+nothing #hide
+# ## References
+#
+# - R. H. Swendsen, J.-S. Wang, *Replica Monte Carlo simulation of spin-glasses*
+#   (parallel tempering), Phys. Rev. Lett. **57**, 2607 (1986).
+#   [doi:10.1103/PhysRevLett.57.2607](https://doi.org/10.1103/PhysRevLett.57.2607)
+# - K. Hukushima, K. Nemoto, *Exchange Monte Carlo method and application to spin glass simulations*,
+#   J. Phys. Soc. Jpn. **65**, 1604 (1996).
+#   [doi:10.1143/JPSJ.65.1604](https://doi.org/10.1143/JPSJ.65.1604)
+# - B. A. Berg, T. Neuhaus, *Multicanonical ensemble: a new approach to simulate first-order
+#   phase transitions*, Phys. Rev. Lett. **68**, 9 (1992).
+#   [doi:10.1103/PhysRevLett.68.9](https://doi.org/10.1103/PhysRevLett.68.9)
+# - J. Zierenberg, M. Marenz, W. Janke, *Scaling properties of a parallel implementation of the
+#   multicanonical algorithm*, Comput. Phys. Commun. **184**, 1155 (2013).
+#   [doi:10.1016/j.cpc.2012.12.006](https://doi.org/10.1016/j.cpc.2012.12.006)

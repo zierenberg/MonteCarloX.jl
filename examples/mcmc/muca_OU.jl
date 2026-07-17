@@ -1,7 +1,7 @@
 # # Large Deviations of the Ornstein–Uhlenbeck Process
 #
 # The [Ornstein–Uhlenbeck (OU) process](https://en.wikipedia.org/wiki/Ornstein%E2%80%93Uhlenbeck_process)
-# is a continuous-time stochastic process with mean-reverting drift:
+# [Uhlenbeck & Ornstein 1930] is a continuous-time stochastic process with mean-reverting drift:
 #
 # ```math
 # dx_t = \theta(\mu - x_t)\,dt + \sigma\,dW_t
@@ -11,7 +11,7 @@
 # ``\sigma = \sqrt{2D}`` the noise amplitude, and ``dW_t \sim \mathcal{N}(0, dt)`` a
 # Wiener increment. The terminal value ``x(T)`` is Gaussian with known mean and
 # variance, an exact reference for three sampling strategies: direct sampling,
-# biased Metropolis, and multicanonical iteration.
+# biased Metropolis, and multicanonical iteration [Hartmann, Majumdar & Rosso 2013; Hartmann 2014].
 
 using Random, Distributions, StatsBase, LinearAlgebra, DelimitedFiles
 using MonteCarloX
@@ -104,6 +104,7 @@ function update!(sys::OUTrajectory, alg::AbstractMarkovChainMonteCarlo; δ = 0.5
         alg.steps += 1
     end
 end
+nothing #hide
 
 # ## Running the samplers
 #
@@ -115,17 +116,17 @@ end
 
 if !isfile(dist_file)                                          # hide
 ## single reference trajectory
-sys0 = OUTrajectory(MersenneTwister(1234); x0 = x0, μ = μ, D = D, θ = θ, dt = dt, T = T)
+sys0 = OUTrajectory(Xoshiro(1234); x0 = x0, μ = μ, D = D, θ = θ, dt = dt, T = T)
 
 ## direct sampling of x(T)
-direct_samples = [OUTrajectory(MersenneTwister(i); x0 = x0, μ = μ, D = D, θ = θ,
+direct_samples = [OUTrajectory(Xoshiro(i); x0 = x0, μ = μ, D = D, θ = θ,
                                dt = dt, T = T).xs[end] for i in 1:n_direct]
 dist_direct = normalize(fit(Histogram, direct_samples, bins_T); mode = :pdf).weights
 
 ## biased Metropolis at several β — keep the x(T) time series, histogram, final trajectory
 function run_metropolis(β)
-    sys  = OUTrajectory(MersenneTwister(123); x0 = x0, μ = μ, D = D, θ = θ, dt = dt, T = T)
-    alg  = Metropolis(MersenneTwister(42); β = β)
+    sys  = OUTrajectory(Xoshiro(123); x0 = x0, μ = μ, D = D, θ = θ, dt = dt, T = T)
+    alg  = MetropolisAlgorithm(Xoshiro(42); β = β)
     meas_ts   = Measurements([:x_T => x_T => Float64[]], interval = 100)
     meas_hist = Measurements([:x_T => x_T => fit(Histogram, [], bins_T)], interval = 1)
     for _ in 1:n_therm; update!(sys, alg); end
@@ -140,17 +141,26 @@ metro = [run_metropolis(β) for β in βs]
 ts_series = hcat((m[1] for m in metro)...)          # x(T) time series per β
 is_dists  = [m[2] for m in metro]                    # biased terminal densities
 
+## function barriers for the hot loops: one "sweep" = one trajectory update
+sweep!(sys, alg, n; kwargs...) = (for _ in 1:n; update!(sys, alg; kwargs...); end)
+function measured_sweeps!(sys, alg, meas, n)
+    for i in 1:n
+        update!(sys, alg)
+        measure!(meas, sys, i)
+    end
+end
+
 ## multicanonical with flat weights
-sys_muca0 = OUTrajectory(MersenneTwister(123); x0 = x0, μ = μ, D = D, θ = θ, dt = dt, T = T)
-alg_muca0 = Multicanonical(MersenneTwister(100), BinnedObject(bins_T, 0.0))
+sys_muca0 = OUTrajectory(Xoshiro(123); x0 = x0, μ = μ, D = D, θ = θ, dt = dt, T = T)
+alg_muca0 = MulticanonicalAlgorithm(Xoshiro(100), BinnedObject(bins_T, 0.0))
 meas_muca0 = Measurements([:x_T => x_T => fit(Histogram, [], bins_T)], interval = 1)
-for _ in 1:n_therm; update!(sys_muca0, alg_muca0); end
-for i in 1:n_muca;  update!(sys_muca0, alg_muca0); measure!(meas_muca0, sys_muca0, i); end
+sweep!(sys_muca0, alg_muca0, n_therm)
+measured_sweeps!(sys_muca0, alg_muca0, meas_muca0, n_muca)
 dist_flat = density(meas_muca0[:x_T].data.weights)
 
 ## multicanonical iteration
-sys_iter = OUTrajectory(MersenneTwister(42); x0 = x0, μ = μ, D = D, θ = θ, dt = dt, T = T)
-alg_iter = Multicanonical(MersenneTwister(42), BinnedObject(bins_T, 0.0))
+sys_iter = OUTrajectory(Xoshiro(42); x0 = x0, μ = μ, D = D, θ = θ, dt = dt, T = T)
+alg_iter = MulticanonicalAlgorithm(Xoshiro(42), BinnedObject(bins_T, 0.0))
 x_left  = first(bins_T) + std_T
 x_right = last(bins_T)  - std_T
 cs      = get_centers(logweight(alg_iter))
@@ -158,12 +168,12 @@ iter_hist   = zeros(length(centers_T), n_iter)
 iter_lw     = zeros(length(centers_T), n_iter)
 iter_accept = zeros(n_iter)
 for it in 1:n_iter
-    for _ in 1:n_therm;      update!(sys_iter, alg_iter; δ = 0.5); end
+    sweep!(sys_iter, alg_iter, n_therm; δ = 0.5)
     reset!(alg_iter)
-    for _ in 1:n_iter_steps; update!(sys_iter, alg_iter; δ = 0.5); end
-    MonteCarloX.update!(ensemble(alg_iter); mode = :simple)
-    set!(logweight(alg_iter), (first(cs), x_left),  x -> logweight(alg_iter)(x_left)  + (x - x_left)  * 2.0)
-    set!(logweight(alg_iter), (x_right, last(cs)),  x -> logweight(alg_iter)(x_right) - (x - x_right) * 2.0)
+    sweep!(sys_iter, alg_iter, n_iter_steps; δ = 0.5)
+    update_logweight!(ensemble(alg_iter); mode = :simple)
+    set_logweight!(ensemble(alg_iter), (first(cs), x_left),  x -> logweight(alg_iter)(x_left)  + (x - x_left)  * 2.0)
+    set_logweight!(ensemble(alg_iter), (x_right, last(cs)),  x -> logweight(alg_iter)(x_right) - (x - x_right) * 2.0)
     iter_hist[:, it]  = ensemble(alg_iter).histogram.values
     iter_lw[:, it]    = logweight(alg_iter).values
     iter_accept[it]   = acceptance_rate(alg_iter)
@@ -282,3 +292,14 @@ for it in 1:n_iter
 end
 plot!(p2, centers_T, logpdf_T .- logpdf_T[i0]; lw = 2, color = :black, ls = :dash, label = "exact")
 plot(p1, p2; layout = (1, 2), size = (900, 280), margin = 4Plots.mm)
+
+# ## References
+#
+# - A. K. Hartmann, S. N. Majumdar, A. Rosso, *Sampling fractional Brownian motion in presence of
+#   absorption: a Markov chain method*, Phys. Rev. E **88**, 022119 (2013).
+#   [doi:10.1103/PhysRevE.88.022119](https://doi.org/10.1103/PhysRevE.88.022119)
+# - A. K. Hartmann, *High-precision work distributions for extreme nonequilibrium processes in
+#   large systems*, Phys. Rev. E **89**, 052103 (2014).
+#   [doi:10.1103/PhysRevE.89.052103](https://doi.org/10.1103/PhysRevE.89.052103)
+# - G. E. Uhlenbeck, L. S. Ornstein, *On the theory of the Brownian motion*, Phys. Rev. **36**, 823 (1930).
+#   [doi:10.1103/PhysRev.36.823](https://doi.org/10.1103/PhysRev.36.823)

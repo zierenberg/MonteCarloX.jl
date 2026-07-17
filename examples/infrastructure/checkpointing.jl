@@ -21,10 +21,11 @@ end
 
 E(sys::System) = 1/4*(sys.x^2 - 2)^2
 
-function update!(sys::System, alg::AbstractMarkovChainMonteCarlo; delta=0.1)
-    x_new = sys.x + delta * randn(alg.rng)
+function update!(sys::System, alg::AbstractMarkovChainMonteCarlo; δ=0.1)
+    x_new = sys.x + δ * randn(alg.rng)
     accept!(alg, E(System(x_new)), E(sys)) && (sys.x = x_new)
 end
+nothing #hide
 
 # ## Parameters
 
@@ -41,7 +42,7 @@ seed = 42
 # Run the full simulation in one go and record the time series.
 
 ref_sys = System(0.0)
-ref_alg = Metropolis(Xoshiro(seed); β=β)
+ref_alg = MetropolisAlgorithm(Xoshiro(seed); β=β)
 
 ref_xs = Vector{Float64}(undef, n_total)
 for j in 1:n_total
@@ -60,7 +61,7 @@ ckpt_file = joinpath(ckpt_dir, "ckpt.mcx")
 # ### First half
 
 sys = System(0.0)
-alg = Metropolis(Xoshiro(seed); β=β)
+alg = MetropolisAlgorithm(Xoshiro(seed); β=β)
 
 ckpt = init_checkpoint(ckpt_file, (sys=sys, alg=alg, sample=0))
 

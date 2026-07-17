@@ -1,5 +1,9 @@
-# Kinetic Monte Carlo - core functionality
-# Shared by all continuous-time event-driven algorithms.
+# ── Kinetic Monte Carlo ───────────────────────────────────────────────────────
+#
+# Continuous-time event-driven sampling: draw a Poissonian waiting time from the total rate,
+# draw an event proportional to its rate, apply it. The event source is anything that answers
+# `total_rate` and `next_event` — a plain rate vector, one of the event handlers
+# (src/event_handler/), or a time-dependent function.
 
 """
     reset!(alg::AbstractKineticMonteCarlo)
@@ -11,55 +15,72 @@ function reset!(alg::AbstractKineticMonteCarlo)
     alg.time = 0.0
 end
 
-"""
-    next_time(rng::AbstractRNG, rate_generation::Number)::Float64
+# ── Waiting times ─────────────────────────────────────────────────────────────
 
-Draw next waiting time for a homogeneous Poisson event stream.
 """
-function next_time(rng::AbstractRNG, rate_generation::Number)::Float64
-    if !(rate_generation > 0)
-        return Inf
-    end
-    return randexp(rng) / rate_generation
+    next_time(rng, rate::Number) -> Float64
+
+Waiting time of a homogeneous Poisson event stream with total `rate` (`Inf` for rate ≤ 0).
+"""
+function next_time(rng::AbstractRNG, rate::Number)::Float64
+    rate > 0 || return Inf
+    return randexp(rng) / rate
 end
 
 """
-    next_time(rng::AbstractRNG, rate::Function, rate_generation::Real)::Real
+    next_time(rng, rate::Function, rate_upper::Real) -> Float64
 
-Draw next waiting time for an inhomogeneous Poisson stream using thinning.
+Waiting time of an inhomogeneous Poisson stream with instantaneous rate `rate(dt)`, sampled by
+thinning against the dominating constant `rate_upper ≥ rate(dt)`.
 """
-function next_time(rng::AbstractRNG, rate::Function, rate_generation::Real)::Real
-    if !(rate_generation > 0)
-        return Inf
-    end
+function next_time(rng::AbstractRNG, rate::Function, rate_upper::Real)::Float64
+    rate_upper > 0 || return Inf
     dt = 0.0
     while true
-        dt += next_time(rng, rate_generation)
-        if rand(rng) < rate(dt) / rate_generation
+        dt += next_time(rng, rate_upper)
+        if rand(rng) < rate(dt) / rate_upper
             return dt
         end
     end
 end
 
-"""
-    next_event(rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVector})::Int
+# ── Event selection ───────────────────────────────────────────────────────────
 
-Draw one event index proportional to rates.
 """
-function next_event(rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVector})::Int
+    total_rate(source) -> Float64
+
+Total event rate ΣR of an event source: a plain rate vector or an `AbstractEventHandlerRate`
+(list handlers sum their rate list; `EventRateTree` reads its Fenwick root).
+"""
+total_rate(rates::AbstractVector) = sum(rates)
+total_rate(event_handler::AbstractEventHandlerRate) = sum(event_handler.list_rate)
+
+"""
+    next_event(rng, rates::AbstractVector) -> Int
+
+Draw one event index proportional to `rates`. One or two rates short-circuit (a single
+`rand` decides two rates — the fast path for two-state problems); longer vectors use a
+two-sided cumulative scan starting from the cheaper end.
+"""
+function next_event(rng::AbstractRNG, rates::AbstractVector)::Int
+    n = length(rates)
+    n == 1 && return 1
+    if n == 2
+        @inbounds return rand(rng) * (rates[1] + rates[2]) < rates[1] ? 1 : 2
+    end
     sum_rates = sum(rates)
     theta = rand(rng) * sum_rates
 
     if theta < 0.5 * sum_rates
         index = 1
         cumulated_rates = rates[index]
-        while cumulated_rates < theta && index < length(rates)
+        while cumulated_rates < theta && index < n
             index += 1
             @inbounds cumulated_rates += rates[index]
         end
         return index
     else
-        index = length(rates)
+        index = n
         cumulated_rates_lower = sum_rates - rates[index]
         while cumulated_rates_lower > theta && index > 1
             index -= 1
@@ -70,160 +91,100 @@ function next_event(rng::AbstractRNG, rates::Union{AbstractWeights, AbstractVect
 end
 @inline next_event(rng::AbstractRNG, rate::Number) = 1
 
-function next_event(rng::AbstractRNG, rates::MVector{2,T})::Int where {T <: AbstractFloat}
-    if rand(rng) * (rates[1] + rates[2]) < rates[1]
-        return 1
-    else
-        return 2
-    end
-end
-
+# Same two-sided scan over a rate handler whose live events need index indirection
+# (ListEventRateActiveMask); ListEventRateSimple below maps back to its event labels.
 function next_event(rng::AbstractRNG, event_handler::AbstractEventHandlerRate{T})::T where T
     ne = length(event_handler)
-    if ne > 1
-        total_rate = sum(event_handler.list_rate)
-        theta::Float64 = rand(rng) * total_rate
-        index_last = last_index(event_handler)
-        index_first = first_index(event_handler)
+    ne == 0 && return event_handler.noevent
+    ne == 1 && return first_index(event_handler)
+    sum_rates = total_rate(event_handler)
+    theta::Float64 = rand(rng) * sum_rates
+    index_last = last_index(event_handler)
+    index_first = first_index(event_handler)
 
-        if theta < 0.5 * total_rate
-            index = index_first
-            cumulated_rates = event_handler.list_rate[index]
-            while cumulated_rates < theta && index < index_last
-                index = next_index(event_handler, index)
-                @inbounds cumulated_rates += event_handler.list_rate[index]
-            end
-        else
-            index = index_last
-            cumulated_rates_lower = total_rate - event_handler.list_rate[index]
-            while cumulated_rates_lower > theta && index > index_first
-                index = previous_index(event_handler, index)
-                @inbounds cumulated_rates_lower -= event_handler.list_rate[index]
-            end
+    if theta < 0.5 * sum_rates
+        index = index_first
+        cumulated_rates = event_handler.list_rate[index]
+        while cumulated_rates < theta && index < index_last
+            index = next_index(event_handler, index)
+            @inbounds cumulated_rates += event_handler.list_rate[index]
         end
-        return index
-    elseif ne == 1
-        return first_index(event_handler)
     else
-        return event_handler.noevent
+        index = index_last
+        cumulated_rates_lower = sum_rates - event_handler.list_rate[index]
+        while cumulated_rates_lower > theta && index > index_first
+            index = previous_index(event_handler, index)
+            @inbounds cumulated_rates_lower -= event_handler.list_rate[index]
+        end
     end
+    return index
 end
 
 function next_event(rng::AbstractRNG, event_handler::ListEventRateSimple{T})::T where T
-    if length(event_handler) > 0
-        index = next_event(rng, event_handler.list_rate)
-        return event_handler.list_event[index]
-    else
-        return event_handler.noevent
-    end
+    length(event_handler) > 0 || return event_handler.noevent
+    index = next_event(rng, event_handler.list_rate)
+    return event_handler.list_event[index]
 end
 
 next_event(event_handler::ListEventRateSimple) = next_event(Random.GLOBAL_RNG, event_handler)
 
+# ── One step: waiting time + event ────────────────────────────────────────────
+
 """
-    next(alg::AbstractKineticMonteCarlo, rates::AbstractVector)
+    next(alg::AbstractKineticMonteCarlo, source) -> (dt, event)
 
-Draw next event waiting time and event id from raw rates.
-
-For zero total rate, returns `(Inf, 0)`.
+Draw the next waiting time and event from an event source: a scalar rate, a rate vector, a
+rate handler, a time-ordered `AbstractEventHandlerTime`, or a function of time returning any
+of these. Exhausted sources (total rate ≤ 0, empty queue) return `(Inf, nothing)`.
 """
 function next(alg::AbstractKineticMonteCarlo, rate::Number)
     dt = next_time(alg.rng, rate)
-    event = 1
-    if !isfinite(dt)
-        return Inf, nothing
-    end
-    return dt, event
+    isfinite(dt) || return (Inf, nothing)
+    return dt, 1
 end
 
-"""
-    next(alg::AbstractKineticMonteCarlo, rates::AbstractVector)
-
-Draw next event waiting time and event id from raw rates (StatsBase.AbstractWeights is also an AbstractVector).
-
-For zero total rate, returns `(Inf, 0)`.
-"""
-function next(alg::AbstractKineticMonteCarlo, rates::AbstractVector)
-    if length(rates) == 1
-        return next(alg, rates[1])
-    end
-    sum_rates = sum(rates)
-    dt = next_time(alg.rng, sum_rates)
-    if !isfinite(dt)
-        return Inf, nothing
-    end
-    event = next_event(alg.rng, rates)
-    return dt, event
+function next(alg::AbstractKineticMonteCarlo,
+              source::Union{AbstractVector, AbstractEventHandlerRate})
+    dt = next_time(alg.rng, total_rate(source))
+    isfinite(dt) || return (Inf, nothing)
+    return dt, next_event(alg.rng, source)
 end
 
-"""
-    next(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerRate)
-
-Draw next event waiting time and event from an event handler.
-"""
-function next(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerRate)
-    sum_rates = sum(event_handler.list_rate)
-    dt = next_time(alg.rng, sum_rates)
-    if !isfinite(dt)
-        return Inf, nothing
-    end
-    event = next_event(alg.rng, event_handler)
-    return dt, event
-end
-
-"""
-    next(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerTime)
-
-Draw next event from a time-ordered event queue.
-"""
 function next(alg::AbstractKineticMonteCarlo, event_handler::AbstractEventHandlerTime)
-    if length(event_handler) > 0
-        time, event = popfirst!(event_handler)
-        dt = time - get_time(event_handler)
-        set_time!(event_handler, time)
-        return dt, event
-    else
-        return Inf, nothing
-    end
+    length(event_handler) > 0 || return (Inf, nothing)
+    time, event = popfirst!(event_handler)
+    dt = time - get_time(event_handler)
+    set_time!(event_handler, time)
+    return dt, event
 end
 
-"""
-  next(alg::AbstractKineticMonteCarlo, rates_at_time::Function)
-
-Draw next event waiting time and event from a time-dependent rates function.
-
-`rates_at_time` is called as `rates_at_time(alg.time)` and should return either
-an `AbstractVector`, `AbstractWeights`, or `AbstractEventHandlerRate`.
-"""
-function next(alg::AbstractKineticMonteCarlo, rates_at_time::Function)
-    return next(alg, rates_at_time(alg.time))
-end
+# Time-dependent rates: `rates_at_time(alg.time)` returns any of the sources above.
+next(alg::AbstractKineticMonteCarlo, rates_at_time::Function) =
+    next(alg, rates_at_time(alg.time))
 
 """
-    step!(alg::AbstractKineticMonteCarlo, event_source)
+    step!(alg::AbstractKineticMonteCarlo, event_source) -> (t_new, event)
 
-Perform one kinetic Monte Carlo step from an event_source (rates or an event handler).
-
-Updates `alg.time` and `alg.steps` internally and returns `(t_new, event)`.
-
-If dt=Inf then this is reflected in the algorithm.time and returned correspondingly
-If event is nothing, then this is returned as well.
+Perform one kinetic Monte Carlo step: advance `alg.time` by the drawn waiting time and count
+the step. An exhausted source yields `(Inf, nothing)`.
 """
-@inline function step!(alg::AbstractKineticMonteCarlo, event_source::Union{AbstractVector, AbstractEventHandler, Function}) 
+@inline function step!(alg::AbstractKineticMonteCarlo,
+                       event_source::Union{AbstractVector, AbstractEventHandler, Function})
     dt, event = next(alg, event_source)
     t_new = alg.time + dt
     alg.steps += 1
     alg.time = t_new
-    if !isfinite(t_new) 
-        event = nothing
-    end
+    isfinite(t_new) || (event = nothing)
     return t_new, event
 end
+
+# ── System protocol ───────────────────────────────────────────────────────────
 
 """
     event_source(sys) -> Union{AbstractVector, AbstractEventHandler, Function}
 
-Return the event source for system `sys`. Must be implemented by the user.
+Return the event source for system `sys`. Must be implemented by the user; raw sources
+(vectors, handlers, functions) pass through unchanged.
 """
 function event_source end
 
@@ -237,39 +198,39 @@ Apply `event` to system `sys` at time `t`. Default is a no-op.
 modify!(sys, event, t) = nothing
 
 """
-    measure!(sys, event, t)
+    observe!(sys, event, t)
 
-Observe system `sys` at time `t` before `modify!`. Default is a no-op.
+Observe system `sys` at time `t`, BEFORE `modify!` applies the event — weight observables
+with the elapsed time to form continuous-time averages. Default is a no-op. (Distinct from
+`measure!`, the Measurements-container API.)
 """
-measure!(sys, event, t) = nothing
+observe!(sys, event, t) = nothing
+
+# Design note: advance! runs the simulation loop for the user, which sits in tension with the
+# package's template-for-specialization philosophy (compose your own loop from step!/observe!/
+# modify!). It stays because the KMC loop order (step! → observe! → modify!) is easy to get
+# wrong; whether MCMC deserves a symmetric convenience — or this one should slim down — is an
+# open design question.
 
 """
-    advance!(alg::AbstractKineticMonteCarlo, sys, total_time; t0=0, measure!=measure!, modify!=modify!, ckpt=nothing, checkpoint_interval=nothing)
+    advance!(alg::AbstractKineticMonteCarlo, sys, total_time;
+             t0=0, observe!=observe!, modify!=modify!, ckpt=nothing, checkpoint_interval=nothing)
 
-Advance system `sys` using `alg` until `total_time`.
+Advance system `sys` using `alg` until `total_time`. Loop order per step:
 
-Loop order per step:
-1. `step!`         — draw next event from `event_source(sys)`
-2. `measure!`      — observe before modification: `measure!(sys, event, t)`
-3. `modify!`       — apply event to state:        `modify!(sys, event, t)`
-4. `checkpoint!`   — optional: if `ckpt::CheckpointSession` and
-                     `checkpoint_interval` are provided, write a checkpoint
-                     every `checkpoint_interval` steps.
+1. `step!`      — draw the next event from `event_source(sys)`
+2. `observe!`   — observe before modification: `observe!(sys, event, t)`
+3. `modify!`    — apply the event:             `modify!(sys, event, t)`
+4. optional checkpoint every `checkpoint_interval` steps (`ckpt::CheckpointSession`)
 
-Stops early if the event source is exhausted or total time is reached.
-
-# Checkpoint usage
-```julia
-ckpt = init_checkpoint("sim/ckpt.mcx", (alg=alg, sys=sys); step=0)
-advance!(alg, sys, 1e6; ckpt=ckpt, checkpoint_interval=1000)
-```
+Stops early if the event source is exhausted; returns the final time.
 """
 function advance!(
     alg::AbstractKineticMonteCarlo,
     sys,
     total_time;
     t0 = 0.0,
-    measure! = measure!,
+    observe! = observe!,
     modify! = modify!,
     ckpt = nothing,
     checkpoint_interval = nothing,
@@ -281,7 +242,7 @@ function advance!(
     while alg.time < total_time
         t_new, event = step!(alg, src)
         isnothing(event) && return alg.time
-        measure!(sys, event, t_new)
+        observe!(sys, event, t_new)
         modify!(sys, event, t_new)
         if !isnothing(ckpt) && !isnothing(checkpoint_interval) && alg.steps % checkpoint_interval == 0
             checkpoint!(ckpt; step=alg.steps)
@@ -289,3 +250,20 @@ function advance!(
     end
     return alg.time
 end
+
+# ── Gillespie: the named continuous-time sampler ──────────────────────────────
+
+"""
+    Gillespie(rng=Random.GLOBAL_RNG) <: AbstractKineticMonteCarlo
+
+Gillespie algorithm (stochastic simulation algorithm): the direct sampler of the KMC
+protocol above — exponential waiting times from the total rate, events proportional to their
+rates. Carries the `rng` and the `steps`/`time` counters.
+"""
+mutable struct Gillespie{RNG<:AbstractRNG} <: AbstractKineticMonteCarlo
+    rng::RNG
+    steps::Int
+    time::Float64
+end
+Gillespie(rng::AbstractRNG) = Gillespie(rng, 0, 0.0)
+Gillespie() = Gillespie(Random.GLOBAL_RNG)

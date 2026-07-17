@@ -10,12 +10,12 @@ function test_wang_landau_accept_and_reset()
     lw = BinnedObject(bins, 0.0)
 
     # default RNG constructor
-    wl_default = WangLandau(lw; logf=log(2.0))
+    wl_default = WangLandauAlgorithm(lw; logf=log(2.0))
     pass &= check(wl_default.rng === Random.GLOBAL_RNG, "default RNG is GLOBAL_RNG\n")
 
     # accept/reject loop with flat weights
     rng = MersenneTwister(42)
-    alg = WangLandau(rng, lw)
+    alg = WangLandauAlgorithm(rng, lw)
 
     step = 0.1
     function update!(x::Float64, alg)::Float64
@@ -46,7 +46,7 @@ function test_wang_landau_update_mechanics()
 
     bins = 0.0:1.0:4.0
     lw = BinnedObject(bins, 0.0)
-    wl = WangLandau(MersenneTwister(780), lw; logf=log(2.0))
+    wl = WangLandauAlgorithm(MersenneTwister(780), lw; logf=log(2.0))
 
     # accept! decrements logweight by logf
     x = 1.2
@@ -56,7 +56,7 @@ function test_wang_landau_update_mechanics()
 
     # update! halves logf
     logf0 = ensemble(wl).logf
-    pass &= check(update!(ensemble(wl)) === nothing, "update! returns nothing\n")
+    pass &= check(update_logweight!(ensemble(wl)) === nothing, "update! returns nothing\n")
     pass &= check(ensemble(wl).logf == 0.5 * logf0, "logf halved\n")
 
     return pass

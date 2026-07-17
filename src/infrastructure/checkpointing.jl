@@ -7,8 +7,6 @@
 #   finalize!(ckpt)                              -> remove checkpoint file
 #   ckpt.sys, ckpt.alg, ...                      -> access stored objects directly
 
-using Serialization
-
 """
     CheckpointSession
 

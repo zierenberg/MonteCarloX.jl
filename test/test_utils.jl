@@ -76,43 +76,6 @@ function test_binary_search()
     return pass
 end
 
-function test_distribution_from_logdos()
-    pass = true
-
-    logdos = BinnedObject(-1:1, 0.0)
-    logdos.values .= log.([1.0, 2.0, 4.0])
-    β = 0.5
-    dist = distribution_from_logdos(logdos, β)
-
-    centers = get_centers(logdos)
-    weights = exp.(logdos.values .- β .* centers)
-    expected = weights ./ sum(weights)
-
-    pass &= check(dist.bins == logdos.bins, "distribution bins match\n")
-    pass &= check(isapprox(sum(dist.values), 1.0; atol=1e-12), "distribution normalized\n")
-    pass &= check(all(isapprox.(dist.values, expected; atol=1e-12)), "distribution values match\n")
-
-    masked_logdos = BinnedObject(-1:1, 0.0)
-    masked_logdos.values .= [0.0, -Inf, log(3.0)]
-    masked_dist = distribution_from_logdos(masked_logdos, 0.0)
-    pass &= check(masked_dist.values[2] == 0.0, "masked bin is zero\n")
-    pass &= check(isapprox(sum(masked_dist.values), 1.0; atol=1e-12), "masked distribution normalized\n")
-    pass &= check(isapprox(masked_dist.values[1], 0.25; atol=1e-12), "masked bin 1 correct\n")
-    pass &= check(isapprox(masked_dist.values[3], 0.75; atol=1e-12), "masked bin 3 correct\n")
-
-    threw = try
-        bad_logdos = BinnedObject(0:2, 0.0)
-        bad_logdos.values .= -Inf
-        distribution_from_logdos(bad_logdos, 1.0)
-        false
-    catch err
-        err isa ArgumentError
-    end
-    pass &= check(threw, "all-masked logdos throws ArgumentError\n")
-
-    return pass
-end
-
 @testset "Utils" begin
     @testset "Histogram set/get" begin
         @test test_histogram_set_get()
@@ -125,8 +88,5 @@ end
     end
     @testset "binary_search" begin
         @test test_binary_search()
-    end
-    @testset "distribution_from_logdos" begin
-        @test test_distribution_from_logdos()
     end
 end
