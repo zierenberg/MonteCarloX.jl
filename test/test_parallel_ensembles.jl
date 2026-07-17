@@ -229,9 +229,44 @@ function test_parallel_tempering()
     return pass
 end
 
+# Threads replica-exchange *dynamics*: single-process, so the swap loop actually runs (the MPI
+# tests can only build a 1-rank backend). Checks a forced swap and the permutation invariant.
+function test_replica_exchange_threads_dynamics()
+    pass = true
+    betas = [1.0, 0.75, 0.5, 0.25]                       # descending β-ladder, 4 replicas
+    algs  = [MetropolisAlgorithm(MersenneTwister(300 + i); β = betas[i]) for i in 1:4]
+    pt    = ParallelTempering(ThreadsBackend(4), algs)
+
+    # forced accept on edge (1,2): (β₁−β₂)(x₁−x₂) > 0 when the cold replica holds the higher energy
+    update!(pt, [10.0, 0.0, -1.0, -2.0])
+    pass &= check(sort(pt.indices) == collect(1:4), "ladder stays a permutation\n")
+    pass &= check(pt.indices[1] == 2 && pt.indices[2] == 1, "edge (1,2) swapped\n")
+    pass &= check(pt.accepted[1] == 1 && pt.steps[1] == 1, "edge-1 attempt+accept counted\n")
+    pass &= check(pt.stage == 1, "stage flipped to 1\n")
+
+    # many alternating sweeps: permutation invariant + stage parity hold every step
+    reset!(pt)
+    pass &= check(pt.indices == collect(1:4) && pt.stage == 0, "reset to identity ladder\n")
+    rng = MersenneTwister(5)
+    for s in 1:50
+        update!(pt, randn(rng, 4))
+        pass &= check(sort(pt.indices) == collect(1:4), "permutation at sweep $s\n")
+        pass &= check(pt.stage == (isodd(s) ? 1 : 0), "stage parity at sweep $s\n")
+    end
+    pass &= check(all(pt.steps .> 0), "every ladder edge attempted\n")
+    rates = acceptance_rates(pt)
+    pass &= check(length(rates) == 3 && all(0.0 .<= rates .<= 1.0), "acceptance rates valid\n")
+    pass &= check(0.0 <= acceptance_rate(pt) <= 1.0, "overall acceptance rate valid\n")
+    return pass
+end
+
 @testset "Parallel ensembles" begin
     @testset "Parallel chains" begin
         @test test_parallel_chains()
+    end
+
+    @testset "Replica exchange dynamics (threads)" begin
+        @test test_replica_exchange_threads_dynamics()
     end
 
     @testset "Parallel multicanonical" begin
