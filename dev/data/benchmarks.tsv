@@ -1,0 +1,11 @@
+comparison	case	cpu	ref_ns_per_flip	mcx_ns_per_flip	speedup_mcx
+optimized C kernel (2D Ising 64×64)	cont/xoshiro	apple-m1	7.560	12.401	0.610
+MonteCarlo.jl (2D Ising 64×64)	T=1.4	apple-m1	51.865	7.277	7.127
+MonteCarlo.jl (2D Ising 64×64)	T=2.269	apple-m1	66.753	12.447	5.363
+MonteCarlo.jl (2D Ising 64×64)	T=3.8	apple-m1	86.315	21.082	4.094
+Carlo.jl kernel (2D Ising 16×16)	T=1.0	apple-m1	36.482	10.113	3.607
+Carlo.jl kernel (2D Ising 16×16)	T=2.286	apple-m1	40.402	15.550	2.598
+Carlo.jl kernel (2D Ising 16×16)	T=3.0	apple-m1	52.807	25.508	2.070
+SpinMC.jl (Heisenberg 8×8×8)	T=0.5	apple-m1	73.510	34.033	2.160
+SpinMC.jl (Heisenberg 8×8×8)	T=1.443	apple-m1	89.058	46.300	1.923
+SpinMC.jl (Heisenberg 8×8×8)	T=10.0	apple-m1	73.260	47.444	1.544
