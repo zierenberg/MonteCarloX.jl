@@ -53,17 +53,18 @@ WangLandauAlgorithm(bins_or_logweight; init::Real=0.0, logf::Real=1.0) =
     WangLandauAlgorithm(Random.GLOBAL_RNG, bins_or_logweight; init=init, logf=logf)
 
 """
-    accept!(alg::MetropolisHastingsAlgorithm{<:WangLandauEnsemble}, arg_new, arg_old) -> Bool
+    accept!(alg::MetropolisHastingsAlgorithm{<:WangLandauEnsemble}, arg_new, arg_old; correction=0) -> Bool
 
 Metropolis acceptance followed by the Wang-Landau adaptation: decrement the tabulated logweight
 at the visited argument by `ens.logf`. `arg_new`/`arg_old` are the ensemble's logweight arguments
-(typically the reaction coordinate), not the full state.
+(typically the reaction coordinate), not the full state; `correction` carries any proposal
+asymmetry, as elsewhere.
 """
-function accept!(alg::MetropolisHastingsAlgorithm{<:WangLandauEnsemble}, arg_new::Real, arg_old::Real)
+function accept!(alg::MetropolisHastingsAlgorithm{<:WangLandauEnsemble}, arg_new::Real, arg_old::Real; correction::Real=0)
     ens = ensemble(alg)
     lw = logweight(alg)
     log_ratio = lw(arg_new) - lw(arg_old)
-    accepted = accept!(alg, log_ratio)
+    accepted = accept_logratio!(alg, iszero(correction) ? log_ratio : log_ratio + correction)
     arg_vis = accepted ? arg_new : arg_old
     lw[arg_vis] -= ens.logf
     return accepted

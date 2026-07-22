@@ -187,7 +187,7 @@ function hmc_update!(s, alg, ϵ; L = 20)
         p  .+= 0.5ϵ .* g                             # half momentum kick
     end
     H = -lp + 0.5 * sum(abs2, p)
-    accepted = accept!(alg, H0 - H)                  # Metropolis on H: logR = −ΔH = H0 − H
+    accepted = accept_logratio!(alg, H0 - H)         # Metropolis on H: logR = −ΔH = H0 − H
     accepted && (s .= s′)
     return accepted
 end

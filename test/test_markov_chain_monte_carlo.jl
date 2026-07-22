@@ -54,7 +54,7 @@ function test_glauber_acceptance()
     logR = logweight(ensemble(glauber), -8.0)      # -β·ΔE with ΔE = -8 ⇒ logR ≈ +6.4
     accepted = 0
     for _ in 1:1_000
-        accepted += accept!(glauber, logR)
+        accepted += accept_logratio!(glauber, logR)
     end
 
     pass = true
@@ -201,8 +201,8 @@ function test_metropolis_temperature()
         function update(x::Float64, alg::MetropolisHastingsAlgorithm)::Float64
             x_new = x + randn(alg.rng) * 0.5
             delta_E = energy(x_new) - energy(x)
-            # linear fast path: caller forms logR = logweight(ensemble, ΔE)
-            if accept!(alg, logweight(ensemble(alg), delta_E))
+            # linear fast path: hand the algorithm the coordinate difference
+            if accept!(alg, delta_E)
                 return x_new
             else
                 return x

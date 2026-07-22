@@ -81,7 +81,7 @@ For Boltzmann, ``\Delta \log \pi = -\beta \Delta E``, so the trait holds.
 For multicanonical and Wang-Landau, the tabulated weight is non-linear in ``x``, so it does not.
 
 This trait selects which *form* of the log-ratio is cheap — not which algorithm you may build.
-For a linear ensemble the log-ratio comes from the local difference alone, ``\log R = \text{logweight}(\text{ens}, \Delta E)`` (the spin fast path).
+For a linear ensemble the log-ratio comes from the local difference alone, so the model passes it directly: `accept!(alg, ΔE)` (the spin fast path).
 For a non-linear ensemble (multicanonical, Wang-Landau) the weight is not linear in ``\Delta E``, so the log-ratio is assembled from absolute values around the move via the two-argument `accept!(alg, arg_new, arg_old)`.
 Both forms drive the same `MetropolisHastingsAlgorithm` engine; `linear_logweight(ens)` is a compile-time constant, so a system's update can branch on it at no cost.
 (Locality of the *weight* — needed by cluster bonds and cached n-fold rates — is a separate factorization property, asserted only where those constructions are built.)
@@ -101,17 +101,20 @@ The accept/reject engine `MetropolisHastingsAlgorithm <: AbstractMarkovChainMont
 Shared API:
 
 ```julia
-accept!(alg, logR)             -> Bool   # primitive: apply the balance function to logR
-accept!(alg, arg_new, arg_old) -> Bool   # convenience: forms logR from a logweight difference
-acceptance_rate(alg)           -> Float64
-balance(alg)                   -> BalanceFunction
-steps(alg)                     -> Int
-ensemble(alg)                  -> AbstractEnsemble
-reset!(alg)                              # zeroes step and acceptance counters
+accept!(alg, Δarg; correction=0)          -> Bool   # linear ensemble: weight the coordinate difference
+accept!(alg, arg_new, arg_old; correction=0) -> Bool # any ensemble: absolute logweight arguments
+accept_logratio!(alg, logR)               -> Bool   # primitive: apply the balance function to logR
+acceptance_rate(alg)                      -> Float64
+balance(alg)                              -> BalanceFunction
+steps(alg)                                -> Int
+ensemble(alg)                             -> AbstractEnsemble
+reset!(alg)                                         # zeroes step and acceptance counters
 ```
 
-`accept!(alg, logR)` is the core contract: it applies `balance(alg)` to the log acceptance-ratio and updates the counters.
-The caller assembles ``\log R`` — for a symmetric move on a linear ensemble that is `logweight(ensemble(alg), ΔE)` (local and cheap for a spin flip); the two-argument convenience forms it from ``\text{logweight}(\text{ens}, x_{\text{new}}) - \text{logweight}(\text{ens}, x_{\text{old}})`` (unavoidable for a full Bayesian posterior move, and the form multicanonical / Wang-Landau use for visit recording).
+The algorithm owns the target ``\pi``: the model hands over *coordinates*, never a logweight, and the algorithm forms ``\log R`` from `ensemble(alg)`.
+For a symmetric move on a linear ensemble, pass the local difference `accept!(alg, ΔE)` (cheap for a spin flip); for any ensemble, pass the absolute pair `accept!(alg, arg_new, arg_old)` (unavoidable for a full Bayesian posterior move, and the form multicanonical / Wang-Landau use for visit recording).
+An asymmetric proposal folds into the `correction` keyword — the log proposal-ratio ``\log[q(x'\to x)/q(x\to x')]``, which also carries any additive log-target term the ensemble argument does not (e.g. a reference-process log-density).
+`accept_logratio!(alg, logR)` is the raw primitive underneath: it applies `balance(alg)` to a caller-assembled log acceptance-ratio and updates the counters — the escape hatch for a bespoke target not expressed as an MCX ensemble (e.g. HMC on a Hamiltonian).
 
 ## A canonical simulation loop
 
@@ -132,7 +135,7 @@ measurements = Measurements(
 for step in 1:1_000_000
     i  = rand(rng, 1:nsites(sys))
     ΔE = local_energy_change(sys, i)               # system-defined: change if site i were flipped
-    if accept!(alg, logweight(ensemble(alg), ΔE))  # linear fast path: logR = -βΔE
+    if accept!(alg, ΔE)                            # linear fast path: alg forms logR = -βΔE
         flip!(sys, i)                              # commit the change
     end
     measure!(measurements, sys, step)
@@ -209,6 +212,7 @@ logweight(ens::AbstractEnsemble)
 logweight(ens::AbstractEnsemble, arg)
 ensemble(alg::AbstractMarkovChainMonteCarlo)
 accept!
+accept_logratio!
 acceptance_rate
 reset!(alg::MetropolisHastingsAlgorithm)
 steps

@@ -48,9 +48,9 @@ GlauberAlgorithm(rng::AbstractRNG, ens)
 Both build the [`MetropolisHastingsAlgorithm`](@ref) engine with the appropriate balance; they accept *any* ensemble (linear or not — multicanonical/Wang-Landau are `MetropolisBalance` with an adaptive ensemble).
 The short names `Metropolis` / `Glauber` remain as deprecated aliases and resolve with a warning.
 
-## `accept!` takes the log-ratio
+## `accept!` takes coordinates; the algorithm owns the target
 
-Core's acceptance contract is one primitive — `accept!(alg, logR)` applies the balance function and updates the counters — so the *ensemble*, *balance*, and *proposal* concerns stay visibly separate at the call site.
+The algorithm owns the target ``\pi``, so the model hands `accept!` *coordinates*, not a logweight: the algorithm forms ``\log R`` from `ensemble(alg)`. This keeps the *ensemble*, *balance*, and *proposal* concerns separate at the call site. (The raw primitive `accept_logratio!(alg, logR)` sits underneath for a bespoke target not expressed as an ensemble.)
 
 ```julia
 using MonteCarloX, Random
@@ -65,7 +65,7 @@ alg = MetropolisAlgorithm(rng; β=1.0)
 for _ in 1:200_000
     i  = rand(rng, 1:L)
     ΔE = local_dE(spins, i)                          # energy change for flipping spin i
-    if accept!(alg, logweight(ensemble(alg), ΔE))    # form logR from the ensemble
+    if accept!(alg, ΔE)                              # linear ensemble: alg forms logR = -βΔE
         spins[i] = -spins[i]
     end
 end
@@ -73,8 +73,9 @@ end
 println("acceptance: ", acceptance_rate(alg))
 ```
 
-`logweight(ensemble(alg), ΔE)` is ``-\beta\,\Delta E`` for a Boltzmann ensemble — the linear fast path.
-For a full-state move, the two-argument convenience `accept!(alg, arg_new, arg_old)` forms ``\log R`` from `logweight(ens, arg_new) - logweight(ens, arg_old)` (this is the path multicanonical / Wang-Landau use, and it drives their visit recording).
+`accept!(alg, ΔE)` weights the coordinate difference through the ensemble — ``-\beta\,\Delta E`` for a Boltzmann ensemble, the linear fast path.
+For a full-state move, the two-argument form `accept!(alg, arg_new, arg_old)` forms ``\log R`` from `logweight(ens, arg_new) - logweight(ens, arg_old)` (this is the path multicanonical / Wang-Landau use, and it drives their visit recording).
+An asymmetric proposal adds a `correction` keyword (the log proposal-ratio) to either form.
 
 Companion packages bundle this loop body. For richer spin systems, [`MCXSpins`](https://github.com/zierenberg/MonteCarloX.jl/tree/main/MCXSpins) provides the system types and a `spin_flip!(sys, alg)` wrapper that hides the propose / ``\Delta E`` / accept / commit dance:
 
