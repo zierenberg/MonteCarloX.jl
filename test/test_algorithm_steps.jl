@@ -17,7 +17,7 @@ function test_algorithm_steps_interface()
 
     alg_glauber = GlauberAlgorithm(Xoshiro(2); β=1.0)
     pass &= check(steps(alg_glauber) == 0, "Glauber steps starts at 0\n")
-    accept!(alg_glauber, 1.0)                       # 1-arg accept! takes logR directly
+    accept_logratio!(alg_glauber, 1.0)              # raw primitive takes logR directly
     pass &= check(steps(alg_glauber) == 1, "Glauber steps increments\n")
 
     alg_heat = HeatBathAlgorithm(Xoshiro(3); β=1.0)

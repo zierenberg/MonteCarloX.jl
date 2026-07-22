@@ -6,14 +6,13 @@ function translate!(sys::ParticleSystem{D,T}, alg::AbstractMarkovChainMonteCarlo
     end
 end
 
-# Accept dispatch: assemble the log acceptance-ratio from the ensemble. A linear ensemble uses the
-# O(1) local ΔE (logR = logweight(ens, dE), no energy(sys) call); a nonlinear ensemble reads the
-# absolute energies around the move and drives record_visit!. linear_logweight(ens) is a
+# Accept dispatch: the model hands the algorithm physical quantities, never a logweight. A linear
+# ensemble takes the O(1) local ΔE (accept!(alg, dE), no energy(sys) call); a nonlinear ensemble
+# takes the absolute energies around the move and drives record_visit!. linear_logweight(ens) is a
 # compile-time constant, so the branch folds away and the linear path stays allocation-free.
-@inline function _accept_energy_change!(alg::AbstractMarkovChainMonteCarlo, sys, dE)
-    ens = ensemble(alg)
-    if linear_logweight(ens)
-        return accept!(alg, logweight(ens, dE))
+@inline function _accept_delta!(alg::AbstractMarkovChainMonteCarlo, sys, dE)
+    if linear_logweight(ensemble(alg))
+        return accept!(alg, dE)
     else
         E_old = energy(sys)
         return accept!(alg, E_old + dE, E_old)
@@ -30,7 +29,7 @@ function _translate_monomer!(sys::ParticleSystem{D,T}, alg::AbstractMarkovChainM
     new_pos = constrain(sys.env, sys.positions[idx] + displacement)
 
     dE = _monomer_energy_change(sys, idx, new_pos)
-    if _accept_energy_change!(alg, sys, _total_dE(dE))
+    if _accept_delta!(alg, sys, _total_dE(dE))
         sys.positions[idx] = new_pos
         update_particle!(sys.cell_list, idx, new_pos)
         _update_cache!(sys.cache, dE)
@@ -50,7 +49,7 @@ function _translate_chain!(sys::ParticleSystem{D,T,TEnv,P,<:Polymer}, alg::Abstr
     displacement = SVector{D,T}(ntuple(_ -> Δ * (T(2) * rand(rng, T) - one(T)), Val(D)))
 
     dE = _pair_energy_change(sys, start_idx, M, displacement)
-    if _accept_energy_change!(alg, sys, dE)
+    if _accept_delta!(alg, sys, dE)
         @inbounds for k in 1:M
             idx     = start_idx + k - 1
             new_pos = constrain(sys.env, sys.positions[idx] + displacement)

@@ -1,12 +1,11 @@
 # ── General spin_flip! ───────────────────────────────────────────────────────
 #
 # One local update for any AbstractSpinSystem through the standard hooks (propose_state →
-# delta_sys → delta_energy → accept! → modify!). The accept step assembles the core
-# primitive's argument LOCALLY: a linear ensemble (Boltzmann) uses the O(1) local ΔE
-# (accept!(alg, logR)); a nonlinear ensemble (multicanonical, Wang-Landau) reads the
-# absolute energies around the move (accept!(alg, E_new, E_old) — also drives visit
-# recording). No core wrapper: logR assembly is caller business, and energy stays a
-# package-level concept.
+# delta_sys → delta_energy → accept! → modify!). The model hands the algorithm physical
+# quantities, never a logweight: a linear ensemble (Boltzmann) takes the O(1) local ΔE
+# (accept!(alg, ΔE)); a nonlinear ensemble (multicanonical, Wang-Landau) takes the absolute
+# energies around the move (accept!(alg, E_new, E_old) — also drives visit recording). The
+# algorithm owns the target π; energy stays a package-level concept.
 #
 # The single-site update is the primitive: spin_flip!(sys, alg, i) updates site i. The common
 # Monte Carlo step spin_flip!(sys, alg) is the thin wrapper that draws a uniform site with
@@ -21,9 +20,8 @@
 # logR assembly shared by spin_flip! and spin_exchange!. linear_logweight(ens) is a
 # compile-time constant, so the branch folds away and the linear path stays allocation-free.
 @inline function _accept_delta!(alg::MetropolisHastingsAlgorithm, sys, ΔE)
-    ens = ensemble(alg)
-    if linear_logweight(ens)
-        return accept!(alg, logweight(ens, ΔE))
+    if linear_logweight(ensemble(alg))
+        return accept!(alg, ΔE)
     else
         E_old = energy(sys)
         return accept!(alg, E_old + ΔE, E_old)

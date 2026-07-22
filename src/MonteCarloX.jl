@@ -165,6 +165,7 @@ export  AbstractMarkovChainMonteCarlo,
         GlauberAlgorithm,
         balance,
         accept!,
+        accept_logratio!,
         acceptance_rate,
         reset!
 
