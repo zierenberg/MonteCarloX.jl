@@ -23,7 +23,7 @@ include(joinpath(@__DIR__, "..", "examples", "defaults.jl"))
 # plotting defaults, and reweighting (kept as a script — no docs page yet).
 example_dir = joinpath(@__DIR__, "..", "examples")
 skip_files  = ("reweighting.jl", "defaults.jl", "runtests.jl")
-skip_dirs   = ("todos",)
+skip_dirs   = ("todos", "external")
 for (root, dirs, files) in walkdir(example_dir)
     basename(root) in skip_dirs && continue
     for file in files

@@ -21,16 +21,22 @@
 # The heavy runs are cached to `docs/src/data/` — delete `bench_*.tsv` and
 # `benchmarks.tsv` there and rerun `julia --project=benchmarks
 # benchmarks/benchmark_all.jl` to regenerate.
+#
+# External framework comparisons are isolated by package:
+# `benchmarks/MonteCarlo`, `benchmarks/Carlo`, `benchmarks/SpinMC`, and
+# `benchmarks/Sunny` each contain their own `Project.toml` + `benchmark.jl`.
+# This file is the orchestrator and only spawns those scripts when cache files
+# are missing.
 
 import Pkg; Pkg.activate(joinpath(@__DIR__)); Pkg.instantiate()  #src
 
-using Random, Statistics, Printf, Plots, DelimitedFiles, Markdown
-using StatsBase: weights
+using Random, Printf, Plots, DelimitedFiles, Markdown
 using MonteCarloX, MCXSpins
 
 datadir = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "docs", "src", "data")))  # hide
 factors_file = joinpath(datadir, "benchmarks.tsv")                                # hide
 bench_file(name) = joinpath(datadir, "bench_$(name).tsv")                         # hide
+status(msg) = println("[benchmark_all] ", msg)                                     # hide
 function recfactor(comparison, case, ref_ns, mcx_ns)                              # hide
     new = !isfile(factors_file)                                                   # hide
     open(factors_file, "a") do io                                                 # hide
@@ -39,9 +45,6 @@ function recfactor(comparison, case, ref_ns, mcx_ns)                            
                 comparison, case, Sys.CPU_NAME, ref_ns, mcx_ns, ref_ns / mcx_ns)  # hide
     end                                                                           # hide
 end                                                                               # hide
-quiet(f) = redirect_stdout(() -> redirect_stderr(f, devnull), devnull)            # hide
-float_val(x) = parse(Float64, strip(first(split(string(x), '±'))))                # hide
-nothing                                                                           # hide
 
 # Two conventions used throughout. Timing is the minimum over interleaved repetitions of a pure update loop, per attempted flip:
 
@@ -59,27 +62,6 @@ mcx_sweep_seq!(sys, alg, nsweeps) = (for _ in 1:nsweeps, i in eachindex(sys.spin
 nothing # hide
 
 # Both sides draw from the same generator: MCX seeds a `Xoshiro`, which is Julia's default RNG (`Random.default_rng()`, a Xoshiro256++ since Julia 1.7). The reference frameworks use that same default — SpinMC.jl copies `Random.GLOBAL_RNG`, MonteCarlo.jl uses `Random.default_rng()`, Carlo.jl takes an `Xoshiro` context — so the comparison is not skewed by RNG throughput.
-
-function mcx_ising_em(L, β; therm=2_000, sweeps=5_000)
-    sys = IsingSystem([L, L]); N = L * L
-    init!(sys, :random, rng=MersenneTwister(3))
-    alg = MetropolisAlgorithm(Xoshiro(4); β=β)
-    mcx_sweep!(sys, alg, therm * N)
-    e = m = 0.0
-    for _ in 1:sweeps
-        mcx_sweep!(sys, alg, N)
-        e += energy(sys) / N; m += abs(magnetization(sys)) / N
-    end
-    return e / sweeps, m / sweeps
-end
-
-function mcx_ising_time(L, β; sweeps=5_000)
-    sys = IsingSystem([L, L]); N = L * L
-    init!(sys, :random, rng=MersenneTwister(2))
-    alg = MetropolisAlgorithm(Xoshiro(1); β=β)
-    mcx_sweep!(sys, alg, 200 * N)
-    return ns_per_flip(() -> mcx_sweep!(sys, alg, sweeps * N), sweeps * N)
-end
 
 function mcx_ising_time_seq(L, β; sweeps=5_000)
     sys = IsingSystem([L, L]); N = L * L
@@ -109,10 +91,13 @@ function c_ceiling(; L=64)                                                      
 end                                                                               # hide
 
 if !isfile(bench_file("cceiling"))                                                # hide
+status("regenerating cceiling")                                                   # hide
 c_ns, c_e = c_ceiling()                                                           # hide
 mcx_ns = mcx_ising_time_seq(64, 0.44)                                             # hide
 recfactor("optimized C kernel (2D Ising 64×64)", "cont/xoshiro", c_ns, mcx_ns)   # hide
 writedlm(bench_file("cceiling"), [["c_ns" "mcx_ns" "c_e_site"]; [c_ns mcx_ns c_e]], '\t')  # hide
+else                                                                              # hide
+status("using cached cceiling")                                                  # hide
 end                                                                               # hide
 
 d = readdlm(bench_file("cceiling"), '\t'; header=true)[1]                         # hide
@@ -133,32 +118,10 @@ Markdown.parse(@sprintf(                                                        
 # the site-taking `spin_flip!(sys, alg, i)` over `eachindex` (`mcx_ising_time_seq`):
 
 if !isfile(bench_file("montecarlo"))                                              # hide
-import MonteCarlo                                                                 # hide
-function mc_em(L, β; therm=10^4, sweeps=10^3)
-    mc = MonteCarlo.MC(MonteCarlo.IsingModel(dims=2, L=L), beta=β)
-    MonteCarlo.run!(mc; sweeps=sweeps, thermalization=therm, verbose=false)
-    meas = MonteCarlo.measurements(mc)
-    return mean(meas[:Energy].e), mean(meas[:Magn].m)
-end
-
-function mc_kernel_time(L, T; sweeps=5_000)
-    mc = MonteCarlo.MC(MonteCarlo.IsingModel(dims=2, L=L), beta=1 / T)
-    for _ in 1:200; MonteCarlo.sweep(mc); end
-    return ns_per_flip(() -> (for _ in 1:sweeps; MonteCarlo.sweep(mc); end), sweeps * L * L)
-end
-
-L, Ts = 8, [1.4, 1.8, 2.269, 3.0, 3.8]
-logdos = logdos_exact_ising2D(L); E = get_centers(logdos)
-e_exact = [mean(E, weights(reweight(logdos, -E ./ T))) / L^2 for T in Ts]
-e_ref = [mc_em(L, 1 / T)[1] for T in Ts]
-e_mcx = [mcx_ising_em(L, 1 / T; therm=10^4, sweeps=10^3)[1] for T in Ts]
-writedlm(bench_file("montecarlo"),                                                # hide
-         [["T" "e_ref" "e_mcx" "e_exact"]; hcat(Ts, e_ref, e_mcx, e_exact)], '\t')  # hide
-for T in (1.4, 2.269, 3.8)                                                        # hide
-    s, Lb = 5_000, 64                                                             # hide
-    recfactor("MonteCarlo.jl (2D Ising 64×64)", "T=$T",                           # hide
-              mc_kernel_time(Lb, T; sweeps=s), mcx_ising_time_seq(Lb, 1 / T; sweeps=s))  # hide
-end                                                                               # hide
+status("running MonteCarlo benchmark env")                                        # hide
+run(`$(Base.julia_cmd()) --project=$(joinpath(@__DIR__, "MonteCarlo")) $(joinpath(@__DIR__, "MonteCarlo", "benchmark.jl"))`)  # hide
+else                                                                              # hide
+status("using cached MonteCarlo benchmark")                                      # hide
 end                                                                               # hide
 
 d = readdlm(bench_file("montecarlo"), '\t'; header=true)[1]                       # hide
@@ -181,39 +144,10 @@ plot!(d[:, 1], d[:, 3] .- d[:, 4]; marker=:diamond, lw=2, label="MCX − exact",
 # pipeline (job → `results.json`); speed times the bare `Carlo.sweep!` kernel:
 
 if !isfile(bench_file("carlo"))                                                   # hide
-using Carlo, Carlo.JobTools                                                       # hide
-import Ising                                                                      # hide
-function carlo_e(Ts; L=8, sweeps=20_000, therm=2_000)
-    tm = TaskMaker()
-    tm.sweeps = sweeps; tm.thermalization = therm; tm.binsize = 100; tm.Lx = L
-    foreach(T -> (tm.T = T; task(tm)), Ts)
-    dir = joinpath(mktempdir(), "job")
-    job = JobInfo(dir, Ising.MC; tasks=make_tasks(tm),
-                  checkpoint_time="30:00", run_time="24:00:00")
-    quiet(() -> start(job, ["run", "--single"]))
-    return [float_val(r["Energy"]) for r in Carlo.ResultTools.dataframe(dir * ".results.json")]
-end
-
-function carlo_kernel_time(L, T; sweeps=5_000)
-    params = Dict(:Lx => L, :T => T)
-    mc = Ising.MC(params)
-    ctx = Carlo.MCContext(sweeps, 0, Xoshiro(1), Carlo.Measurements(100))
-    Carlo.init!(mc, ctx, params)
-    for _ in 1:200; Carlo.sweep!(mc, ctx); end
-    return ns_per_flip(() -> (for _ in 1:sweeps; Carlo.sweep!(mc, ctx); end), sweeps * L * L)
-end
-
-L, Ts = 8, [1.0, 1.429, 2.0, 2.429, 3.0]
-logdos = logdos_exact_ising2D(L); E = get_centers(logdos)
-e_exact = [mean(E, weights(reweight(logdos, -E ./ T))) / L^2 for T in Ts]
-e_ref = carlo_e(Ts; L=L)
-e_mcx = [mcx_ising_em(L, 1 / T; therm=2_000, sweeps=20_000)[1] for T in Ts]
-writedlm(bench_file("carlo"),                                                     # hide
-         [["T" "e_ref" "e_mcx" "e_exact"]; hcat(Ts, e_ref, e_mcx, e_exact)], '\t')  # hide
-for T in (1.0, 2.286, 3.0)                                                        # hide
-    recfactor("Carlo.jl kernel (2D Ising 16×16)", "T=$T",                         # hide
-              carlo_kernel_time(16, T), mcx_ising_time(16, 1 / T))                # hide
-end                                                                               # hide
+status("running Carlo benchmark env")                                             # hide
+run(`$(Base.julia_cmd()) --project=$(joinpath(@__DIR__, "Carlo")) $(joinpath(@__DIR__, "Carlo", "benchmark.jl"))`)  # hide
+else                                                                              # hide
+status("using cached Carlo benchmark")                                           # hide
 end                                                                               # hide
 
 d = readdlm(bench_file("carlo"), '\t'; header=true)[1]                            # hide
@@ -236,52 +170,10 @@ plot!(d[:, 1], d[:, 3] .- d[:, 4]; marker=:diamond, lw=2, label="MCX − exact",
 # compared code-vs-code with statistical errors:
 
 if !isfile(bench_file("spinmc"))                                                  # hide
-using SpinMC                                                                      # hide
-function spinmc_lattice(L)
-    uc = UnitCell((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
-    b = addBasisSite!(uc, (0.0, 0.0, 0.0))
-    M = [-1.0 0.0 0.0; 0.0 -1.0 0.0; 0.0 0.0 -1.0]
-    for dir in ((1, 0, 0), (0, 1, 0), (0, 0, 1))
-        addInteraction!(uc, b, b, M, dir)
-    end
-    return Lattice(uc, (L, L, L))
-end
-
-function spinmc_m(T; L=8, therm=2_000, sweeps=5_000)
-    mc = SpinMC.MonteCarlo(spinmc_lattice(L), 1 / T, therm, sweeps; reportInterval=10^9)
-    quiet(() -> SpinMC.run!(mc))
-    return mean(mc.observables.magnetization), SpinMC.std_error(mc.observables.magnetization)
-end
-
-function mcx_heisenberg_m(T; L=8, therm=2_000, sweeps=5_000)
-    sys = HeisenbergSystem([L, L, L]); N = L^3
-    init!(sys, :random, rng=MersenneTwister(3))
-    alg = MetropolisAlgorithm(Xoshiro(4); β=1 / T)
-    mcx_sweep!(sys, alg, therm * N)
-    ms = [(mcx_sweep!(sys, alg, N);
-           sqrt(sum(abs2, magnetization(sys))) / N) for _ in 1:sweeps]
-    return mean(ms), std(ms) / sqrt(length(ms) / 100)        ## crude blocking (100 sweeps)
-end
-
-Ts = [10.0 * (0.1 / 10.0)^((i - 1) / 7) for i in 1:8]        ## the example's log grid
-ref = spinmc_m.(Ts)
-mcx = mcx_heisenberg_m.(Ts)
-writedlm(bench_file("spinmc"),                                                    # hide
-         [["T" "m_ref" "dm_ref" "m_mcx" "dm_mcx"];                                # hide
-          hcat(Ts, first.(ref), last.(ref), first.(mcx), last.(mcx))], '\t')      # hide
-for T in (0.5, 1.443, 10.0)                                                       # hide
-    s, N = 5_000, 512                                                             # hide
-    lat = spinmc_lattice(8)                                                       # hide
-    t_ref = ns_per_flip(s * N) do                                                 # hide
-        quiet(() -> SpinMC.run!(SpinMC.MonteCarlo(lat, 1 / T, s, 0; reportInterval=10^9)))  # hide
-    end                                                                           # hide
-    sys = HeisenbergSystem([8, 8, 8])                                             # hide
-    init!(sys, :random, rng=MersenneTwister(2))                                   # hide
-    alg = MetropolisAlgorithm(Xoshiro(1); β=1 / T)                                # hide
-    mcx_sweep!(sys, alg, 200 * N)                                                 # hide
-    t_mcx = ns_per_flip(() -> mcx_sweep!(sys, alg, s * N), s * N)                 # hide
-    recfactor("SpinMC.jl (Heisenberg 8×8×8)", "T=$T", t_ref, t_mcx)               # hide
-end                                                                               # hide
+status("running SpinMC benchmark env")                                            # hide
+run(`$(Base.julia_cmd()) --project=$(joinpath(@__DIR__, "SpinMC")) $(joinpath(@__DIR__, "SpinMC", "benchmark.jl"))`)  # hide
+else                                                                              # hide
+status("using cached SpinMC benchmark")                                          # hide
 end                                                                               # hide
 
 d = readdlm(bench_file("spinmc"), '\t'; header=true)[1]                           # hide
@@ -293,3 +185,32 @@ plot!(d[:, 1], d[:, 4]; yerror=d[:, 5], marker=:diamond, ls=:dash, lw=2,        
 plot!(d[:, 1], d[:, 4] .- d[:, 2]; yerror=sqrt.(d[:, 3].^2 .+ d[:, 5].^2),        # hide
       marker=:circle, lw=2, color=:gray, label="MCX − SpinMC.jl",                 # hide
       xscale=:log10, xlabel="T", ylabel="Δ⟨|m|⟩", subplot=2)                      # hide
+
+# ## Sunny.jl
+#
+# Reference: [Sunny.jl](https://github.com/SunnySuite/Sunny.jl) on its
+# [Monte Carlo Ising prime example](https://github.com/SunnySuite/Sunny.jl/blob/main/examples/05_MC_Ising.jl)
+# — 2D Ising with a `System` and `LocalSampler(..., propose=propose_flip)`.
+# Physics is checked against the exact Beale referee on a small lattice; speed is measured
+# for the local-update kernel in ns/attempted flip, matched to MCX's random-site `spin_flip!`.
+#
+# Sunny depends on a newer JLD2 than MonteCarlo.jl, so this benchmark runs in
+# a dedicated environment (`benchmarks/Sunny/Project.toml`). If the cached data
+# file is missing, we regenerate it by spawning `benchmarks/Sunny/benchmark.jl`.
+
+if !isfile(bench_file("sunny_ising"))                                             # hide
+status("running Sunny benchmark env")                                             # hide
+run(`$(Base.julia_cmd()) --project=$(joinpath(@__DIR__, "Sunny")) $(joinpath(@__DIR__, "Sunny", "benchmark.jl"))`)  # hide
+else                                                                              # hide
+status("using cached Sunny benchmark")                                           # hide
+end                                                                               # hide
+
+d = readdlm(bench_file("sunny_ising"), '\t'; header=true)[1]                     # hide
+plot(d[:, 1], d[:, 2]; marker=:circle, lw=2, label="Sunny.jl",                    # hide
+     ylabel="e per site", title="2D Ising 8×8, exact referee",                    # hide
+     layout=(2, 1), legend=:bottomright, subplot=1)                               # hide
+plot!(d[:, 1], d[:, 3]; marker=:diamond, ls=:dash, lw=2, label="MCX", subplot=1)  # hide
+plot!(d[:, 1], d[:, 4]; ls=:dot, color=:gray, lw=2, label="exact", subplot=1)     # hide
+plot!(d[:, 1], d[:, 2] .- d[:, 4]; marker=:circle, lw=2,                          # hide
+      label="Sunny.jl − exact", xlabel="T", ylabel="Δe vs exact", subplot=2)      # hide
+plot!(d[:, 1], d[:, 3] .- d[:, 4]; marker=:diamond, lw=2, label="MCX − exact", subplot=2)  # hide

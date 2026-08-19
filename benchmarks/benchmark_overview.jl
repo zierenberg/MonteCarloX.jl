@@ -21,7 +21,8 @@
 # - [Spin systems](@ref) — Ising and Heisenberg against the exact prime examples of
 #   [MonteCarlo.jl](https://github.com/carstenbauer/MonteCarlo.jl/tree/master/example/ising2d),
 #   [Carlo.jl](https://github.com/lukas-weber/Ising.jl/tree/main/example) and
-#   [SpinMC.jl](https://github.com/fbuessen/SpinMC.jl#specific-heat-and-magnetization-of-a-cubic-lattice-heisenberg-ferromagnet).
+#   [SpinMC.jl](https://github.com/fbuessen/SpinMC.jl#specific-heat-and-magnetization-of-a-cubic-lattice-heisenberg-ferromagnet),
+#   [Sunny.jl](https://github.com/SunnySuite/Sunny.jl/blob/main/examples/05_MC_Ising.jl).
 #
 
 using DelimitedFiles, Printf, Markdown                                            # hide
@@ -44,6 +45,7 @@ prime_urls = [                                                                  
     "MonteCarlo.jl" => "https://github.com/carstenbauer/MonteCarlo.jl/tree/master/example/ising2d",  # hide
     "Carlo.jl"      => "https://github.com/lukas-weber/Ising.jl/tree/main/example",  # hide
     "SpinMC.jl"     => "https://github.com/fbuessen/SpinMC.jl#specific-heat-and-magnetization-of-a-cubic-lattice-heisenberg-ferromagnet",  # hide
+    "Sunny.jl"      => "https://github.com/SunnySuite/Sunny.jl/blob/main/examples/05_MC_Ising.jl",  # hide
 ]                                                                                 # hide
 linked(lab) = (i = findfirst(p -> startswith(lab, first(p)), prime_urls);         # hide
                isnothing(i) ? lab : "[$lab]($(last(prime_urls[i])))")             # hide

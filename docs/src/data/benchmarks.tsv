@@ -1,11 +1,14 @@
 comparison	case	cpu	ref_ns_per_flip	mcx_ns_per_flip	speedup_mcx
-optimized C kernel (2D Ising 64×64)	cont/xoshiro	apple-m1	7.560	12.401	0.610
-MonteCarlo.jl (2D Ising 64×64)	T=1.4	apple-m1	51.865	7.277	7.127
-MonteCarlo.jl (2D Ising 64×64)	T=2.269	apple-m1	66.753	12.447	5.363
-MonteCarlo.jl (2D Ising 64×64)	T=3.8	apple-m1	86.315	21.082	4.094
-Carlo.jl kernel (2D Ising 16×16)	T=1.0	apple-m1	36.482	10.113	3.607
-Carlo.jl kernel (2D Ising 16×16)	T=2.286	apple-m1	40.402	15.550	2.598
-Carlo.jl kernel (2D Ising 16×16)	T=3.0	apple-m1	52.807	25.508	2.070
-SpinMC.jl (Heisenberg 8×8×8)	T=0.5	apple-m1	73.510	34.033	2.160
-SpinMC.jl (Heisenberg 8×8×8)	T=1.443	apple-m1	89.058	46.300	1.923
-SpinMC.jl (Heisenberg 8×8×8)	T=10.0	apple-m1	73.260	47.444	1.544
+optimized C kernel (2D Ising 64×64)	cont/xoshiro	apple-m1	7.408	12.276	0.603
+MonteCarlo.jl (2D Ising 64×64)	T=1.4	apple-m1	52.75174360351563	7.336637353515625	7.190180059566069
+MonteCarlo.jl (2D Ising 64×64)	T=2.269	apple-m1	68.18920698242188	12.81099443359375	5.322709906391973
+MonteCarlo.jl (2D Ising 64×64)	T=3.8	apple-m1	88.81999916992187	21.02872109375	4.223747073060011
+Carlo.jl kernel (2D Ising 16×16)	T=1.0	apple-m1	30.14905625	9.002896875	3.3488172383402985
+Carlo.jl kernel (2D Ising 16×16)	T=2.286	apple-m1	37.55377578125	15.29772109375	2.45486079600398
+Carlo.jl kernel (2D Ising 16×16)	T=3.0	apple-m1	49.01328125	23.6928390625	2.06869599378557
+SpinMC.jl (Heisenberg 8×8×8)	T=0.5	apple-m1	73.684423828125	34.202864453125	2.1543348782704865
+SpinMC.jl (Heisenberg 8×8×8)	T=1.443	apple-m1	86.67179375	46.236767578125	1.8745210422323113
+SpinMC.jl (Heisenberg 8×8×8)	T=10.0	apple-m1	74.940543359375	47.810091015625	1.5674628884283737
+Sunny.jl (2D Ising 64×64)	T=1.4	apple-m1	132.20396928710937	9.559189892578125	13.830039027653818
+Sunny.jl (2D Ising 64×64)	T=2.269	apple-m1	135.15162963867186	14.230171728515625	9.497540312028953
+Sunny.jl (2D Ising 64×64)	T=3.8	apple-m1	145.26878662109374	26.125185107421874	5.5604883189832215

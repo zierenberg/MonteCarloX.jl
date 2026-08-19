@@ -370,6 +370,89 @@ Allows:
 - Easy reset between runs
 - Cleaner function signatures
 
+## Sunny.jl Interoperability Proposal
+
+Goal: use Sunny-defined spin models with MonteCarloX algorithms without adding model-specific logic to MonteCarloX core.
+
+### Architecture
+
+Follow the same split already used for `MCXSpins`:
+
+- `MonteCarloX`: algorithms and measurement infrastructure
+- `MCXSpins`: native spin-model package
+- `MCXSunny` (new companion package): Sunny-specific wrappers and update hooks
+
+This preserves the "no systems in core" principle.
+
+### Minimal adapter protocol
+
+Define one wrapper type and the smallest local-update hook set in `MCXSunny`:
+
+```julia
+struct SunnyLocalStateModel{S,C}
+    sys::S
+    constraints::C
+end
+
+propose_state(rng, m::SunnyLocalStateModel, i)
+delta_energy(m::SunnyLocalStateModel, i, proposal)
+modify!(m::SunnyLocalStateModel, i, proposal)
+nsites(m::SunnyLocalStateModel)
+```
+
+Then one generic local Metropolis update:
+
+```julia
+function spin_flip!(m::SunnyLocalStateModel, alg::MonteCarloX.AbstractMarkovChainMonteCarlo)
+    i = rand(alg.rng, 1:nsites(m))
+    s_new = propose_state(alg.rng, m, i)
+    dE = delta_energy(m, i, s_new)
+    MonteCarloX.accept!(alg, dE) && modify!(m, i, s_new)
+    return nothing
+end
+```
+
+### User-facing API
+
+Keep the public surface compact with two constructors:
+
+1. `SunnyIsingModel(; L, J=-1.0, B=0.0, seed=...)`
+2. `SunnyHeisenbergModel(; dims, bonds, exchanges, field=(0,0,0), seed=...)`
+
+Both return `SunnyLocalStateModel`, avoiding many one-off wrappers.
+
+### Constraint strategy
+
+Represent proposal constraints with one field on the adapter:
+
+- `:ising_z` for ±z flips
+- `:heisenberg_sphere` for random unit-vector proposals
+- `CustomProposal(f)` for user-defined local proposals
+
+### Delta-energy strategy
+
+Use a two-tier implementation:
+
+1. Correctness-first fallback: full-energy difference with reversible trial moves
+2. Optional fast path: local-neighborhood delta cache
+
+Both paths are internal to `delta_energy` and share one external API.
+
+### Measurements
+
+No Sunny-specific measurement API should be added to MonteCarloX.
+Use existing `Measurements` with callable observables on the adapter type.
+
+### Benchmark alignment
+
+For fair Sunny comparisons:
+
+- random-site local updates on both sides
+- consistent temperature mapping (`kT = T`, `β = 1/T`)
+- report ns per attempted update
+
+The benchmark implementation follows this protocol in `benchmarks/benchmark_all.jl`.
+
 ## Conclusion
 
 This API design provides:

@@ -1,0 +1,13 @@
+[deps]
+Carlo = "780c37f4-4e5a-43de-9e79-65c261e525a4"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+Ising = "a4b17d44-13d4-4c91-98cd-0449bec393fd"
+MCXSpins = "a4536488-68f2-4eaf-b6de-eac06300b674"
+MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+
+[sources]
+Ising = {url = "https://github.com/lukas-weber/Ising.jl"}
+MCXSpins = {path = "../../MCXSpins"}
+MonteCarloX = {path = "../.."}

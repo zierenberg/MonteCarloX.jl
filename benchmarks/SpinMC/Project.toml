@@ -1,12 +1,12 @@
 [deps]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 MCXSpins = "a4536488-68f2-4eaf-b6de-eac06300b674"
-Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
 MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
-Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SpinMC = "341a0f32-da10-4b75-900e-7f27269b54d1"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [sources]
-MCXSpins = {path = "../MCXSpins"}
-MonteCarloX = {path = ".."}
+MCXSpins = {path = "../../MCXSpins"}
+MonteCarloX = {path = "../.."}
+SpinMC = {url = "https://github.com/fbuessen/SpinMC.jl"}
