@@ -5,6 +5,23 @@ All notable changes to MonteCarloX.jl will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-25
+
+### Added
+- benchmarks
+- inference use cases (still experimental)
+- reweighting
+- extension to include Distributions.jl
+- on-compile checks that could break usage: e.g. if using dx API for Metropolis the logweight has to be linear
+
+### Changed
+- documentation incl. real examples that are precomputed
+- cleanup in algorithms
+- organization of system modules (long-term goal is to have them external)
+- organization of algorithms, ensembles, etc
+- accept API clear and concise
+- restructured event handlers (kMC)
+
 ## [0.2.0] - 2026-06-08
 
 ### Added
