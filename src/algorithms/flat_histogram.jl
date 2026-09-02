@@ -67,7 +67,20 @@ function accept!(alg::MetropolisHastingsAlgorithm{<:WangLandauEnsemble}, arg_new
     accepted = accept_logratio!(alg, iszero(correction) ? log_ratio : log_ratio + correction)
     arg_vis = accepted ? arg_new : arg_old
     lw[arg_vis] -= ens.logf
+    ens.histogram[arg_vis] += 1
     return accepted
+end
+
+"""
+    reset!(alg::MetropolisHastingsAlgorithm{<:WangLandauEnsemble})
+
+Reset the visit histogram and acceptance counters. Does NOT reset the logweight
+(accumulated density-of-states estimate) or `logf`.
+"""
+function reset!(alg::MetropolisHastingsAlgorithm{<:WangLandauEnsemble})
+    fill!(ensemble(alg).histogram.values, zero(eltype(ensemble(alg).histogram.values)))
+    _reset!(alg)
+    return nothing
 end
 
 # ── Parallel multicanonical: independent chains, merged weight refinement ────
