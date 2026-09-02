@@ -19,6 +19,8 @@ docs/Manifest.toml
 examples/Manifest.toml
 MCX*/Manifest.toml
 
+*.pdf
+
 # some specific files
 MCXSpins/references/ising_cpu
 MCXSpins/references/ising_cpu_modes
