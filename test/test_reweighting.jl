@@ -160,6 +160,24 @@ function test_reweight_binned_logdos()
     return pass
 end
 
+function test_wham_general_sources()
+    bins = -1:1
+    h1 = BinnedObject(bins, 0.0; boundary=ZeroBoundary())
+    h2 = BinnedObject(bins, 0.0; boundary=ZeroBoundary())
+    h1.values .= [10.0, 20.0, 40.0]
+    h2.values .= [10.0, 20.0, 80.0]
+
+    x, log_g = wham([h1, h2], [x -> 0.0, x -> (x == 1 ? log(2.0) : 0.0)])
+    expected = log.([1.0, 2.0, 4.0])
+    @test x == collect(float.(bins))
+    @test isapprox(log_g .- log_g[1], expected .- expected[1]; atol=1e-10)
+
+    x_temperature, log_g_temperature = wham([h1, h2], [1.0, 2.0])
+    @test x_temperature == x
+    @test all(isfinite, log_g_temperature)
+    return true
+end
+
 @testset "Reweighting" begin
     @testset "identity (source == target)" begin
         @test test_reweight_identity()
@@ -181,6 +199,9 @@ end
     end
     @testset "binned log-density" begin
         @test test_reweight_binned_logdos()
+    end
+    @testset "generalized WHAM" begin
+        @test test_wham_general_sources()
     end
 end
 

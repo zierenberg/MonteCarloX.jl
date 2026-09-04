@@ -118,3 +118,66 @@ Kish effective sample size `(Σ wᵢ)² / Σ wᵢ²`, computed in log space. Ran
 that the source and target distributions overlap too little for reliable reweighting.
 """
 ess(iw::ImportanceWeights) = exp(2 * iw.log_sum_weights - log_sum(2 .* iw.logw))
+
+"""
+    wham(histograms, sources; n_iters=1000, return_logz=false)
+
+Estimate a common log-density from multiple histograms. WHAM means *weighted
+histogram analysis method*: histogram `Hᵢ(x)` contains samples drawn from source
+distribution `pᵢ(x) ∝ exp(bᵢ(x))`, where `bᵢ(x) = logweight(sources[i], x)`.
+
+The estimator solves the coupled equations
+
+```math
+g(x) = \\frac{\\sum_i H_i(x)}{\\sum_i N_i\\exp[b_i(x)-\\log Z_i]},
+\\qquad
+Z_i = \\sum_x g(x)\\exp[b_i(x)],
+```
+
+iteratively in log space. Thus `log Zᵢ` are fitted normalization constants,
+not values that need to be supplied or matched between histograms. `sources[i]`
+may be any `AbstractEnsemble` or callable accepted by [`reweight`](@ref), so
+WHAM is not limited to Boltzmann weights. Histograms must be one-dimensional,
+non-empty, and share identical bins. Empty bins are omitted from the result.
+
+Returns `(x, log_g)`, normalized only up to the unavoidable additive constant.
+Set `return_logz=true` to additionally return the fitted `log Z` values.
+"""
+function wham(histograms::AbstractVector{<:BinnedObject}, sources::AbstractVector;
+             n_iters::Int=1000, return_logz::Bool=false)
+    isempty(histograms) && throw(ArgumentError("histograms must be non-empty"))
+    length(histograms) == length(sources) ||
+        throw(DimensionMismatch("one source is required per histogram"))
+    all(length(h.bins) == 1 for h in histograms) ||
+        throw(ArgumentError("WHAM requires one-dimensional histograms"))
+    reference = histograms[1]
+    all(h -> h.bins == reference.bins, histograms) ||
+        throw(DimensionMismatch("histograms must have identical bins"))
+
+    counts = reduce(hcat, (Float64.(h.values) for h in histograms))
+    totals = vec(sum(counts; dims=1))
+    any(iszero, totals) && throw(ArgumentError("histograms must contain at least one sample each"))
+    observed = vec(sum(counts; dims=2)) .> 0
+    x = Float64.(get_centers(reference))[observed]
+    counts = counts[observed, :]
+    log_sources = [_as_ensemble(source) for source in sources]
+    log_bias = [logweight(source, xᵢ) for xᵢ in x, source in log_sources]
+
+    log_g = log.(vec(sum(counts; dims=2)))
+    log_z = zeros(Float64, length(sources))
+    for _ in 1:n_iters
+        for i in eachindex(x)
+            log_g[i] = log(sum(counts[i, :])) -
+                log_sum([log(totals[j]) + log_bias[i, j] - log_z[j] for j in eachindex(sources)])
+        end
+        for j in eachindex(sources)
+            log_z[j] = log_sum(log_g .+ log_bias[:, j])
+        end
+    end
+    result = (x, log_g .- minimum(log_g))
+    return return_logz ? (result..., log_z) : result
+end
+
+"""Temperature convenience form using Boltzmann source ensembles."""
+wham(histograms::AbstractVector{<:BinnedObject}, kT::AbstractVector{<:Real}; kwargs...) =
+    wham(histograms, [BoltzmannEnsemble(β=inv(t)) for t in kT]; kwargs...)
