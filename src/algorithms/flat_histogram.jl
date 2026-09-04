@@ -67,7 +67,7 @@ function accept!(alg::MetropolisHastingsAlgorithm{<:WangLandauEnsemble}, arg_new
     accepted = accept_logratio!(alg, iszero(correction) ? log_ratio : log_ratio + correction)
     arg_vis = accepted ? arg_new : arg_old
     lw[arg_vis] -= ens.logf
-    ens.histogram[arg_vis] += 1
+    record_visit!(ens, arg_vis)
     return accepted
 end
 
