@@ -283,6 +283,41 @@ function test_binned_object_interpolation()
     return pass
 end
 
+function test_binned_object_push_empty()
+    pass = true
+
+    h = histogram(-4:2:4)
+    pass &= check(all(iszero, h.values), "histogram initialized to zero\n")
+    pass &= check(h isa BinnedObject{1,Float64,DiscreteBinning{Int},ZeroBoundary}, "histogram default ZeroBoundary\n")
+
+    push!(h, 0)
+    push!(h, 0)
+    push!(h, 2)
+    pass &= check(h[0] == 2.0, "push! increments correct bin\n")
+    pass &= check(h[2] == 1.0, "push! increments second bin\n")
+    pass &= check(h[-2] == 0.0, "unvisited bin remains 0\n")
+
+    # out of bounds push! on ZeroBoundary is a no-op
+    push!(h, 100)
+    push!(h, -100)
+    pass &= check(sum(h.values) == 3.0, "OOB push! with ZeroBoundary is dropped\n")
+
+    # 2D push!
+    h2d = histogram((0:2, 0:2))
+    push!(h2d, (1, 2))
+    push!(h2d, (1, 2))
+    pass &= check(h2d[1, 2] == 2.0, "2D push! works\n")
+    pass &= check(sum(h2d.values) == 2.0, "2D push! sum correct\n")
+
+    # empty!
+    empty!(h)
+    pass &= check(all(iszero, h.values), "empty! clears 1D histogram\n")
+    empty!(h2d)
+    pass &= check(all(iszero, h2d.values), "empty! clears 2D histogram\n")
+
+    return pass
+end
+
 @testset "BinnedObject" begin
     @testset "Discrete" begin
         @test test_binned_object_discrete()
@@ -298,5 +333,8 @@ end
     end
     @testset "Interpolation" begin
         @test test_binned_object_interpolation()
+    end
+    @testset "Push & Empty" begin
+        @test test_binned_object_push_empty()
     end
 end

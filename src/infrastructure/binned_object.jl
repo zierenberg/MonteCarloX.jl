@@ -231,6 +231,27 @@ end
 # default constructor
 @inline BinnedObject(domain; boundary::AbstractBoundary=ErrorBoundary(), interpretation::Symbol=:auto) = BinnedObject(domain, 0.0; boundary=boundary, interpretation=interpretation)
 
+"""
+    histogram(domain; init=0.0, boundary=ZeroBoundary(), interpretation=:auto)
+
+Construct a histogram from the same domain specification accepted by `BinnedObject`.
+The default `ZeroBoundary` ignores out-of-range increments, which is convenient for
+sampling histograms.
+
+Examples:
+```julia
+histogram(-2L^2:4:2L^2)
+histogram(0.0:0.1:1.0)
+histogram([0.0, 0.1, 0.25, 1.0])
+histogram((0:10, 0:10))
+```
+"""
+function histogram(domain; init::Real=0.0,
+                   boundary::AbstractBoundary=ZeroBoundary(),
+                   interpretation::Symbol=:auto)
+    BinnedObject(domain, init; boundary=boundary, interpretation=interpretation)
+end
+
 # size of the values array
 @inline Base.size(lw::BinnedObject) = size(lw.values)
 
@@ -295,6 +316,25 @@ end
     end
     return @inbounds (lw.values[idxs...] = v)
 end
+
+"""
+    push!(bo::BinnedObject, x)
+
+Record a sample at coordinate `x` by incrementing its bin (a histogram `push!`). This lets a
+`BinnedObject` histogram serve directly as a [`Measurement`](@ref) data container. Out-of-range
+samples follow the object's boundary policy (silently ignored under the default `ZeroBoundary`).
+For an `N`-dimensional object pass the coordinates as a tuple.
+"""
+@inline Base.push!(bo::BinnedObject{1,T}, x::Real) where {T} = (bo[x] += one(T); bo)
+@inline Base.push!(bo::BinnedObject{N,T}, xs::NTuple{N,Real}) where {N,T} = (bo[xs...] += one(T); bo)
+
+"""
+    empty!(bo::BinnedObject)
+
+Zero all bin values in place, preserving the binning. Lets `reset!(::Measurement)` clear a
+histogram-backed measurement between runs.
+"""
+@inline Base.empty!(bo::BinnedObject) = (fill!(bo.values, zero(eltype(bo.values))); bo)
 
 # BinnedObject equality
 ==(a::BinnedObject, b::BinnedObject) = (a.values == b.values && a.bins == b.bins)

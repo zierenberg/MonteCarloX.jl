@@ -158,11 +158,17 @@ end
 function update!(rx::ReplicaExchange{ThreadsBackend}, xs::AbstractVector{<:Real})
     length(xs) == size(rx) || throw(ArgumentError("xs must have length size(rx)"))
 
+    # Inverse permutation: position[ladder_index] = chain position. Built once in O(n) so the
+    # pair lookups below are O(1) instead of a findfirst scan (avoids O(n²) per exchange sweep).
+    position = Vector{Int}(undef, size(rx))
+    @inbounds for p in eachindex(rx.indices)
+        position[rx.indices[p]] = p
+    end
+
     first = iseven(rx.stage) ? 1 : 2
     @inbounds for pair_id in first:2:(size(rx) - 1)
-        ri = findfirst(==(pair_id), rx.indices)
-        rj = findfirst(==(pair_id + 1), rx.indices)
-        (ri === nothing || rj === nothing) && throw(ArgumentError("Replica-exchange local index permutation is inconsistent"))
+        ri = position[pair_id]
+        rj = position[pair_id + 1]
 
         rx.steps[pair_id] += 1
         u = rand(algorithm(rx, ri).rng)
@@ -170,6 +176,7 @@ function update!(rx::ReplicaExchange{ThreadsBackend}, xs::AbstractVector{<:Real}
         if did_accept
             rx.accepted[pair_id] += 1
             rx.indices[ri], rx.indices[rj] = rx.indices[rj], rx.indices[ri]
+            position[pair_id], position[pair_id + 1] = rj, ri
         end
     end
 

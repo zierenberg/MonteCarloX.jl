@@ -36,6 +36,7 @@ export  AbstractAlgorithm,
 
 include("infrastructure/binned_object.jl")
 export  BinnedObject,
+    histogram,
         DiscreteBinning,
         ContinuousBinning,
         ArbitraryContinuousBinning,
