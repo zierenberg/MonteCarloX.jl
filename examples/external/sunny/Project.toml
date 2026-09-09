@@ -1,4 +1,5 @@
 [deps]
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MCXSpins = "a4536488-68f2-4eaf-b6de-eac06300b674"
 MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"

@@ -6,19 +6,19 @@
 # 1. Sunny native
 # 2. Sunny model + MCX parallel tempering
 # 3. full MCX
-# 4. compare reconstructed energy distributions and runtime
+# 4. compare reconstructed density of states and runtime
 #
 # Reference: [Sunny's PT and WHAM example](https://github.com/SunnySuite/Sunny.jl/blob/main/examples/extra/Advanced_MC/PT_WHAM_ising2d.jl)
 #
 # Run: `julia --project=examples/external/sunny -t auto examples/external/sunny/sunny_pt.jl`
 
-using Random, Statistics, Plots, Printf, DelimitedFiles
+using Random, Statistics, Plots, Printf, DelimitedFiles, Markdown
 using Sunny, MonteCarloX, MCXSpins
 import MonteCarloX: histogram
 import MCXSpins: energy, logdos_exact_ising2D
 
 SEED = 42
-L = 8
+L = 20
 kT_min, kT_max = 0.5, 10.0
 n_replicas = 40
 n_therm = 1_000
@@ -39,7 +39,7 @@ function run_pt_sunny(; n_therm=n_therm, n_measure=n_measure)
                            [1 => Sunny.Moment(s=1, g=-1)], :dipole; dims=(L, L, 1), seed=0)
         Sunny.polarize_spins!(sys, [0, 0, 1])
         Sunny.set_exchange!(sys, -1.0, Sunny.Bond(1, 1, (1, 0, 0)))
-        kT_sched = exp.(range(log(kT_min), log(kT_max), length=n_replicas))   # geometric ladder
+        kT_sched = collect(range(kT_min, kT_max, length=n_replicas)) 
         PT = Sunny.ParallelTempering(sys, Sunny.LocalSampler(; kT=0, propose=Sunny.propose_flip), kT_sched)
         E_hists = [Sunny.Histogram(bin_size=1.0) for _ in 1:PT.n_replicas]
     end
@@ -52,7 +52,7 @@ function run_pt_sunny(; n_therm=n_therm, n_measure=n_measure)
             end
         end
     end
-    t_wham = @elapsed dos = Sunny.WHAM(E_hists, kT_sched; n_iters=1000)
+    t_wham = @elapsed dos = Sunny.WHAM(E_hists, kT_sched; n_iters=10_000) 
     dos, PT.n_accept ./ PT.n_exch, (t_create, t_run, t_wham)
 end
 
@@ -92,7 +92,7 @@ sweep!(sys, alg, n) = (for _ in 1:n, _ in 1:L^2; spin_flip!(sys, alg); end)
 
 function run_pt_bridge(; n_therm=n_therm, n_measure=n_measure)
     t_create = @elapsed begin
-        kT_sched = exp.(range(log(kT_min), log(kT_max), length=n_replicas))   # geometric ladder
+        kT_sched = collect(range(kT_min, kT_max, length=n_replicas))
         systems = [SunnyIsing(L) for _ in 1:n_replicas]
         pt = ParallelTempering(1 ./ kT_sched; seed=SEED, rng=Xoshiro)
         E_hists = [histogram(-2L^2:4:2L^2) for _ in 1:n_replicas]
@@ -116,7 +116,7 @@ function run_pt_bridge(; n_therm=n_therm, n_measure=n_measure)
             end
         end
     end
-    t_wham = @elapsed dos = wham(E_hists, kT_sched)
+    t_wham = @elapsed dos = wham(E_hists, kT_sched, n_iters=10_000)
     dos, acceptance_rates(pt), (t_create, t_run, t_wham)
 end
 
@@ -128,7 +128,7 @@ end
 
 function run_pt_mcx(; n_therm=n_therm, n_measure=n_measure)
     t_create = @elapsed begin
-        kT_sched = exp.(range(log(kT_min), log(kT_max), length=n_replicas))   # geometric ladder
+        kT_sched = collect(range(kT_min, kT_max, length=n_replicas)) 
         systems = [IsingSystem([L, L]) for _ in 1:n_replicas]
         pt = ParallelTempering(1 ./ kT_sched; seed=SEED, rng=Xoshiro)
         E_hists = [histogram(-2L^2:4:2L^2) for _ in 1:n_replicas]
@@ -153,7 +153,7 @@ function run_pt_mcx(; n_therm=n_therm, n_measure=n_measure)
             end
         end
     end
-    t_wham = @elapsed dos = wham(E_hists, kT_sched)
+    t_wham = @elapsed dos = wham(E_hists, kT_sched, n_iters=10_000)
     dos, acceptance_rates(pt), (t_create, t_run, t_wham)
 end
 
@@ -168,25 +168,24 @@ datadir     = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..
 dos_file    = joinpath(datadir, "sunny_pt_L$(L)_dos.tsv")     # hide
 timing_file = joinpath(datadir, "sunny_pt_L$(L)_timing.tsv")  # hide
 
-# Normalize each ln-DoS to a probability over the common energy window: subtracting `log_sum`
-# anchors the curves by their total (bulk-dominated) weight, where the statistics live. `Emax`
-# optionally caps the upper energy (drop the marginally-sampled peak/tail).
-function common_logdos(curves...; Emax=nothing)
-    lo = maximum(minimum(E) for (E, _) in curves)
-    hi = Emax === nothing ? minimum(maximum(E) for (E, _) in curves) : Emax
-    map(curves) do (E, log_g)
-        m = lo .<= E .<= hi
-        (E[m], log_g[m] .- MonteCarloX.log_sum(log_g[m]))
-    end
-end
+## Restrict each ln-DoS to the common energy window and anchor it to zero at the lowest      # hide
+## sampled energy (the Beale convention); `Emax` optionally caps the upper energy.            # hide
+function common_logdos(curves...; Emax=nothing)                                               # hide
+    lo = maximum(minimum(E) for (E, _) in curves)                                             # hide
+    hi = Emax === nothing ? minimum(maximum(E) for (E, _) in curves) : Emax                   # hide
+    map(curves) do (E, log_g)                                                                 # hide
+        m = lo .<= E .<= hi                                                                   # hide
+        (E[m], log_g[m] .- log_g[m][argmin(E[m])])                                            # hide
+    end                                                                                       # hide
+end                                                                                           # hide
 
 if !isfile(dos_file)                                                        # hide
-    run_pt_sunny(n_therm=exch_interval, n_measure=1)                        # warmup: compile all paths # hide
+    run_pt_sunny(n_therm=exch_interval, n_measure=1)                        # hide
     run_pt_bridge(n_therm=exch_interval, n_measure=1)                       # hide
     run_pt_mcx(n_therm=exch_interval, n_measure=1)                          # hide
-    sunny_dos,  sunny_A,  sunny_t  = run_pt_sunny()
-    bridge_dos, bridge_A, bridge_t = run_pt_bridge()
-    mcx_dos,    mcx_A,    mcx_t    = run_pt_mcx()
+    sunny_dos,  sunny_A,  sunny_t  = run_pt_sunny()                         # hide
+    bridge_dos, bridge_A, bridge_t = run_pt_bridge()                        # hide
+    mcx_dos,    mcx_A,    mcx_t    = run_pt_mcx()                           # hide
 
     # overlay the exact Beale density of states (MCXSpins) when it is tabulated for this L
     labeled = [("Sunny", sunny_dos), ("MCX bridge", bridge_dos), ("MCX native", mcx_dos)]
@@ -215,22 +214,31 @@ if !isfile(dos_file)                                                        # hi
     writedlm(timing_file, [["implementation" "create" "run" "wham" "p_mean" "p_min" "p_max"]; timemat], '\t')  # hide
 end                                                                         # hide
 
-# Report the (cached) timings and plot the (cached) reconstructed log-DoS.
-dosdata, doshdr = readdlm(dos_file, '\t'; header=true)
-timedata        = readdlm(timing_file, '\t'; header=true)[1]
-println("Parallel Tempering: 2D Ising, L=$L, n_replicas=$n_replicas  (threads=$(Threads.nthreads()))")
-println(@sprintf "n_therm=%d  n_measure=%d  measure_interval=%d  exch_interval=%d" n_therm n_measure measure_interval exch_interval)
-println("-"^60)
-println("  implementation   create [s]   run [s]   wham [s]   <p_exch>  min   max")
-for r in axes(timedata, 1)
-    println(@sprintf "  %-13s  %8.4f  %8.4f  %8.4f    %.3f  %.3f  %.3f" timedata[r, 1] timedata[r, 2] timedata[r, 3] timedata[r, 4] timedata[r, 5] timedata[r, 6] timedata[r, 7])
-end
+# The three implementations, timed side by side. `create`/`run`/`wham` are the three timed
+# stages; `⟨p_exch⟩` is the mean replica-exchange acceptance over the ladder edges (min–max in
+# parentheses flag a tunneling bottleneck). Identical physics, so the numbers are directly
+# comparable.
 
-E = dosdata[:, 1]
-plt = plot(; xlabel="E", ylabel="ln p(E)", title="2D Ising PT, L=$L")
-for j in 2:size(dosdata, 2)
-    plot!(plt, E, dosdata[:, j]; label=doshdr[j], lw=2,
-          ls=(doshdr[j] == "exact" ? :dash : :solid), lc=(doshdr[j] == "exact" ? :black : :auto))
-end
-savefig(plt, joinpath(@__DIR__, "sunny_pt_dos.png"))
-plt
+timedata = readdlm(timing_file, '\t'; header=true)[1]                                          # hide
+io = IOBuffer()                                                                                 # hide
+println(io, "| implementation | create [s] | run [s] | wham [s] | ⟨p_exch⟩ (min–max) |")       # hide
+println(io, "|---|---:|---:|---:|---:|")                                                        # hide
+for r in axes(timedata, 1)                                                                      # hide
+    println(io, @sprintf("| %s | %.3f | %.3f | %.3f | %.3f (%.3f–%.3f) |",                      # hide
+        timedata[r, 1], timedata[r, 2], timedata[r, 3], timedata[r, 4],                         # hide
+        timedata[r, 5], timedata[r, 6], timedata[r, 7]))                                        # hide
+end                                                                                             # hide
+Markdown.parse(String(take!(io)))                                                               # hide
+
+# The reconstructed log-density of states, all three implementations against the exact Beale
+# reference — they overlap, which is the correctness check that makes the timing table meaningful.
+
+dosdata, doshdr = readdlm(dos_file, '\t'; header=true)                                          # hide
+E = dosdata[:, 1]                                                                               # hide
+plt = plot(; xlabel="E", ylabel="ln p(E)", title="2D Ising PT, L=$L")                           # hide
+for j in 2:size(dosdata, 2)                                                                     # hide
+    plot!(plt, E, dosdata[:, j]; label=doshdr[j], lw=2,                                         # hide
+          ls=(doshdr[j] == "exact" ? :dash : :solid), lc=(doshdr[j] == "exact" ? :black : :auto))  # hide
+end                                                                                             # hide
+savefig(plt, joinpath(@__DIR__, "sunny_pt_dos.png"))                                            # hide
+plt                                                                                             # hide

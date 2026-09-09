@@ -120,7 +120,7 @@ that the source and target distributions overlap too little for reliable reweigh
 ess(iw::ImportanceWeights) = exp(2 * iw.log_sum_weights - log_sum(2 .* iw.logw))
 
 """
-    wham(histograms, sources; n_iters=1000, return_logz=false)
+    wham(histograms, sources; n_iters=:auto, tol=1e-8, max_iters=100_000, return_logz=false)
 
 Estimate a common log-density from multiple histograms. WHAM means *weighted
 histogram analysis method*: histogram `Hᵢ(x)` contains samples drawn from source
@@ -140,11 +140,22 @@ may be any `AbstractEnsemble` or callable accepted by [`reweight`](@ref), so
 WHAM is not limited to Boltzmann weights. Histograms must be one-dimensional,
 non-empty, and share identical bins. Empty bins are omitted from the result.
 
+By default (`n_iters=:auto`) the iteration runs to self-consistency: it stops once
+no `log Zᵢ` changes by more than `tol` in one iteration, capped at `max_iters`
+(with a warning if the cap is hit before `tol` — raise `max_iters` then). A fixed
+integer `n_iters` runs exactly that many iterations; beware that this can silently
+under-converge when the fitted `log Zᵢ` spread is large (e.g. deep low-temperature
+tails), biasing the poorly-overlapping bins. `tol` and `max_iters` only apply to
+`:auto`.
+
 Returns `(x, log_g)`, normalized only up to the unavoidable additive constant.
 Set `return_logz=true` to additionally return the fitted `log Z` values.
 """
 function wham(histograms::AbstractVector{<:BinnedObject}, sources::AbstractVector;
-             n_iters::Int=1000, return_logz::Bool=false)
+             n_iters::Union{Int,Symbol}=:auto, tol::Real=1e-8, max_iters::Int=100_000,
+             return_logz::Bool=false)
+    n_iters isa Int || n_iters === :auto ||
+        throw(ArgumentError("n_iters must be an Int or :auto"))
     isempty(histograms) && throw(ArgumentError("histograms must be non-empty"))
     length(histograms) == length(sources) ||
         throw(DimensionMismatch("one source is required per histogram"))
@@ -165,15 +176,22 @@ function wham(histograms::AbstractVector{<:BinnedObject}, sources::AbstractVecto
 
     log_g = log.(vec(sum(counts; dims=2)))
     log_z = zeros(Float64, length(sources))
-    for _ in 1:n_iters
+    auto = n_iters === :auto
+    Δ = Inf
+    for _ in 1:(auto ? max_iters : n_iters)
         for i in eachindex(x)
             log_g[i] = log(sum(counts[i, :])) -
                 log_sum([log(totals[j]) + log_bias[i, j] - log_z[j] for j in eachindex(sources)])
         end
+        Δ = 0.0
         for j in eachindex(sources)
-            log_z[j] = log_sum(log_g .+ log_bias[:, j])
+            z = log_sum(log_g .+ log_bias[:, j])
+            Δ = max(Δ, abs(z - log_z[j]))
+            log_z[j] = z
         end
+        auto && Δ < tol && break
     end
+    auto && Δ >= tol && @warn "wham(n_iters=:auto) hit max_iters=$max_iters before reaching tol=$tol (Δ=$Δ)"
     result = (x, log_g .- minimum(log_g))
     return return_logz ? (result..., log_z) : result
 end
