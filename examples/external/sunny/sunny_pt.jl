@@ -11,6 +11,7 @@
 # Reference: [Sunny's PT and WHAM example](https://github.com/SunnySuite/Sunny.jl/blob/main/examples/extra/Advanced_MC/PT_WHAM_ising2d.jl)
 #
 # Run: `julia --project=examples/external/sunny -t auto examples/external/sunny/sunny_pt.jl`
+# (append `--rerun` to overwrite the cached results instead of reloading them)
 
 using Random, Statistics, Plots, Printf, DelimitedFiles, Markdown
 using Sunny, MonteCarloX, MCXSpins
@@ -39,7 +40,7 @@ function run_pt_sunny(; n_therm=n_therm, n_measure=n_measure)
                            [1 => Sunny.Moment(s=1, g=-1)], :dipole; dims=(L, L, 1), seed=0)
         Sunny.polarize_spins!(sys, [0, 0, 1])
         Sunny.set_exchange!(sys, -1.0, Sunny.Bond(1, 1, (1, 0, 0)))
-        kT_sched = collect(range(kT_min, kT_max, length=n_replicas)) 
+        kT_sched = collect(range(kT_min, kT_max, length=n_replicas))
         PT = Sunny.ParallelTempering(sys, Sunny.LocalSampler(; kT=0, propose=Sunny.propose_flip), kT_sched)
         E_hists = [Sunny.Histogram(bin_size=1.0) for _ in 1:PT.n_replicas]
     end
@@ -128,7 +129,7 @@ end
 
 function run_pt_mcx(; n_therm=n_therm, n_measure=n_measure)
     t_create = @elapsed begin
-        kT_sched = collect(range(kT_min, kT_max, length=n_replicas)) 
+        kT_sched = collect(range(kT_min, kT_max, length=n_replicas))
         systems = [IsingSystem([L, L]) for _ in 1:n_replicas]
         pt = ParallelTempering(1 ./ kT_sched; seed=SEED, rng=Xoshiro)
         E_hists = [histogram(-2L^2:4:2L^2) for _ in 1:n_replicas]
@@ -167,6 +168,7 @@ end
 datadir     = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..", "..", "docs", "src", "data")))  # hide
 dos_file    = joinpath(datadir, "sunny_pt_L$(L)_dos.tsv")     # hide
 timing_file = joinpath(datadir, "sunny_pt_L$(L)_timing.tsv")  # hide
+rerun       = "--rerun" in ARGS || "--reset" in ARGS  # pass --rerun to overwrite the cached results  # hide
 
 ## Restrict each ln-DoS to the common energy window and anchor it to zero at the lowest      # hide
 ## sampled energy (the Beale convention); `Emax` optionally caps the upper energy.            # hide
@@ -179,13 +181,14 @@ function common_logdos(curves...; Emax=nothing)                                 
     end                                                                                       # hide
 end                                                                                           # hide
 
-if !isfile(dos_file)                                                        # hide
-    run_pt_sunny(n_therm=exch_interval, n_measure=1)                        # hide
+runstage(label, f) = (print(stderr, label, " ... "); flush(stderr); r = f(); println(stderr, "done"); r)  # hide
+if rerun || !isfile(dos_file)                                               # hide
+    run_pt_sunny(n_therm=exch_interval, n_measure=1)                        # warmup (compile) # hide
     run_pt_bridge(n_therm=exch_interval, n_measure=1)                       # hide
     run_pt_mcx(n_therm=exch_interval, n_measure=1)                          # hide
-    sunny_dos,  sunny_A,  sunny_t  = run_pt_sunny()                         # hide
-    bridge_dos, bridge_A, bridge_t = run_pt_bridge()                        # hide
-    mcx_dos,    mcx_A,    mcx_t    = run_pt_mcx()                           # hide
+    sunny_dos,  sunny_A,  sunny_t  = runstage("Sunny native", run_pt_sunny)  # hide
+    bridge_dos, bridge_A, bridge_t = runstage("MCX bridge  ", run_pt_bridge) # hide
+    mcx_dos,    mcx_A,    mcx_t    = runstage("MCX native  ", run_pt_mcx)    # hide
 
     # overlay the exact Beale density of states (MCXSpins) when it is tabulated for this L
     labeled = [("Sunny", sunny_dos), ("MCX bridge", bridge_dos), ("MCX native", mcx_dos)]
@@ -212,6 +215,8 @@ if !isfile(dos_file)                                                        # hi
     mkpath(datadir)                                                                        # hide
     writedlm(dos_file,    [permutedims(["E"; names]); hcat(Egrid, dosmat)], '\t')          # hide
     writedlm(timing_file, [["implementation" "create" "run" "wham" "p_mean" "p_min" "p_max"]; timemat], '\t')  # hide
+else                                                                        # hide
+    println(stderr, "loaded precomputed results from $(relpath(dos_file)) (pass --rerun to recompute)")  #src
 end                                                                         # hide
 
 # The three implementations, timed side by side. `create`/`run`/`wham` are the three timed
@@ -220,6 +225,16 @@ end                                                                         # hi
 # comparable.
 
 timedata = readdlm(timing_file, '\t'; header=true)[1]                                          # hide
+## echo setup + timings to the terminal (the Markdown table below is for the rendered docs)    # hide
+println("\nParallel Tempering: 2D Ising, L=$L, n_replicas=$n_replicas  (threads=$(Threads.nthreads()))")  # hide
+println(@sprintf("n_therm=%d  n_measure=%d  measure_interval=%d  exch_interval=%d",             # hide
+                 n_therm, n_measure, measure_interval, exch_interval))                          # hide
+println(@sprintf("%-14s %10s %9s %9s %20s", "implementation", "create[s]", "run[s]", "wham[s]", "⟨p_exch⟩ (min–max)"))  # hide
+for r in axes(timedata, 1)                                                                      # hide
+    println(@sprintf("%-14s %10.3f %9.3f %9.3f   %.3f (%.3f–%.3f)",                             # hide
+        timedata[r, 1], timedata[r, 2], timedata[r, 3], timedata[r, 4],                         # hide
+        timedata[r, 5], timedata[r, 6], timedata[r, 7]))                                        # hide
+end                                                                                             # hide
 io = IOBuffer()                                                                                 # hide
 println(io, "| implementation | create [s] | run [s] | wham [s] | ⟨p_exch⟩ (min–max) |")       # hide
 println(io, "|---|---:|---:|---:|---:|")                                                        # hide

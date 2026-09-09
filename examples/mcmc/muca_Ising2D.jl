@@ -15,6 +15,7 @@ using MonteCarloX, MCXSpins, MPI
 datadir   = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..", "docs", "src", "data")))   # hide
 lw_file   = joinpath(datadir, "muca_Ising2D_logweight.tsv")     # hide
 hist_file = joinpath(datadir, "muca_Ising2D_histogram.tsv")     # hide
+rerun     = "--rerun" in ARGS || "--reset" in ARGS              # hide
 L      = 8
 n_iter = 10
 nothing # hide
@@ -27,7 +28,7 @@ nothing # hide
 sweep!(sys, alg, n_sweeps) =
     (for _ in 1:n_sweeps, _ in 1:length(sys.spins); spin_flip!(sys, alg); end)
 
-if !isfile(lw_file)                                             # hide
+if rerun || !isfile(lw_file)                                    # hide
 E   = get_centers(logdos_exact_ising2D(L))
 sys = IsingSystem([L, L])
 init!(sys, :random, rng = Xoshiro(1000))
@@ -48,6 +49,8 @@ header = permutedims(["E"; ["iter$(it)" for it in 1:n_iter]])   # hide
 mkpath(datadir)                                                 # hide
 writedlm(lw_file,   [header; hcat(E, W)], '\t')                 # hide
 writedlm(hist_file, [header; hcat(E, H)], '\t')                 # hide
+else                                                                # hide
+println(stderr, "loaded precomputed results from $(relpath(lw_file)) (pass --rerun to recompute)")  #src
 end                                                                 # hide
 lw = readdlm(lw_file,   '\t'; header = true)[1]                     # hide
 hh = readdlm(hist_file, '\t'; header = true)[1]                     # hide
@@ -105,7 +108,7 @@ plot(p1, p2, p3; layout = (1, 3), size = (1100, 300), margin = 4Plots.mm)
 threads_file = joinpath(datadir, "muca_Ising2D_threads.tsv")       # hide
 tsv_header   = permutedims(["E"; ["iter$(it)" for it in 1:n_iter]]) # hide
 E_bins       = get_centers(logdos_exact_ising2D(L))                 # hide
-if Threads.nthreads() > 1 && !isfile(threads_file)                 # hide
+if Threads.nthreads() > 1 && (rerun || !isfile(threads_file))      # hide
 backend = init(:threads)                                # one replica per thread
 algs    = [MulticanonicalAlgorithm(Xoshiro(1000 + i), E_bins) for i in 1:size(backend)]
 pmuca   = ParallelMulticanonical(backend, algs)
@@ -138,7 +141,7 @@ nothing # hide
 # standalone template in `examples/mcmc/muca_Ising2D_mpi.jl`.
 
 mpi_file = joinpath(datadir, "muca_Ising2D_mpi.tsv")               # hide
-if get(ENV, "MCX_MPI", "0") == "1" && !isfile(mpi_file)            # hide
+if get(ENV, "MCX_MPI", "0") == "1" && (rerun || !isfile(mpi_file)) # hide
 backend = init(:MPI)                                      # one rank per replica
 alg     = MulticanonicalAlgorithm(Xoshiro(1000 + rank(backend)), E_bins)
 pmuca   = ParallelMulticanonical(backend, alg)

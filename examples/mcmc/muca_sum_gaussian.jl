@@ -19,6 +19,7 @@ dist_file   = joinpath(datadir, "muca_sum_gaussian_distributions.tsv")  # hide
 iterh_file  = joinpath(datadir, "muca_sum_gaussian_iter_hist.tsv")      # hide
 iterw_file  = joinpath(datadir, "muca_sum_gaussian_iter_logweight.tsv") # hide
 accept_file = joinpath(datadir, "muca_sum_gaussian_acceptance.tsv")     # hide
+rerun       = "--rerun" in ARGS || "--reset" in ARGS                    # hide
 
 n_direct     = 100_000
 n_therm      = 10_000
@@ -89,7 +90,7 @@ nothing #hide
 # sampling learns flat weights so the whole support — including rare tails — is
 # visited uniformly, either from scratch or from known/iterated weights.
 
-if !isfile(dist_file)                                          # hide
+if rerun || !isfile(dist_file)                                 # hide
 ## direct sampling
 direct_samples = [sum(μ .+ σ .* randn(Xoshiro(i), N)) for i in 1:n_direct]
 dist_direct    = normalize(fit(Histogram, direct_samples, bins_sum); mode = :pdf).weights
@@ -164,6 +165,8 @@ iheader = permutedims(["S_N"; ["iter$(it)" for it in 1:n_iter]])         # hide
 writedlm(iterh_file, [iheader; hcat(centers_sum, iter_hist)], '\t')      # hide
 writedlm(iterw_file, [iheader; hcat(centers_sum, iter_lw)], '\t')        # hide
 writedlm(accept_file, ["iter" "acceptance"; hcat(1:n_iter, iter_accept)], '\t')  # hide
+else                                                                      # hide
+println(stderr, "loaded precomputed results from $(relpath(dist_file)) (pass --rerun to recompute)")  #src
 end                                                                       # hide
 dd = readdlm(dist_file, '\t'; header = true)[1]                          # hide
 ih = readdlm(iterh_file, '\t'; header = true)[1]                         # hide

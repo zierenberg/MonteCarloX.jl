@@ -28,6 +28,7 @@ using MonteCarloX, MCXSpins
 
 datadir   = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..", "docs", "src", "data")))  # hide
 scan_file = joinpath(datadir, "glauber_nonreciprocal_scan.tsv")  # hide
+rerun     = "--rerun" in ARGS || "--reset" in ARGS               # hide
 nothing #hide
 
 # ## Parameters
@@ -66,10 +67,12 @@ nothing #hide
 # higher ``T`` as nonreciprocity increases, while ``T_c(0)\approx2.269`` recovers the
 # equilibrium 2D Ising value.
 
-if !isfile(scan_file)                                           # hide
+if rerun || !isfile(scan_file)                                  # hide
 m = [mean_abs_m(κ, T) for T in Ts, κ in κs]
 header = permutedims(["T"; ["kappa$(κ)" for κ in κs]])          # hide
 writedlm(scan_file, [header; hcat(Ts, m)], '\t')                # hide
+else                                                            # hide
+println(stderr, "loaded precomputed results from $(relpath(scan_file)) (pass --rerun to recompute)")  #src
 end                                                             # hide
 m = readdlm(scan_file, '\t'; header = true)[1][:, 2:end]        # hide
 

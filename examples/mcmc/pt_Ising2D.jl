@@ -16,6 +16,7 @@ using MonteCarloX, MCXSpins, MPI
 datadir      = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..", "docs", "src", "data")))  # hide
 samples_file = joinpath(datadir, "pt_Ising2D_energies.tsv")    # hide
 betas_file   = joinpath(datadir, "pt_Ising2D_betas.tsv")       # hide
+rerun        = "--rerun" in ARGS || "--reset" in ARGS          # hide
 
 L                       = 8
 nreplicas               = 4
@@ -42,7 +43,7 @@ nothing # hide
 # measurement sweeps (recording each replica's energy, tagged by its current
 # temperature index) and exchange attempts between neighbors.
 
-if !isfile(samples_file)                                        # hide
+if rerun || !isfile(samples_file)                               # hide
 betas   = set_betas(nreplicas, inv(Tmax), inv(Tmin), :uniform)
 systems = [IsingSystem([L, L]) for _ in 1:nreplicas]
 pt      = ParallelTempering(betas; seed = seed, rng = Xoshiro)
@@ -93,6 +94,8 @@ energy_col  = reduce(vcat, energy_samples)                                      
 mkpath(datadir)                                                                         # hide
 writedlm(samples_file, ["replica" "energy"; hcat(replica_col, energy_col)], '\t')       # hide
 writedlm(betas_file,   ["beta"; betas], '\t')                                           # hide
+else                                                            # hide
+println(stderr, "loaded precomputed results from $(relpath(samples_file)) (pass --rerun to recompute)")  #src
 end                                                             # hide
 sm    = readdlm(samples_file, '\t'; header = true)[1]          # hide
 betas = vec(readdlm(betas_file, '\t'; header = true)[1])       # hide
@@ -142,7 +145,7 @@ plot(plots...; layout = (2, 2), size = (950, 720), margin = 3Plots.mm)
 # concurrently, then the exchange step swaps neighbours. Launch with `julia -t 4`.
 
 pt_threads_file = joinpath(datadir, "pt_Ising2D_threads.tsv")      # hide
-if Threads.nthreads() > 1 && !isfile(pt_threads_file)              # hide
+if Threads.nthreads() > 1 && (rerun || !isfile(pt_threads_file))   # hide
 backend = init(:threads)
 betas_p = set_betas(size(backend), inv(Tmax), inv(Tmin), :uniform)
 algs    = [MetropolisAlgorithm(Xoshiro(seed + i); β = betas_p[i]) for i in 1:size(backend)]
@@ -173,7 +176,7 @@ nothing # hide
 # template is `examples/mcmc/pt_Ising2D_mpi.jl`.
 
 pt_mpi_file = joinpath(datadir, "pt_Ising2D_mpi.tsv")             # hide
-if get(ENV, "MCX_MPI", "0") == "1" && !isfile(pt_mpi_file)        # hide
+if get(ENV, "MCX_MPI", "0") == "1" && (rerun || !isfile(pt_mpi_file))  # hide
 backend = init(:MPI)                                      # one rank per replica
 betas_p = set_betas(size(backend), inv(Tmax), inv(Tmin), :uniform)
 pt  = ParallelTempering(betas_p; seed = seed, rng = Xoshiro, backend = backend)
