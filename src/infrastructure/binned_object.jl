@@ -231,27 +231,6 @@ end
 # default constructor
 @inline BinnedObject(domain; boundary::AbstractBoundary=ErrorBoundary(), interpretation::Symbol=:auto) = BinnedObject(domain, 0.0; boundary=boundary, interpretation=interpretation)
 
-"""
-    histogram(domain; init=0.0, boundary=ZeroBoundary(), interpretation=:auto)
-
-Construct a histogram from the same domain specification accepted by `BinnedObject`.
-The default `ZeroBoundary` ignores out-of-range increments, which is convenient for
-sampling histograms.
-
-Examples:
-```julia
-histogram(-2L^2:4:2L^2)
-histogram(0.0:0.1:1.0)
-histogram([0.0, 0.1, 0.25, 1.0])
-histogram((0:10, 0:10))
-```
-"""
-function histogram(domain; init::Real=0.0,
-                   boundary::AbstractBoundary=ZeroBoundary(),
-                   interpretation::Symbol=:auto)
-    BinnedObject(domain, init; boundary=boundary, interpretation=interpretation)
-end
-
 # size of the values array
 @inline Base.size(lw::BinnedObject) = size(lw.values)
 

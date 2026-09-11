@@ -286,9 +286,9 @@ end
 function test_binned_object_push_empty()
     pass = true
 
-    h = histogram(-4:2:4)
+    h = BinnedObject(-4:2:4, 0.0; boundary=ZeroBoundary())
     pass &= check(all(iszero, h.values), "histogram initialized to zero\n")
-    pass &= check(h isa BinnedObject{1,Float64,DiscreteBinning{Int},ZeroBoundary}, "histogram default ZeroBoundary\n")
+    pass &= check(h isa BinnedObject{1,Float64,DiscreteBinning{Int},ZeroBoundary}, "histogram-style ZeroBoundary\n")
 
     push!(h, 0)
     push!(h, 0)
@@ -303,7 +303,7 @@ function test_binned_object_push_empty()
     pass &= check(sum(h.values) == 3.0, "OOB push! with ZeroBoundary is dropped\n")
 
     # 2D push!
-    h2d = histogram((0:2, 0:2))
+    h2d = BinnedObject((0:2, 0:2), 0.0; boundary=ZeroBoundary())
     push!(h2d, (1, 2))
     push!(h2d, (1, 2))
     pass &= check(h2d[1, 2] == 2.0, "2D push! works\n")

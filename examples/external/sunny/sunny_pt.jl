@@ -15,7 +15,6 @@
 
 using Random, Statistics, Plots, Printf, DelimitedFiles, Markdown
 using Sunny, MonteCarloX, MCXSpins
-import MonteCarloX: histogram
 import MCXSpins: energy, logdos_exact_ising2D
 
 SEED = 42
@@ -96,7 +95,7 @@ function run_pt_bridge(; n_therm=n_therm, n_measure=n_measure)
         kT_sched = collect(range(kT_min, kT_max, length=n_replicas))
         systems = [SunnyIsing(L) for _ in 1:n_replicas]
         pt = ParallelTempering(1 ./ kT_sched; seed=SEED, rng=Xoshiro)
-        E_hists = [histogram(-2L^2:4:2L^2) for _ in 1:n_replicas]
+        E_hists = [BinnedObject(-2L^2:4:2L^2, 0.0; boundary=ZeroBoundary()) for _ in 1:n_replicas]
     end
     t_run = @elapsed begin
         for _ in 1:(n_therm ÷ exch_interval)
@@ -132,7 +131,7 @@ function run_pt_mcx(; n_therm=n_therm, n_measure=n_measure)
         kT_sched = collect(range(kT_min, kT_max, length=n_replicas))
         systems = [IsingSystem([L, L]) for _ in 1:n_replicas]
         pt = ParallelTempering(1 ./ kT_sched; seed=SEED, rng=Xoshiro)
-        E_hists = [histogram(-2L^2:4:2L^2) for _ in 1:n_replicas]
+        E_hists = [BinnedObject(-2L^2:4:2L^2, 0.0; boundary=ZeroBoundary()) for _ in 1:n_replicas]
         for s in systems; init!(s, :up) end
     end
     t_run = @elapsed begin
