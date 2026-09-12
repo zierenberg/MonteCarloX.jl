@@ -16,6 +16,7 @@ datadir   = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..",
 hist_file = joinpath(datadir, "muca_LJgas_histogram.tsv")     # hide
 lw_file   = joinpath(datadir, "muca_LJgas_logweight.tsv")     # hide
 diag_file = joinpath(datadir, "muca_LJgas_diagnostics.tsv")   # hide
+rerun     = "--rerun" in ARGS || "--reset" in ARGS            # hide
 
 N              = 16
 rho            = 0.01
@@ -54,7 +55,7 @@ nothing #hide
 # the recursive scheme, reapplying temperature ramps outside the target range and
 # tracking acceptance, flatness, and round trips.
 
-if !isfile(lw_file)                                            # hide
+if rerun || !isfile(lw_file)                                  # hide
 sys = ParticleGas(; N = N, rho = rho, pair_potential = lj)
 init!(sys, :random; rng = Xoshiro(42))
 dx_short = 0.1
@@ -97,6 +98,8 @@ writedlm(hist_file, [header; hcat(E, H)], '\t')                   # hide
 writedlm(lw_file,   [header; hcat(E, W)], '\t')                   # hide
 writedlm(diag_file, ["iter" "acceptrate" "flatness" "roundtrips"; # hide
                      hcat(1:num_iter, acceptrate, flatness_log, roundtrip_log)], '\t')  # hide
+else                                                               # hide
+println(stderr, "loaded precomputed results from $(relpath(lw_file)) (pass --rerun to recompute)")  #src
 end                                                                # hide
 hh = readdlm(hist_file, '\t'; header = true)[1]                   # hide
 ll = readdlm(lw_file,   '\t'; header = true)[1]                   # hide

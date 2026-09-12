@@ -41,6 +41,7 @@ function discover_scripts(root::String)
     scripts = String[]
     for (dir, _, files) in walkdir(root)
         "todos" in splitpath(dir) && continue   # incomplete/experimental drafts, not built
+        "external" in splitpath(dir) && continue   # isolated optional env with external deps
         for f in files
             endswith(f, ".jl")             || continue
             f == "runtests.jl"             && continue

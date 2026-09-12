@@ -160,6 +160,46 @@ function test_reweight_binned_logdos()
     return pass
 end
 
+function test_wham_general_sources()
+    bins = -1:1
+    h1 = BinnedObject(bins, 0.0; boundary=ZeroBoundary())
+    h2 = BinnedObject(bins, 0.0; boundary=ZeroBoundary())
+    h1.values .= [10.0, 20.0, 40.0]
+    h2.values .= [10.0, 20.0, 80.0]
+
+    x, log_g = wham([h1, h2], [x -> 0.0, x -> (x == 1 ? log(2.0) : 0.0)])
+    expected = log.([1.0, 2.0, 4.0])
+    @test x == collect(float.(bins))
+    @test isapprox(log_g .- log_g[1], expected .- expected[1]; atol=1e-6)   # :auto stops at tol
+    _, log_g_tight = wham([h1, h2], [x -> 0.0, x -> (x == 1 ? log(2.0) : 0.0)]; tol=1e-13)
+    @test isapprox(log_g_tight .- log_g_tight[1], expected .- expected[1]; atol=1e-10)
+
+    x_temperature, log_g_temperature = wham([h1, h2], [1.0, 2.0])
+    @test x_temperature == x
+    @test all(isfinite, log_g_temperature)
+    return true
+end
+
+function test_wham_auto_iters()
+    # ideal histograms from a known log-density: :auto must recover it to tol accuracy
+    bins = 0:19
+    log_g = 0.1 .* collect(bins) .^ 2
+    kT = [0.5, 1.0, 2.0, 5.0]
+    hists = map(kT) do t
+        h = BinnedObject(bins, 0.0; boundary=ZeroBoundary())
+        lnp = log_g .- collect(bins) ./ t
+        h.values .= 1e6 .* exp.(lnp .- MonteCarloX.log_sum(lnp))
+        h
+    end
+    x, lg_auto = wham(hists, kT; n_iters=:auto, tol=1e-12)
+    _, lg_ref = wham(hists, kT; n_iters=200_000)
+    @test isapprox(lg_auto .- lg_auto[1], log_g .- log_g[1]; atol=1e-6)
+    @test isapprox(lg_auto, lg_ref; atol=1e-8)
+    @test_throws ArgumentError wham(hists, kT; n_iters=:fast)
+    @test_logs (:warn, r"hit max_iters") wham(hists, kT; tol=1e-12, max_iters=3)
+    return true
+end
+
 @testset "Reweighting" begin
     @testset "identity (source == target)" begin
         @test test_reweight_identity()
@@ -181,6 +221,12 @@ end
     end
     @testset "binned log-density" begin
         @test test_reweight_binned_logdos()
+    end
+    @testset "generalized WHAM" begin
+        @test test_wham_general_sources()
+    end
+    @testset "WHAM n_iters=:auto" begin
+        @test test_wham_auto_iters()
     end
 end
 

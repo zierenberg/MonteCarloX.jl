@@ -18,6 +18,7 @@ datadir   = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..",
 hist_file = joinpath(datadir, "muca_BlumeCapel_histogram.tsv")     # hide
 lw_file   = joinpath(datadir, "muca_BlumeCapel_logweight.tsv")     # hide
 diag_file = joinpath(datadir, "muca_BlumeCapel_diagnostics.tsv")   # hide
+rerun     = "--rerun" in ARGS || "--reset" in ARGS                 # hide
 
 L                     = 8
 T                     = 0.9
@@ -100,7 +101,7 @@ function record_sweeps!(sys, alg, rt, n_sweeps)
     end
 end
 
-if !isfile(lw_file)                                                # hide
+if rerun || !isfile(lw_file)                                       # hide
 sys = BlumeCapelSystem([L, L])
 ens = CustomEnsemble(BoltzmannEnsemble(T = T),
                      MulticanonicalEnsemble(0:1:length(sys.spins)), true)
@@ -140,6 +141,8 @@ writedlm(hist_file, [header; hcat(s2, H)], '\t')                   # hide
 writedlm(lw_file,   [header; hcat(s2, W)], '\t')                   # hide
 writedlm(diag_file, ["iter" "acceptrate" "flatness" "roundtrips";  # hide
                      hcat(1:num_iter, acceptrate, flatness_log, roundtrip_log)], '\t')  # hide
+else                                                               # hide
+println(stderr, "loaded precomputed results from $(relpath(lw_file)) (pass --rerun to recompute)")  #src
 end                                                                # hide
 hh = readdlm(hist_file, '\t'; header = true)[1]                    # hide
 ll = readdlm(lw_file,   '\t'; header = true)[1]                    # hide

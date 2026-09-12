@@ -21,6 +21,7 @@ using MonteCarloX
 datadir      = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..", "docs", "src", "data")))  # hide
 samples_file = joinpath(datadir, "sir_samples.tsv")   # hide
 meta_file    = joinpath(datadir, "sir_meta.tsv")      # hide
+rerun        = "--rerun" in ARGS || "--reset" in ARGS # hide
 
 function sir!(du, u, θ, t)
     β, γ = θ
@@ -102,11 +103,13 @@ function metropolis(logposterior; n = 10_000, warmup = 2_000, Δ0 = [0.1, 0.04],
 end
 nothing #hide
 
-if !isfile(samples_file)                                       # hide
+if rerun || !isfile(samples_file)                              # hide
 samples, alg = metropolis(logposterior)
 mkpath(datadir)                                                # hide
 writedlm(samples_file, ["beta" "gamma"; permutedims(samples)], '\t')  # hide
 writedlm(meta_file, ["acceptance"; acceptance_rate(alg)], '\t')       # hide
+else                                                           # hide
+println(stderr, "loaded precomputed results from $(relpath(samples_file)) (pass --rerun to recompute)")  #src
 end                                                            # hide
 samples = permutedims(readdlm(samples_file, '\t'; header = true)[1])   # hide
 acc     = readdlm(meta_file, '\t'; header = true)[1][1]                # hide

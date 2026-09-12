@@ -1,0 +1,16 @@
+[deps]
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+MCXSpins = "a4536488-68f2-4eaf-b6de-eac06300b674"
+MonteCarlo = "7ed9e010-db43-58a0-91f1-3971ebfac852"
+MonteCarloX = "320e4f08-8d0f-4a8f-bb3c-13768a65d394"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+
+[sources]
+MCXSpins = {path = "../../MCXSpins"}
+MonteCarlo = {url = "https://github.com/carstenbauer/MonteCarlo.jl"}
+MonteCarloX = {path = "../.."}
+
+[compat]
+TimerOutputs = "=0.5.13"

@@ -24,6 +24,7 @@ dist_file   = joinpath(datadir, "muca_OU_distributions.tsv") # hide
 iterh_file  = joinpath(datadir, "muca_OU_iter_hist.tsv")     # hide
 iterw_file  = joinpath(datadir, "muca_OU_iter_logweight.tsv")# hide
 accept_file = joinpath(datadir, "muca_OU_acceptance.tsv")    # hide
+rerun       = "--rerun" in ARGS || "--reset" in ARGS         # hide
 
 μ, D, θ    = 0.0, 1.0, 1.0
 dt, T, x0  = 0.1, 10.0, 0.0
@@ -114,7 +115,7 @@ nothing #hide
 # tilts by ``e^{\beta x(T)}`` to reach the tails. **Multicanonical** sampling learns
 # flat weights so the whole support is visited uniformly.
 
-if !isfile(dist_file)                                          # hide
+if rerun || !isfile(dist_file)                                 # hide
 ## single reference trajectory
 sys0 = OUTrajectory(Xoshiro(1234); x0 = x0, μ = μ, D = D, θ = θ, dt = dt, T = T)
 
@@ -194,6 +195,8 @@ iheader = permutedims(["x_T"; ["iter$(it)" for it in 1:n_iter]])            # hi
 writedlm(iterh_file, [iheader; hcat(centers_T, iter_hist)], '\t')          # hide
 writedlm(iterw_file, [iheader; hcat(centers_T, iter_lw)], '\t')            # hide
 writedlm(accept_file, ["iter" "acceptance"; hcat(1:n_iter, iter_accept)], '\t')  # hide
+else                                                                        # hide
+println(stderr, "loaded precomputed results from $(relpath(dist_file)) (pass --rerun to recompute)")  #src
 end                                                                         # hide
 tr = readdlm(traj_file, '\t'; header = true)[1]                            # hide
 tsd = readdlm(ts_file, '\t'; header = true)[1]                             # hide

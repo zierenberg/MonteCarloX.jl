@@ -296,6 +296,25 @@ end
     return @inbounds (lw.values[idxs...] = v)
 end
 
+"""
+    push!(bo::BinnedObject, x)
+
+Record a sample at coordinate `x` by incrementing its bin (a histogram `push!`). This lets a
+`BinnedObject` histogram serve directly as a [`Measurement`](@ref) data container. Out-of-range
+samples follow the object's boundary policy (silently ignored under the default `ZeroBoundary`).
+For an `N`-dimensional object pass the coordinates as a tuple.
+"""
+@inline Base.push!(bo::BinnedObject{1,T}, x::Real) where {T} = (bo[x] += one(T); bo)
+@inline Base.push!(bo::BinnedObject{N,T}, xs::NTuple{N,Real}) where {N,T} = (bo[xs...] += one(T); bo)
+
+"""
+    empty!(bo::BinnedObject)
+
+Zero all bin values in place, preserving the binning. Lets `reset!(::Measurement)` clear a
+histogram-backed measurement between runs.
+"""
+@inline Base.empty!(bo::BinnedObject) = (fill!(bo.values, zero(eltype(bo.values))); bo)
+
 # BinnedObject equality
 ==(a::BinnedObject, b::BinnedObject) = (a.values == b.values && a.bins == b.bins)
 

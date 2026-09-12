@@ -58,6 +58,8 @@ function test_wang_landau_update_mechanics()
     logf0 = ensemble(wl).logf
     pass &= check(update_logweight!(ensemble(wl)) === nothing, "update! returns nothing\n")
     pass &= check(ensemble(wl).logf == 0.5 * logf0, "logf halved\n")
+    pass &= check(minimum(ensemble(wl).logweight.values) == 0.0, "logweight normalized\n")
+    pass &= check(ensemble(wl).logweight.values[1] == 0.0, "unvisited logweight unchanged\n")
 
     return pass
 end

@@ -12,9 +12,18 @@ These are the two Literate sources that render the documentation's benchmark pag
 | Source | Docs page | Content |
 |---|---|---|
 | `benchmark_overview.jl` | Benchmarks → Overview | Landing page: the MCX-speedup table across all comparisons. |
-| `benchmark_all.jl`      | Benchmarks → Spin systems | Sections: the hand-optimized Julia + compiled-C speed ceiling, then MonteCarlo.jl, Carlo.jl and SpinMC.jl on their prime examples, each with physics-agreement plots. |
+| `benchmark_all.jl`      | Benchmarks → Spin systems | Sections: the hand-optimized Julia + compiled-C speed ceiling, then MonteCarlo.jl, Carlo.jl, SpinMC.jl, and Sunny.jl on their prime examples, each with physics-agreement plots. |
 
 The heavy runs are cached to `docs/src/data/` (`bench_*.tsv` for the per-comparison physics, `benchmarks.tsv` for the timing rows the overview reads). At the docs build only the cached data is reloaded — the reference packages and the C compiler are needed only when regenerating.
+
+Each external framework benchmark has its own isolated environment:
+
+- `benchmarks/MonteCarlo/Project.toml` + `benchmarks/MonteCarlo/benchmark.jl`
+- `benchmarks/Carlo/Project.toml` + `benchmarks/Carlo/benchmark.jl`
+- `benchmarks/SpinMC/Project.toml` + `benchmarks/SpinMC/benchmark.jl`
+- `benchmarks/Sunny/Project.toml` + `benchmarks/Sunny/benchmark.jl`
+
+`benchmark_all.jl` is the orchestrator: it runs each package benchmark script only if the corresponding cached `bench_*.tsv` is missing.
 
 ## Regenerating
 
@@ -24,6 +33,15 @@ From the repository root:
 julia --project=benchmarks -e 'using Pkg; Pkg.instantiate()'
 rm -f docs/src/data/bench_*.tsv docs/src/data/benchmarks.tsv
 julia --project=benchmarks benchmarks/benchmark_all.jl        # rebuilds bench_*.tsv + benchmarks.tsv
+```
+
+To run one package benchmark directly:
+
+```bash
+julia --project=benchmarks/MonteCarlo benchmarks/MonteCarlo/benchmark.jl
+julia --project=benchmarks/Carlo benchmarks/Carlo/benchmark.jl
+julia --project=benchmarks/SpinMC benchmarks/SpinMC/benchmark.jl
+julia --project=benchmarks/Sunny benchmarks/Sunny/benchmark.jl
 ```
 
 The compiled-C ceiling is built on the fly from `MCXSpins/references/ising_cpu_modes.c` with the system `cc`.
