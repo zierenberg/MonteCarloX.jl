@@ -112,11 +112,15 @@ makedocs(;
                 "Contact Process (Gillespie)"         => "generated/contact_process.md",
                 "Hawkes Process"                      => "generated/hawkes_process.md",
             ],
+            "Population Monte Carlo" => [
+                "Kalman & Particle Filters (state-space filtering)" => "generated/kalman_particle_filter.md",
+            ],
             "Inference" => [
                 "Coin Flip"                           => "generated/coin_flip.md",
                 "Conjugate Gaussian"                  => "generated/gaussian.md",
                 "Eight Schools (hierarchical)"        => "generated/eight_schools.md",
                 "SIR (dynamical model)"               => "generated/sir.md",
+                "AR(1) with Immigration (state-space)" => "generated/ar1.md",
                 "House Price Prediction"              => "generated/house_price_prediction.md",
             ],
             "Infrastructure" => [
