@@ -36,9 +36,10 @@ for (root, dirs, files) in walkdir(example_dir)
     end
 end
 
-# External examples need to include specific packages (e.g., Sunny.jl) and are built in their own project environment.
+# External examples need to include specific packages (e.g., Sunny.jl) and are built in
+# their own project environment.
 sunny_dir = joinpath(example_dir, "external", "sunny")
-run(`$(Base.julia_cmd()) --project=$sunny_dir $(joinpath(sunny_dir, "build_docs.jl")) $generated_dir`)
+run(`$(Base.julia_cmd()) --project=$sunny_dir $(joinpath(sunny_dir, "build_docs.jl"))`)
 
 # The benchmark pages: same Literate pipeline, heavy runs cached in docs/src/data (the
 # reference packages and the C compiler are only needed when regenerating — never at docs

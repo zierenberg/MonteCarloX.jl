@@ -26,7 +26,7 @@ SEED = 42
 L, therm, prod = 20, 20_000, 500_000
 Tc = 2 / log(1 + sqrt(2.0))
 Ts = [1.8, Tc, 3.0]
-nothing # hide
+nothing #hide
 
 logdos = logdos_exact_ising2D(L)
 Egrid = get_centers(logdos)
@@ -150,61 +150,61 @@ end
 # We time each implementation per temperature, then cache both the timings and the measured
 # energies to TSV so the table and figure regenerate without rerunning the simulation.
 
-datadir     = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..", "..", "docs", "src", "data")))  # hide
-energy_file = joinpath(datadir, "sunny_ising_L$(L)_energy.tsv")   # hide
-timing_file = joinpath(datadir, "sunny_ising_L$(L)_timing.tsv")   # hide
-rerun       = "--rerun" in ARGS || "--reset" in ARGS  # pass --rerun to overwrite the cached results  # hide
+datadir     = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..", "..", "docs", "src", "data")))  #hide
+energy_file = joinpath(datadir, "sunny_ising_L$(L)_energy.tsv")   #hide
+timing_file = joinpath(datadir, "sunny_ising_L$(L)_timing.tsv")   #hide
+rerun       = "--rerun" in ARGS || "--reset" in ARGS  # pass --rerun to overwrite the cached results  #hide
 
-runstage(label, f) = (print(stderr, label, " ... "); flush(stderr); r = f(); println(stderr, "done"); r)  # hide
-if rerun || !isfile(energy_file)                                            # hide
-    run_ising_sunny([Tc], 2, 2); run_ising_bridge([Tc], 2, 2); run_ising_mcx([Tc], 2, 2)  # warmup (compile) # hide
-    e_s,  t_s  = runstage("Sunny native", () -> run_ising_sunny(Ts, therm, prod))   # hide
-    e_bs, t_bs = runstage("MCX bridge  ", () -> run_ising_bridge(Ts, therm, prod))  # hide
-    e_n,  t_n  = runstage("MCX native  ", () -> run_ising_mcx(Ts, therm, prod))     # hide
+runstage(label, f) = (print(stderr, label, " ... "); flush(stderr); r = f(); println(stderr, "done"); r)  #hide
+if rerun || !isfile(energy_file)                                            #hide
+    run_ising_sunny([Tc], 2, 2); run_ising_bridge([Tc], 2, 2); run_ising_mcx([Tc], 2, 2)  # warmup (compile) #hide
+    e_s,  t_s  = runstage("Sunny native", () -> run_ising_sunny(Ts, therm, prod))   #hide
+    e_bs, t_bs = runstage("MCX bridge  ", () -> run_ising_bridge(Ts, therm, prod))  #hide
+    e_n,  t_n  = runstage("MCX native  ", () -> run_ising_mcx(Ts, therm, prod))     #hide
 
-    mkpath(datadir)                                                                                # hide
-    energymat = hcat(Ts, e_exact, e_s, e_bs, e_n)                                                  # hide
-    timingmat = hcat(Ts, t_s, t_bs, t_n)                                                           # hide
-    writedlm(energy_file, [["T" "e_exact" "e_sunny" "e_bridge" "e_native"]; energymat], '\t')      # hide
-    writedlm(timing_file, [["T" "t_sunny" "t_bridge" "t_native"]; timingmat], '\t')                # hide
-else                                                                         # hide
+    mkpath(datadir)                                                                                #hide
+    energymat = hcat(Ts, e_exact, e_s, e_bs, e_n)                                                  #hide
+    timingmat = hcat(Ts, t_s, t_bs, t_n)                                                           #hide
+    writedlm(energy_file, [["T" "e_exact" "e_sunny" "e_bridge" "e_native"]; energymat], '\t')      #hide
+    writedlm(timing_file, [["T" "t_sunny" "t_bridge" "t_native"]; timingmat], '\t')                #hide
+else                                                                         #hide
     println(stderr, "loaded precomputed results from $(relpath(energy_file)) (pass --rerun to recompute)")  #src
-end                                                                          # hide
+end                                                                          #hide
 
 # The three implementations, timed side by side per temperature.
 
-energydata = readdlm(energy_file, '\t'; header=true)[1]                                          # hide
-timingdata = readdlm(timing_file, '\t'; header=true)[1]                                          # hide
-## echo setup + results to the terminal (the Markdown table below is for the rendered docs)      # hide
-println("\nSunny interop: 2D Ising, L=$L")                                                       # hide
-println(@sprintf("therm=%d  prod=%d", therm, prod))                                              # hide
-println(@sprintf("%-7s %12s %12s %12s %12s  %10s %11s %11s", "T", "e_exact", "e_sunny", "e_bridge", "e_native", "t_sunny(s)", "t_bridge(s)", "t_native(s)"))  # hide
-for r in axes(energydata, 1)                                                                     # hide
-    println(@sprintf("%-7.3f %12.6f %12.6f %12.6f %12.6f  %10.4f %11.4f %11.4f",                 # hide
-        energydata[r, 1], energydata[r, 2], energydata[r, 3], energydata[r, 4], energydata[r, 5], # hide
-        timingdata[r, 2], timingdata[r, 3], timingdata[r, 4]))                                   # hide
-end                                                                                               # hide
-io = IOBuffer()                                                                                   # hide
-println(io, "| T | e_exact | e_sunny | e_bridge | e_native | t_sunny [s] | t_bridge [s] | t_native [s] |")  # hide
-println(io, "|---:|---:|---:|---:|---:|---:|---:|---:|")                                          # hide
-for r in axes(energydata, 1)                                                                      # hide
-    println(io, @sprintf("| %.3f | %.6f | %.6f | %.6f | %.6f | %.4f | %.4f | %.4f |",             # hide
-        energydata[r, 1], energydata[r, 2], energydata[r, 3], energydata[r, 4], energydata[r, 5], # hide
-        timingdata[r, 2], timingdata[r, 3], timingdata[r, 4]))                                   # hide
-end                                                                                                # hide
-Markdown.parse(String(take!(io)))                                                                 # hide
+energydata = readdlm(energy_file, '\t'; header=true)[1]                                          #hide
+timingdata = readdlm(timing_file, '\t'; header=true)[1]                                          #hide
+## echo setup + results to the terminal (the Markdown table below is for the rendered docs)      #hide
+println("\nSunny interop: 2D Ising, L=$L")                                                       #hide
+println(@sprintf("therm=%d  prod=%d", therm, prod))                                              #hide
+println(@sprintf("%-7s %12s %12s %12s %12s  %10s %11s %11s", "T", "e_exact", "e_sunny", "e_bridge", "e_native", "t_sunny(s)", "t_bridge(s)", "t_native(s)"))  #hide
+for r in axes(energydata, 1)                                                                     #hide
+    println(@sprintf("%-7.3f %12.6f %12.6f %12.6f %12.6f  %10.4f %11.4f %11.4f",                 #hide
+        energydata[r, 1], energydata[r, 2], energydata[r, 3], energydata[r, 4], energydata[r, 5], #hide
+        timingdata[r, 2], timingdata[r, 3], timingdata[r, 4]))                                   #hide
+end                                                                                               #hide
+io = IOBuffer()                                                                                   #hide
+println(io, "| T | e_exact | e_sunny | e_bridge | e_native | t_sunny [s] | t_bridge [s] | t_native [s] |")  #hide
+println(io, "|---:|---:|---:|---:|---:|---:|---:|---:|")                                          #hide
+for r in axes(energydata, 1)                                                                      #hide
+    println(io, @sprintf("| %.3f | %.6f | %.6f | %.6f | %.6f | %.4f | %.4f | %.4f |",             #hide
+        energydata[r, 1], energydata[r, 2], energydata[r, 3], energydata[r, 4], energydata[r, 5], #hide
+        timingdata[r, 2], timingdata[r, 3], timingdata[r, 4]))                                   #hide
+end                                                                                                #hide
+Markdown.parse(String(take!(io)))                                                                 #hide
 
 # The energy per site against the exact (Beale) reference, all three implementations
 # overlapping; the reference is drawn as a continuous curve reweighted from the exact
 # density of states on a fine temperature grid, not just at the three sampled points.
 
-Tgrid = range(1.2, 3.8, length=300)                                                          # hide
-e_exact_curve = [mean(Egrid, weights(reweight(logdos, -Egrid ./ T))) / L^2 for T in Tgrid]    # hide
+Tgrid = range(1.2, 3.8, length=300)                                                          #hide
+e_exact_curve = [mean(Egrid, weights(reweight(logdos, -Egrid ./ T))) / L^2 for T in Tgrid]    #hide
 
-plt = plot(Tgrid, e_exact_curve; lw=2, ls=:dot, color=:black, label="exact",                 # hide
-           xlabel="T", ylabel="e per site", title="2D Ising, L=$L")                          # hide
-scatter!(plt, energydata[:, 1], energydata[:, 3]; marker=:o, label="Sunny")                  # hide
-scatter!(plt, energydata[:, 1], energydata[:, 4]; marker=:d, label="MCX bridge")             # hide
-scatter!(plt, energydata[:, 1], energydata[:, 5]; marker=:s, label="MCX native")             # hide
-savefig(plt, joinpath(@__DIR__, "sunny_ising_energy.png"))                                   # hide
-plt                                                                                           # hide
+plt = plot(Tgrid, e_exact_curve; lw=2, ls=:dot, color=:black, label="exact",                 #hide
+           xlabel="T", ylabel="e per site", title="2D Ising, L=$L")                          #hide
+scatter!(plt, energydata[:, 1], energydata[:, 3]; marker=:o, label="Sunny")                  #hide
+scatter!(plt, energydata[:, 1], energydata[:, 4]; marker=:d, label="MCX bridge")             #hide
+scatter!(plt, energydata[:, 1], energydata[:, 5]; marker=:s, label="MCX native")             #hide
+savefig(plt, joinpath(@__DIR__, "sunny_ising_energy.png"))                                   #hide
+plt                                                                                           #hide

@@ -22,7 +22,7 @@ n_iters = 20
 nsweeps_per_check = 1_000
 max_hchecks_per_iter = 100
 flatness_threshold = 0.8
-nothing # hide
+nothing #hide
 
 # ## 1. Sunny native
 #
@@ -127,83 +127,83 @@ end
 # the reconstructed curves to TSV so the table and figure regenerate without rerunning the
 # simulation. The exact Beale density of states is overlaid as a referee when tabulated for this `L`.
 
-datadir     = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..", "..", "docs", "src", "data")))  # hide
-dos_file    = joinpath(datadir, "sunny_wl_L$(L)_dos.tsv")     # hide
-timing_file = joinpath(datadir, "sunny_wl_L$(L)_timing.tsv")  # hide
-rerun       = "--rerun" in ARGS || "--reset" in ARGS  # pass --rerun to overwrite the cached results  # hide
+datadir     = get(ENV, "MCX_EXAMPLE_DATA", normpath(joinpath(@__DIR__, "..", "..", "..", "docs", "src", "data")))  #hide
+dos_file    = joinpath(datadir, "sunny_wl_L$(L)_dos.tsv")     #hide
+timing_file = joinpath(datadir, "sunny_wl_L$(L)_timing.tsv")  #hide
+rerun       = "--rerun" in ARGS || "--reset" in ARGS  # pass --rerun to overwrite the cached results  #hide
 
-## Restrict each ln-DoS to the common energy window and anchor it to zero at the E=0 bin (the   # hide
-## peak of the density), so every curve runs negative; `Emax` optionally caps the upper energy. # hide
-function common_logdos(curves...; Emax=nothing)                                                 # hide
-    lo = maximum(minimum(E) for (E, _) in curves)                                               # hide
-    hi = Emax === nothing ? minimum(maximum(E) for (E, _) in curves) : Emax                     # hide
-    map(curves) do (E, log_g)                                                                   # hide
-        m = lo .<= E .<= hi                                                                     # hide
-        (E[m], log_g[m] .- log_g[m][argmin(abs.(E[m]))])                                        # hide
-    end                                                                                         # hide
-end                                                                                             # hide
+## Restrict each ln-DoS to the common energy window and anchor it to zero at the E=0 bin (the   #hide
+## peak of the density), so every curve runs negative; `Emax` optionally caps the upper energy. #hide
+function common_logdos(curves...; Emax=nothing)                                                 #hide
+    lo = maximum(minimum(E) for (E, _) in curves)                                               #hide
+    hi = Emax === nothing ? minimum(maximum(E) for (E, _) in curves) : Emax                     #hide
+    map(curves) do (E, log_g)                                                                   #hide
+        m = lo .<= E .<= hi                                                                     #hide
+        (E[m], log_g[m] .- log_g[m][argmin(abs.(E[m]))])                                        #hide
+    end                                                                                         #hide
+end                                                                                             #hide
 
-runstage(label, f) = (print(stderr, label, " ... "); flush(stderr); r = f(); println(stderr, "done"); r)  # hide
-if rerun || !isfile(dos_file)                                                       # hide
-    run_wl_sunny(); run_wl_bridge(); run_wl_mcx()                                   # warmup (compile) # hide
-    t_sunny  = @elapsed sunny  = runstage("Sunny native", run_wl_sunny)            # hide
-    t_bridge = @elapsed bridge = runstage("MCX bridge  ", run_wl_bridge)           # hide
-    t_mcx    = @elapsed mcx    = runstage("MCX native  ", run_wl_mcx)              # hide
+runstage(label, f) = (print(stderr, label, " ... "); flush(stderr); r = f(); println(stderr, "done"); r)  #hide
+if rerun || !isfile(dos_file)                                                       #hide
+    run_wl_sunny(); run_wl_bridge(); run_wl_mcx()                                   # warmup (compile) #hide
+    t_sunny  = @elapsed sunny  = runstage("Sunny native", run_wl_sunny)            #hide
+    t_bridge = @elapsed bridge = runstage("MCX bridge  ", run_wl_bridge)           #hide
+    t_mcx    = @elapsed mcx    = runstage("MCX native  ", run_wl_mcx)              #hide
 
-    labeled = [("Sunny", sunny), ("MCX bridge", bridge), ("MCX native", mcx)]      # hide
-    if isfile(joinpath(pkgdir(MCXSpins), "data", "exact_solutions", "ising2D_$(L)x$(L).csv"))  # hide
-        vex = logdos_exact_ising2D(L; format=:vector)                                           # hide
-        push!(labeled, ("exact", (first.(vex), last.(vex))))                                    # hide
-    end                                                                                         # hide
+    labeled = [("Sunny", sunny), ("MCX bridge", bridge), ("MCX native", mcx)]      #hide
+    if isfile(joinpath(pkgdir(MCXSpins), "data", "exact_solutions", "ising2D_$(L)x$(L).csv"))  #hide
+        vex = logdos_exact_ising2D(L; format=:vector)                                           #hide
+        push!(labeled, ("exact", (first.(vex), last.(vex))))                                    #hide
+    end                                                                                         #hide
 
-    names  = first.(labeled)                                                        # hide
-    normed = common_logdos((c[2] for c in labeled)...)                              # hide
-    Egrid  = sort(unique(reduce(vcat, [E for (E, _) in normed])))                   # hide
-    pos    = Dict(e => i for (i, e) in enumerate(Egrid))                            # hide
-    dosmat = fill(NaN, length(Egrid), length(names))                               # hide
-    for (j, (E, p)) in enumerate(normed), k in eachindex(E)                         # hide
-        dosmat[pos[E[k]], j] = p[k]                                                 # hide
-    end                                                                            # hide
+    names  = first.(labeled)                                                        #hide
+    normed = common_logdos((c[2] for c in labeled)...)                              #hide
+    Egrid  = sort(unique(reduce(vcat, [E for (E, _) in normed])))                   #hide
+    pos    = Dict(e => i for (i, e) in enumerate(Egrid))                            #hide
+    dosmat = fill(NaN, length(Egrid), length(names))                               #hide
+    for (j, (E, p)) in enumerate(normed), k in eachindex(E)                         #hide
+        dosmat[pos[E[k]], j] = p[k]                                                 #hide
+    end                                                                            #hide
 
-    timemat = ["Sunny native" t_sunny  1.0                                         # hide
-               "MCX bridge"   t_bridge t_sunny / t_bridge                          # hide
-               "MCX native"   t_mcx    t_sunny / t_mcx]                            # hide
+    timemat = ["Sunny native" t_sunny  1.0                                         #hide
+               "MCX bridge"   t_bridge t_sunny / t_bridge                          #hide
+               "MCX native"   t_mcx    t_sunny / t_mcx]                            #hide
 
-    mkpath(datadir)                                                                          # hide
-    writedlm(dos_file,    [permutedims(["E"; names]); hcat(Egrid, dosmat)], '\t')            # hide
-    writedlm(timing_file, [["implementation" "time" "speedup"]; timemat], '\t')             # hide
-else                                                                                # hide
+    mkpath(datadir)                                                                          #hide
+    writedlm(dos_file,    [permutedims(["E"; names]); hcat(Egrid, dosmat)], '\t')            #hide
+    writedlm(timing_file, [["implementation" "time" "speedup"]; timemat], '\t')             #hide
+else                                                                                #hide
     println(stderr, "loaded precomputed results from $(relpath(dos_file)) (pass --rerun to recompute)")  #src
-end                                                                                 # hide
+end                                                                                 #hide
 
 # The three implementations, timed side by side; `speedup` is relative to the Sunny-native run.
 
-timedata = readdlm(timing_file, '\t'; header=true)[1]                                             # hide
-## echo setup + timings to the terminal (the Markdown table below is for the rendered docs)       # hide
-println("\nWang-Landau: 2D Ising, L=$L")                                                          # hide
-println(@sprintf("n_iters=%d  nsweeps_per_check=%d  max_hchecks_per_iter=%d  flatness=%.2f",      # hide
-                 n_iters, nsweeps_per_check, max_hchecks_per_iter, flatness_threshold))           # hide
-println(@sprintf("%-14s %10s %9s", "implementation", "time [s]", "speedup"))                      # hide
-for r in axes(timedata, 1)                                                                        # hide
-    println(@sprintf("%-14s %10.3f %8.2f×", timedata[r, 1], timedata[r, 2], timedata[r, 3]))      # hide
-end                                                                                               # hide
-io = IOBuffer()                                                                                    # hide
-println(io, "| implementation | time [s] | speedup |")                                            # hide
-println(io, "|---|---:|---:|")                                                                     # hide
-for r in axes(timedata, 1)                                                                         # hide
-    println(io, @sprintf("| %s | %.3f | %.2f× |", timedata[r, 1], timedata[r, 2], timedata[r, 3]))  # hide
-end                                                                                                # hide
-Markdown.parse(String(take!(io)))                                                                 # hide
+timedata = readdlm(timing_file, '\t'; header=true)[1]                                             #hide
+## echo setup + timings to the terminal (the Markdown table below is for the rendered docs)       #hide
+println("\nWang-Landau: 2D Ising, L=$L")                                                          #hide
+println(@sprintf("n_iters=%d  nsweeps_per_check=%d  max_hchecks_per_iter=%d  flatness=%.2f",      #hide
+                 n_iters, nsweeps_per_check, max_hchecks_per_iter, flatness_threshold))           #hide
+println(@sprintf("%-14s %10s %9s", "implementation", "time [s]", "speedup"))                      #hide
+for r in axes(timedata, 1)                                                                        #hide
+    println(@sprintf("%-14s %10.3f %8.2f×", timedata[r, 1], timedata[r, 2], timedata[r, 3]))      #hide
+end                                                                                               #hide
+io = IOBuffer()                                                                                    #hide
+println(io, "| implementation | time [s] | speedup |")                                            #hide
+println(io, "|---|---:|---:|")                                                                     #hide
+for r in axes(timedata, 1)                                                                         #hide
+    println(io, @sprintf("| %s | %.3f | %.2f× |", timedata[r, 1], timedata[r, 2], timedata[r, 3]))  #hide
+end                                                                                                #hide
+Markdown.parse(String(take!(io)))                                                                 #hide
 
 # The reconstructed log-density of states against the exact Beale reference — anchored to zero at
 # the E=0 bin (the peak), so the curves run negative and any deviation is easy to spot.
 
-dosdata, doshdr = readdlm(dos_file, '\t'; header=true)                                          # hide
-E = dosdata[:, 1]                                                                               # hide
-plt = plot(; xlabel="E", ylabel="ln g(E)", title="2D Ising WL, L=$L")                           # hide
-for j in 2:size(dosdata, 2)                                                                     # hide
-    plot!(plt, E, dosdata[:, j]; label=doshdr[j], lw=2,                                         # hide
-          ls=(doshdr[j] == "exact" ? :dash : :solid), lc=(doshdr[j] == "exact" ? :black : :auto))  # hide
-end                                                                                             # hide
-savefig(plt, joinpath(@__DIR__, "sunny_wl_dos.png"))                                            # hide
-plt                                                                                             # hide
+dosdata, doshdr = readdlm(dos_file, '\t'; header=true)                                          #hide
+E = dosdata[:, 1]                                                                               #hide
+plt = plot(; xlabel="E", ylabel="ln g(E)", title="2D Ising WL, L=$L")                           #hide
+for j in 2:size(dosdata, 2)                                                                     #hide
+    plot!(plt, E, dosdata[:, j]; label=doshdr[j], lw=2,                                         #hide
+          ls=(doshdr[j] == "exact" ? :dash : :solid), lc=(doshdr[j] == "exact" ? :black : :auto))  #hide
+end                                                                                             #hide
+savefig(plt, joinpath(@__DIR__, "sunny_wl_dos.png"))                                            #hide
+plt                                                                                             #hide
