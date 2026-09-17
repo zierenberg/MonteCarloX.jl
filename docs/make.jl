@@ -20,7 +20,8 @@ include(joinpath(@__DIR__, "..", "examples", "defaults.jl"))
 # Every runnable example lives in the top-level examples/. Light ones execute at
 # build; heavy ones cache their outcome into docs/src/data/ and only reload. Skipped:
 # parallel (_mpi/_threads) reference scripts, incomplete todos/, the smoke runner, the
-# plotting defaults, and reweighting (kept as a script — no docs page yet).
+# plotting defaults, external/ (rendered separately below), and reweighting (kept as a
+# script — no docs page yet).
 example_dir = joinpath(@__DIR__, "..", "examples")
 skip_files  = ("reweighting.jl", "defaults.jl", "runtests.jl")
 skip_dirs   = ("todos", "external")
@@ -34,6 +35,10 @@ for (root, dirs, files) in walkdir(example_dir)
         Literate.markdown(joinpath(root, file), generated_dir; documenter = true)
     end
 end
+
+# External examples need to include specific packages (e.g., Sunny.jl) and are built in their own project environment.
+sunny_dir = joinpath(example_dir, "external", "sunny")
+run(`$(Base.julia_cmd()) --project=$sunny_dir $(joinpath(sunny_dir, "build_docs.jl")) $generated_dir`)
 
 # The benchmark pages: same Literate pipeline, heavy runs cached in docs/src/data (the
 # reference packages and the C compiler are only needed when regenerating — never at docs
@@ -122,6 +127,15 @@ makedocs(;
             "Infrastructure" => [
                 "Checkpointing"                       => "generated/checkpointing.md",
                 "Checkpointing (Ising 2D)"            => "generated/checkpoint_Ising2D.md",
+            ],
+            "External" => [
+                "Sunny.jl" => [
+                    "Heisenberg"                       => "generated/sunny_heisenberg.md",
+                    "Ising"                             => "generated/sunny_ising.md",
+                    "Parallel Tempering"                => "generated/sunny_pt.md",
+                    "Wang-Landau"                       => "generated/sunny_wl.md",
+                    "Replica-Exchange Wang-Landau"      => "generated/sunny_rewl.md",
+                ],
             ],
         ],
         "Benchmarks" => [
