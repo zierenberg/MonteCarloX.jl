@@ -27,6 +27,12 @@ end
 
 linear_logweight(::BoltzmannEnsemble) = true
 
-@inline logweight(e::BoltzmannEnsemble, E::Real) = -e.beta * E
-@inline logweight(e::BoltzmannEnsemble, E::AbstractArray) = -e.beta * sum(E)
+# `iszero(E)` short-circuits before the multiplication: at β = 1/T = Inf (T = 0, a zero-temperature
+# "always downhill, never uphill" limit), `-beta * E` hits `Inf * 0.0 = NaN` for exactly the E == 0
+# case that should trivially contribute zero regardless of beta.
+@inline logweight(e::BoltzmannEnsemble, E::Real) = iszero(E) ? zero(float(E)) : -e.beta * E
+@inline function logweight(e::BoltzmannEnsemble, E::AbstractArray)
+    s = sum(E)
+    return iszero(s) ? zero(float(s)) : -e.beta * s
+end
 @inline logweight(e::BoltzmannEnsemble) = x -> logweight(e, x)

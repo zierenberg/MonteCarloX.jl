@@ -101,13 +101,18 @@ binned reaction coordinate for `MulticanonicalEnsemble`) and the algorithm forms
 logweight(ens, arg_new) − logweight(ens, arg_old) + correction`. Valid for linear and nonlinear
 ensembles alike; it also drives multicanonical visit recording.
 
+When [`linear_logweight`](@ref) holds, the ratio is instead formed as `logweight(ens, arg_new -
+arg_old)` — the same value for any finite parameter, but the only form that stays exact at an
+infinite one (e.g. `BoltzmannEnsemble` at `T = 0`, `β = ∞`).
+
 Argument-order convention: STATE pairs follow the acceptance-ratio order — numerator first,
 `(arg_new, arg_old)`, as in `min(1, π(x′)/π(x))`. (Ensemble pairs, e.g. in `reweight`, follow the
 flow order source → target instead.) See the one-argument form for the meaning of `correction`.
 """
 @inline function accept!(alg::MetropolisHastingsAlgorithm, arg_new::T, arg_old::T; correction::Real=0) where T
     ens = ensemble(alg)
-    logR = logweight(ens, arg_new) - logweight(ens, arg_old)
+    logR = linear_logweight(ens) ? logweight(ens, arg_new - arg_old) :
+                                    logweight(ens, arg_new) - logweight(ens, arg_old)
     # Default (symmetric) call: `correction` is the literal 0, `iszero` folds and the add is elided.
     accepted = accept_logratio!(alg, iszero(correction) ? logR : logR + correction)
     if should_record_visit(ens)
