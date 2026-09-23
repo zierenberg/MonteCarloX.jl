@@ -3,8 +3,7 @@
 # Run with `julia examples/inference/sbi.jl` from anywhere in the repo — no
 # `--project` flag needed, the line below activates `examples/` itself.
 
-import Pkg
-Pkg.activate(joinpath(@__DIR__, ".."))
+import Pkg; Pkg.activate(joinpath(@__DIR__, "..")); Pkg.instantiate()  #src
 #
 # Simulation-based inference (SBI, a.k.a. likelihood-free inference) applies when
 # you can *simulate* data but cannot write down the likelihood ``p(x\mid\theta)``.
@@ -32,6 +31,10 @@ Pkg.activate(joinpath(@__DIR__, ".."))
 # `StochasticDiffEq.jl` is the right tool for an SDE *without* a closed form.
 
 using Random, Distributions, StatsBase, Plots
+
+CI_MODE = get(ENV, "MCX_SMOKE", get(ENV, "MCX_CI", "false")) == "true"   #hide
+shrink(full, small) = CI_MODE ? small : full                             #hide
+nothing #hide
 
 n_obs, dt = 15, 0.4
 
@@ -71,6 +74,7 @@ rand_prior(rng) = [rand(rng, LogNormal(log(1.0), 0.5)), rand(rng, LogNormal(log(
 logposterior_exact(θ) = all(θ .> 0) ? logprior(θ) + loglik_exact(θ, y_obs) : -Inf
 
 κg, Dg = range(0.2, 3.0; length = 300), range(0.05, 2.0; length = 300)
+κg, Dg = range(0.2, 3.0; length = shrink(300, 80)), range(0.05, 2.0; length = shrink(300, 80))  #hide
 logp   = [logposterior_exact([κ, D]) for D in Dg, κ in κg]
 w      = exp.(logp .- maximum(logp))
 κ_grid = sum(w .* κg') / sum(w)
@@ -118,6 +122,7 @@ function simulate_prior_predictive(rng, n)
 end
 
 n_train = 20_000
+n_train = shrink(n_train, 4_000)   #hide
 θs_train, ss_train = simulate_prior_predictive(Xoshiro(3), n_train)
 θmat = permutedims(reduce(hcat, θs_train))     # n×2
 smat = permutedims(reduce(hcat, ss_train))     # n×2
@@ -190,7 +195,9 @@ end
 
 ε_mcmc = quantile(ρs, 0.10)                     # looser than rejection: a chain must keep re-simulating
 Δ_mcmc = vec(std(θ_abc_rej, dims = 1))          # proposal width ≈ posterior width
-samples_abc, alg_abc = abc_mcmc(θ0_seed, ε_mcmc, Δ_mcmc)
+n_abc, warmup_abc = 50_000, 5_000
+n_abc, warmup_abc = shrink(n_abc, 4_000), shrink(warmup_abc, 500)   #hide
+samples_abc, alg_abc = abc_mcmc(θ0_seed, ε_mcmc, Δ_mcmc; n = n_abc, warmup = warmup_abc)
 (; acceptance = round(acceptance_rate(alg_abc); digits = 3),
    mean = round.(vec(mean(samples_abc, dims = 2)); digits = 2),
    std  = round.(vec(std(samples_abc, dims = 2)); digits = 2))
@@ -316,9 +323,12 @@ nothing #hide
 
 # ## NPE: the posterior in one forward pass
 
-npe_model = density_net(Z, Θ)
+n_epochs, n_draw, warmup_nle = 40, 20_000, 2_000
+n_epochs, n_draw, warmup_nle = shrink(n_epochs, 4), shrink(n_draw, 4_000), shrink(warmup_nle, 400)  #hide
+
+npe_model = density_net(Z, Θ; epochs = n_epochs)
 μ_npe, L_npe = gauss(npe_model, z_obs_n)
-samples_npe  = exp.((μ_npe .* θ_std .+ θ_mean) .+ (θ_std .* L_npe) * randn(Xoshiro(50), 2, 20_000))
+samples_npe  = exp.((μ_npe .* θ_std .+ θ_mean) .+ (θ_std .* L_npe) * randn(Xoshiro(50), 2, n_draw))
 (; mean_npe = round.(vec(mean(samples_npe, dims = 2)); digits = 2),
    std_npe  = round.(vec(std(samples_npe,  dims = 2)); digits = 2))
 
@@ -369,8 +379,8 @@ function metropolis(logposterior; n = 20_000, warmup = 2_000, Δ0 = [0.3, 0.15],
     return samples, alg
 end
 
-nle_model = density_net(Θ, Z)
-samples_nle, alg_nle = metropolis(logposterior_nle)
+nle_model = density_net(Θ, Z; epochs = n_epochs)
+samples_nle, alg_nle = metropolis(logposterior_nle; n = n_draw, warmup = warmup_nle)
 (; acceptance = round(acceptance_rate(alg_nle); digits = 2),
    mean_nle = round.(vec(mean(samples_nle, dims = 2)); digits = 2),
    std_nle  = round.(vec(std(samples_nle,  dims = 2)); digits = 2))
