@@ -28,7 +28,7 @@ MonteCarloX inverts this: the ensemble is the first-class object that defines th
 The consequences are concrete:
 
 - **Bayesian inference and statistical mechanics share an interface.** `MetropolisAlgorithm(rng, BoltzmannEnsemble(β=1.0))` and `MetropolisAlgorithm(rng, FunctionEnsemble(logposterior))` differ only in the ensemble.
-- **Replica exchange is an ensemble swap.** Two algorithms hold two ensembles; a successful exchange moves the ensembles, not the configurations.
+- **Replica exchange is an ensemble swap.** Two algorithms hold two ensembles; a successful exchange moves the ensembles, not the configurations — hence `attempt_exchange!`.
 - **Adaptive methods are ensembles that learn.** Multicanonical and Wang-Landau are not new algorithms; they are `MetropolisHastingsAlgorithm` (Metropolis balance) with an adaptive ensemble whose `update_logweight!` reshapes `logweight` from accumulated histograms.
 - **Metropolis vs Glauber is a balance-function choice.** The two differ only in the `BalanceFunction` slot; the same balance also supplies continuous-time rates via `transition_rate` (see [Metropolis, Glauber, and the balance function](metropolis.md)).
 
@@ -174,6 +174,55 @@ end
 The loop *shape* is identical to the stat-mech example: propose, accept-or-reject, measure.
 Only the ensemble, the algorithm carrier, and the form of `accept!` differ.
 
+## Replica methods: the ladder is a parameter schedule
+
+Replica exchange runs one chain per ensemble and swaps the ensembles between them. Temperature is
+the usual difference, but nothing assumes it — you hand it the ensembles you want, and
+[`ParallelTempering`](@ref) is the `BoltzmannEnsemble` shorthand:
+
+```julia
+pt = ParallelTempering(betas; observable = energy)
+for _ in 1:n_exchanges
+    advance!(sweep!, pt, systems, n_sweeps)   # sample every replica, in parallel
+    attempt_exchange!(pt, systems)            # attempt the swaps
+end
+```
+
+A swap moves the **ensemble** between algorithms, never the configuration — which is what lets
+MonteCarloX drive models it knows nothing about. So `ensemble_index(pt, r)` is the ladder slot
+replica `r` currently holds: bin measurements by it, and re-read any per-rung state (an
+integrator's temperature, a cached model parameter) after each exchange. What to record is the
+caller's business; MonteCarloX does not own the loop.
+
+The coordinate need not be a scalar. Tempering the strength ``\lambda`` of an auxiliary Hamiltonian
+term at fixed ``\beta`` — a standard way to quench a barrier the physical system cannot cross —
+means replica ``r`` targets ``\exp[-\beta(E_0 + \lambda_r E_1)]``, so the coordinate is the pair
+``(E_0, E_1)``:
+
+```julia
+rx = ReplicaExchange([FunctionEnsemble(x -> -β * (x[1] + λ * x[2]); linear=true) for λ in λs])
+attempt_exchange!(rx, [(E0(s), E1(s)) for s in systems])
+```
+
+The ``E_0`` part cancels from the exchange ratio by itself, leaving
+``\beta(\lambda_i-\lambda_j)(E_1^i-E_1^j)``. When only one term carries the ladder parameter the
+coordinate collapses back to a scalar. `BoltzmannEnsemble` would then produce the right number with
+``\lambda`` in the ``\beta`` slot, but it names a temperature the problem does not have. The
+ensemble protocol is one method wide, so a rung that is a coupling can say so:
+
+```julia
+struct TiltedEnsemble{T<:Real} <: AbstractEnsemble
+    λ::T
+end
+
+MonteCarloX.logweight(e::TiltedEnsemble, X::Real) = -e.λ * X
+MonteCarloX.linear_logweight(::TiltedEnsemble) = true
+```
+
+The [SmoQyDQMC example](../generated/smoqy_replica_exchange.md) runs this ladder over a determinant
+quantum Monte Carlo simulation, where ``E_0`` contains the fermion determinant and cancelling it is
+what makes the swap free.
+
 ## Choosing an algorithm
 
 | Goal | Algorithm |
@@ -216,6 +265,12 @@ accept_logratio!
 acceptance_rate
 reset!(alg::MetropolisHastingsAlgorithm)
 steps
+ReplicaExchange
+ParallelTempering
+attempt_exchange!
+index
+acceptance_rates
+exchange_log_ratio
 ```
 
 ## See also

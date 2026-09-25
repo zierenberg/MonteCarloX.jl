@@ -38,8 +38,10 @@ end
 
 # External examples need to include specific packages (e.g., Sunny.jl) and are built in
 # their own project environment.
-sunny_dir = joinpath(example_dir, "external", "sunny")
-run(`$(Base.julia_cmd()) --project=$sunny_dir $(joinpath(sunny_dir, "build_docs.jl"))`)
+for pkg in ("sunny", "smoqy")
+    dir = joinpath(example_dir, "external", pkg)
+    run(`$(Base.julia_cmd()) --project=$dir $(joinpath(dir, "build_docs.jl"))`)
+end
 
 # The benchmark pages: same Literate pipeline, heavy runs cached in docs/src/data (the
 # reference packages and the C compiler are only needed when regenerating — never at docs
@@ -130,13 +132,8 @@ makedocs(;
                 "Checkpointing (Ising 2D)"            => "generated/checkpoint_Ising2D.md",
             ],
             "External" => [
-                "Sunny.jl" => [
-                    "Heisenberg"                       => "generated/sunny_heisenberg.md",
-                    "Ising"                             => "generated/sunny_ising.md",
-                    "Parallel Tempering"                => "generated/sunny_pt.md",
-                    "Wang-Landau"                       => "generated/sunny_wl.md",
-                    "Replica-Exchange Wang-Landau"      => "generated/sunny_rewl.md",
-                ],
+                "Sunny.jl"     => "generated/sunny_interop.md",
+                "SmoQyDQMC.jl" => "generated/smoqy_replica_exchange.md",
             ],
         ],
         "Benchmarks" => [
