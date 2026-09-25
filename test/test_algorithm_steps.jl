@@ -30,7 +30,7 @@ function test_algorithm_steps_interface()
 
     rx = ParallelTempering([1.0, 0.5]; seed=10, rng=Xoshiro)
     pass &= check(steps(rx) == 0, "ReplicaExchange steps starts at 0\n")
-    update!(rx, [-1.0, -0.5])
+    attempt_exchange!(rx, [-1.0, -0.5])
     pass &= check(steps(rx) >= 0, "ReplicaExchange steps readable\n")
 
     return pass

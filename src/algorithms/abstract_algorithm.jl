@@ -59,3 +59,22 @@ Return the algorithm's ensemble as a logweight callable. Equivalent to `logweigh
 function Base.:(==)(a::T, b::T) where {T<:AbstractAlgorithm}
     all(getfield(a, f) == getfield(b, f) for f in fieldnames(T))
 end
+
+"""
+    advance!(sweep!, alg::AbstractAlgorithm, state, n)
+    advance!(sweep!, pc::ParallelChains, states, n)
+
+Apply `sweep!(state, alg)` `n` times — one chain, or every chain in parallel.
+
+`sweep!` is one unit of the caller's own dynamics (a lattice sweep, a batch of proposals, an
+integrator step); MonteCarloX only repeats it. For a `ParallelChains` the repeat loop sits *inside*
+the parallel region, so there is one thread barrier per call rather than one per unit, and the
+block is handed the state itself rather than its index so the same `sweep!` works on threads and
+MPI alike (`states` is the vector of per-chain states, or the rank-local state).
+
+For a replica ladder this is the sampling half; [`attempt_exchange!`](@ref) is the other, left to
+the caller so both stay visible. Per-chain state that must follow the ladder after a swap (an
+integrator temperature, say) belongs inside the stored state, where `sweep!` can reach it.
+"""
+advance!(sweep!, alg::AbstractAlgorithm, state, n::Integer) =
+    (for _ in 1:n; sweep!(state, alg); end; nothing)

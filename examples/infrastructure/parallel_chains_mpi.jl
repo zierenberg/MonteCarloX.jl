@@ -121,10 +121,10 @@ time = @elapsed for s in 1:Int(n_samples / exchange_after_sample)
         for j in 1:exchange_after_sample
             for _ in 1:n_sweep; update!(sys, alg); end
             # here store all samples in a local vector ths is sorted later
-            push!(pt_samples_local, (index(pt), sys.x, E(sys)))
+            push!(pt_samples_local, (ensemble_index(pt), sys.x, E(sys)))
         end
         # replica exchange gets only local energy value, rest is handled by MPI (needs to be within parallel block to have access to local alg state)
-        MonteCarloX.update!(pt, E(sys))
+        attempt_exchange!(pt, E(sys))
     end
 end
 

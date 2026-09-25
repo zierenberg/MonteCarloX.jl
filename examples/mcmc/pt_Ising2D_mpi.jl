@@ -70,10 +70,10 @@ for meas in 1:nmeasurements
     sweep!(sys, alg, 1)
 
     e = energy(sys)
-    push!(local_samples, (index(pt), e))
+    push!(local_samples, (ensemble_index(pt), e))
 
     if meas % sweeps_between_exchange == 0
-        MonteCarloX.update!(pt, e)
+        attempt_exchange!(pt, e)
     end
 end
 

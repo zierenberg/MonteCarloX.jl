@@ -108,6 +108,20 @@ function with_parallel(f, pc::ParallelChains{<:MPIBackend})
 end
 
 
+# ParallelChains methods of `advance!` (the generic lives in algorithms/abstract_algorithm.jl):
+# the repeat loop sits inside the parallel region, so there is one barrier per call, not per unit.
+function advance!(sweep!, pc::ParallelChains{ThreadsBackend}, states, n::Integer)
+    length(states) == size(pc) || throw(ArgumentError("states must have length size(pc)"))
+    with_parallel(pc) do i, alg
+        for _ in 1:n; sweep!(states[i], alg); end
+    end
+end
+
+advance!(sweep!, pc::ParallelChains{<:MPIBackend}, state, n::Integer) =
+    with_parallel(pc) do alg
+        for _ in 1:n; sweep!(state, alg); end
+    end
+
 """
     merge!(values, op, pc::ParallelChains)
 

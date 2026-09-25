@@ -88,11 +88,11 @@ function main()
     for meas in 1:nmeasurements
         sweep!(sys, alg, 1)
         e = energy(sys)
-        push!(local_samples, (index(pt), e))
+        push!(local_samples, (ensemble_index(pt), e))
 
         sweeps_since_exchange += 1
         if sweeps_since_exchange >= next_exchange_interval
-            MonteCarloX.update!(pt, e)
+            attempt_exchange!(pt, e)
             exchange_counter += 1
             sweeps_since_exchange = 0
 
@@ -110,7 +110,7 @@ function main()
 
                 # Propose a rank-local interval from the current ladder index,
                 # then synchronize to one global interval via max-reduction.
-                interval_buf = [sweeps_after_exchange[index(pt)]]
+                interval_buf = [sweeps_after_exchange[ensemble_index(pt)]]
                 MPI.Allreduce!(interval_buf, max, backend.comm)
                 next_exchange_interval = only(interval_buf)
             end

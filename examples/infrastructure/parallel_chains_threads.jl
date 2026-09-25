@@ -110,7 +110,7 @@ pt_sys  = [System(0.0) for _ in 1:size(pt)]
 pt_xs = zeros(Float64, size(pt), n_samples)
 pt_Es = zeros(Float64, size(pt), n_samples)
 
-exchange_after_sample = 100
+exchange_after_sample = CI_MODE ? 10 : 100   # must divide n_samples
 time = @elapsed for s in 1:Int(n_samples / exchange_after_sample)
     with_parallel(pt) do i, alg
         sys = pt_sys[i]
@@ -120,12 +120,12 @@ time = @elapsed for s in 1:Int(n_samples / exchange_after_sample)
         reset!(alg)
         for j in 1:exchange_after_sample
             for _ in 1:n_sweep; update!(sys, alg); end
-            pt_xs[index(pt, i), (s-1)*exchange_after_sample + j] = sys.x
-            pt_Es[index(pt, i), (s-1)*exchange_after_sample + j] = E(sys)
+            pt_xs[ensemble_index(pt, i), (s-1)*exchange_after_sample + j] = sys.x
+            pt_Es[ensemble_index(pt, i), (s-1)*exchange_after_sample + j] = E(sys)
         end
     end
     # replica exchange gets full energy array, here we are no longer parallel
-    MonteCarloX.update!(pt, E.(pt_sys))
+    attempt_exchange!(pt, E.(pt_sys))
 end
 
 # No need to gather samples, we have shared memory

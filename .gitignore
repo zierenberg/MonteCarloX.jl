@@ -9,6 +9,8 @@ docs/src/generated/
 /sandbox/
 /checkpoints/
 docs/src/assets/logo.png
+# figures written when an external example is run directly (docs get their own copy)
+examples/external/*/*.png
 
 settings.json
 .vscode/

@@ -75,9 +75,9 @@ for exch in 1:n_exchanges
         step     = (exch - 1) * sweeps_between_exchange + s
         n_before = length(data(meas, :energies))
         measure!(meas, nothing, step)
-        length(data(meas, :energies)) > n_before && push!(index_trace, copy(index(pt)))
+        length(data(meas, :energies)) > n_before && push!(index_trace, copy(ensemble_index(pt)))
     end
-    MonteCarloX.update!(pt, energies)                         # replica exchange
+    attempt_exchange!(pt, energies)                         # replica exchange
 end
 
 energy_samples = [Float64[] for _ in 1:nreplicas]            # regroup samples by temperature
@@ -160,10 +160,10 @@ for exch in 1:(nmeasurements ÷ sweeps_between_exchange)
         sys = systems[i]
         for _ in 1:sweeps_between_exchange
             sweep!(sys, alg, 1)
-            sumE[index(pt, i)] += energy(sys); cntE[index(pt, i)] += 1
+            sumE[ensemble_index(pt, i)] += energy(sys); cntE[ensemble_index(pt, i)] += 1
         end
     end
-    MonteCarloX.update!(pt, [energy(systems[i]) for i in 1:size(pt)])   # replica exchange
+    attempt_exchange!(pt, [energy(systems[i]) for i in 1:size(pt)])   # replica exchange
 end
 writedlm(pt_threads_file, ["beta" "meanE"; hcat(betas_p, sumE ./ cntE)], '\t')  # hide
 end                                                                # hide
@@ -187,8 +187,8 @@ sumE = zeros(size(backend)); cntE = zeros(Int, size(backend))
 sweep!(sys, alg, ntherm_init)
 for meas in 1:nmeasurements
     sweep!(sys, alg, 1)
-    sumE[index(pt)] += energy(sys); cntE[index(pt)] += 1  # accumulate into the current rung
-    meas % sweeps_between_exchange == 0 && MonteCarloX.update!(pt, energy(sys))
+    sumE[ensemble_index(pt)] += energy(sys); cntE[ensemble_index(pt)] += 1  # accumulate into the current rung
+    meas % sweeps_between_exchange == 0 && attempt_exchange!(pt, energy(sys))
 end
 gsumE = MPI.Reduce(sumE, +, backend.comm; root = backend.root)   # combine rungs on the root
 gcntE = MPI.Reduce(cntE, +, backend.comm; root = backend.root)

@@ -128,22 +128,21 @@ function test_parallel_tempering()
     pass &= check(pt isa ReplicaExchange{<:MPIBackend}, "MPI type\n")
     pass &= check(pt.replica.backend === backend, "backend stored\n")
     pass &= check(algorithm(pt) === alg, "alg stored\n")
-    pass &= check(index(pt) == 1, "index == 1\n")
+    pass &= check(ensemble_index(pt) == 1, "index == 1\n")
     pass &= check(isempty(pt.steps), "steps empty\n")
     pass &= check(isempty(pt.accepted), "accepted empty\n")
     pass &= check(isempty(acceptance_rates(pt)), "acceptance_rates empty\n")
     pass &= check(acceptance_rate(pt) == 0.0, "acceptance_rate == 0.0\n")
 
-    update!(pt, -10.0)
-    pass &= check(index(pt) == 1, "index unchanged after update\n")
+    attempt_exchange!(pt, -10.0)
+    pass &= check(ensemble_index(pt) == 1, "index unchanged after update\n")
     pass &= check(ensemble(alg).beta == 0.8, "beta unchanged\n")
     pass &= check(pt.stage == 1, "stage == 1\n")
     pass &= check(isempty(pt.steps), "steps still empty\n")
     pass &= check(isempty(pt.accepted), "accepted still empty\n")
 
     reset!(pt)
-    pass &= check(pt.stage == 0, "stage reset\n")
-    pass &= check(index(pt) == 1, "index reset\n")
+    pass &= check(isempty(pt.steps) && isempty(pt.accepted), "reset clears counters (1 rank)\n")
 
     # constructor from backend
     rx_backend = ReplicaExchange(backend, alg)
@@ -161,9 +160,9 @@ function test_parallel_tempering()
     v_algs = [MetropolisAlgorithm(MersenneTwister(11); β=1.0), MetropolisAlgorithm(MersenneTwister(12); β=0.5)]
     v_pt = ParallelTempering(ThreadsBackend(2), v_algs)
     pass &= check(v_pt isa ReplicaExchange{ThreadsBackend}, "Threads type\n")
-    pass &= check(index(v_pt,1) == v_pt.indices[1], "Threads index\n")
+    pass &= check(ensemble_index(v_pt,1) == v_pt.indices[1], "Threads index\n")
 
-    update!(v_pt, [-10.0, -8.0])
+    attempt_exchange!(v_pt, [-10.0, -8.0])
     pass &= check(v_pt.stage == 1, "Threads stage == 1\n")
     pass &= check(sum(v_pt.steps) >= 0, "Threads steps >= 0\n")
 
@@ -222,7 +221,7 @@ function test_parallel_tempering()
         min_points=2,
         max_lag=2,
     )
-    pass &= check(interval == sweeps[index(v_pt3)], "optimize interval consistent\n")
+    pass &= check(interval == sweeps[ensemble_index(v_pt3)], "optimize interval consistent\n")
     pass &= check(all(2 .<= sweeps .<= 50), "sweeps in bounds\n")
     pass &= check(sweeps[2] >= sweeps[1], "higher temp needs more sweeps\n")
 
@@ -238,18 +237,24 @@ function test_replica_exchange_threads_dynamics()
     pt    = ParallelTempering(ThreadsBackend(4), algs)
 
     # forced accept on edge (1,2): (β₁−β₂)(x₁−x₂) > 0 when the cold replica holds the higher energy
-    update!(pt, [10.0, 0.0, -1.0, -2.0])
+    attempt_exchange!(pt, [10.0, 0.0, -1.0, -2.0])
     pass &= check(sort(pt.indices) == collect(1:4), "ladder stays a permutation\n")
     pass &= check(pt.indices[1] == 2 && pt.indices[2] == 1, "edge (1,2) swapped\n")
     pass &= check(pt.accepted[1] == 1 && pt.steps[1] == 1, "edge-1 attempt+accept counted\n")
     pass &= check(pt.stage == 1, "stage flipped to 1\n")
 
-    # many alternating sweeps: permutation invariant + stage parity hold every step
+    # reset! clears statistics only — the ladder permutation and stage are live state
+    ladder, stage = copy(pt.indices), pt.stage
     reset!(pt)
-    pass &= check(pt.indices == collect(1:4) && pt.stage == 0, "reset to identity ladder\n")
+    pass &= check(all(pt.steps .== 0) && all(pt.accepted .== 0), "reset clears counters\n")
+    pass &= check(pt.indices == ladder && pt.stage == stage, "reset leaves the ladder alone\n")
+
+    # many alternating sweeps: permutation invariant + stage parity hold every step
+    pt = ParallelTempering(ThreadsBackend(4),
+                           [MetropolisAlgorithm(MersenneTwister(300 + i); β = betas[i]) for i in 1:4])
     rng = MersenneTwister(5)
     for s in 1:50
-        update!(pt, randn(rng, 4))
+        attempt_exchange!(pt, randn(rng, 4))
         pass &= check(sort(pt.indices) == collect(1:4), "permutation at sweep $s\n")
         pass &= check(pt.stage == (isodd(s) ? 1 : 0), "stage parity at sweep $s\n")
     end
@@ -257,6 +262,72 @@ function test_replica_exchange_threads_dynamics()
     rates = acceptance_rates(pt)
     pass &= check(length(rates) == 3 && all(0.0 .<= rates .<= 1.0), "acceptance rates valid\n")
     pass &= check(0.0 <= acceptance_rate(pt) <= 1.0, "overall acceptance rate valid\n")
+    return pass
+end
+
+# Tempering the strength λ of an auxiliary Hamiltonian term: replica r targets exp(-β(E₀ + λ_r E₁)),
+# so the coordinate is the PAIR (E₀, E₁) and the E₀ part must cancel from the exchange ratio by
+# itself, leaving β(λᵢ-λⱼ)(E₁ⁱ-E₁ʲ).
+const _E0 = [0.0, 1.0, 2.0, 1.5, 0.5, 2.5]
+const _E1 = [0.0, -2.0, 3.0, -1.0, 2.0, -3.0]
+
+function test_replica_exchange_composite_coordinate()
+    pass = true
+    β, λs = 1.0, [1.0, 0.5, 0.0]
+    tempered(λ) = FunctionEnsemble(x -> -β * (x[1] + λ * x[2]); linear=true)
+
+    # the shared E₀ part cancels; only the λ-conjugate half survives
+    logR = exchange_log_ratio(tempered(1.0), tempered(0.25), (7.0, -2.0), (-3.0, 1.5))
+    pass &= check(isapprox(logR, β * (1.0 - 0.25) * (-2.0 - 1.5); atol=1e-12),
+                  "composite exchange ratio drops the shared term\n")
+
+    # parameter-schedule constructor: one replica per λ
+    rx = ReplicaExchange([tempered(λ) for λ in λs]; seed=9, rng=MersenneTwister)
+    pass &= check(logweight(ensemble(algorithm(rx, 1)), (0.0, 1.0)) ≈ -β, "replica 1 carries λ=1\n")
+    pass &= check(logweight(ensemble(algorithm(rx, 3)), (0.0, 1.0)) ≈ 0.0, "replica 3 carries λ=0\n")
+
+    # end-to-end: the λ=1 replica must sample exp(-β(E₀+E₁))
+    states, counts, nsamples = [Ref(1) for _ in 1:3], zeros(Int, length(_E0)), 4000
+    proposal!(s, alg) = begin
+        s_new = rand(alg.rng, eachindex(_E0))
+        accept!(alg, (_E0[s_new] - _E0[s[]], _E1[s_new] - _E1[s[]])) && (s[] = s_new)
+    end
+    for _ in 1:nsamples
+        advance!(proposal!, rx, states, 20)
+        attempt_exchange!(rx, [(_E0[s[]], _E1[s[]]) for s in states])
+        for r in eachindex(states)
+            ensemble_index(rx, r) == 1 && (counts[states[r][]] += 1)
+        end
+    end
+    exact = (w = exp.(-β .* (_E0 .+ _E1)); w ./ sum(w))
+    dev = maximum(abs, counts ./ sum(counts) .- exact)
+    pass &= check(dev < 0.03, "λ=1 replica reproduces its target (max dev $dev)\n")
+    pass &= check(sort(rx.indices) == collect(1:3), "ladder stays a permutation\n")
+    return pass
+end
+
+function test_advance_and_ensemble_index()
+    pass = true
+    betas = [1.0, 0.6, 0.3]
+    states = [Ref(-4.0), Ref(-1.0), Ref(2.0)]
+    pt = ParallelTempering(betas; seed=5, rng=MersenneTwister)
+    attempt_exchange!(pt, [s[] for s in states])
+
+    # the invariant every measurement binning relies on
+    for r in eachindex(states)
+        pass &= check(ensemble(algorithm(pt, r)).beta == betas[ensemble_index(pt, r)],
+                      "replica $r carries the ensemble of its ladder slot\n")
+    end
+
+    # advance! must hit every replica — a ReplicaExchange is an AbstractAlgorithm, so it would
+    # otherwise fall through to the single-chain method and sample only one
+    calls = zeros(Int, 3)
+    advance!((s, alg) -> (calls[findfirst(x -> x === s, states)] += 1), pt, states, 4)
+    pass &= check(all(calls .== 4), "advance! runs n units on every replica\n")
+
+    serial = 0
+    advance!((s, alg) -> (serial += 1), MetropolisAlgorithm(MersenneTwister(1); β=1.0), states[1], 7)
+    pass &= check(serial == 7, "single-chain advance! repeats n times\n")
     return pass
 end
 
@@ -275,5 +346,13 @@ end
 
     @testset "Parallel tempering" begin
         @test test_parallel_tempering()
+    end
+
+    @testset "Composite reaction coordinate" begin
+        @test test_replica_exchange_composite_coordinate()
+    end
+
+    @testset "advance! and ensemble_index" begin
+        @test test_advance_and_ensemble_index()
     end
 end

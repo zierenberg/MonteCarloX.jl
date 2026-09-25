@@ -1,24 +1,19 @@
 # External/Sunny
 
-Examples in this folder demonstrate how MonteCarloX workflows can be connected
-with external model packages, starting with Sunny.jl model definitions and
-progressing toward MCX-driven algorithm control on external model states.
+How to drive [Sunny.jl](https://github.com/SunnySuite/Sunny.jl) models with MonteCarloX
+algorithms. The point is the interop surface, not a race: speed and physics-agreement numbers
+against Sunny live in the [benchmarks](../../../benchmarks/), not here.
 
-Each script runs standalone via `julia --project=examples/external/sunny
-examples/external/sunny/<script>.jl` so package-compatibility constraints
-(notably Sunny's git-sourced dependency) stay isolated from the main examples
-env. `docs/make.jl` renders them into docs pages the same way, but out of
-process: it shells out to `build_docs.jl` in this environment (Sunny never
-becomes a docs/Project.toml dependency) with `Literate`'s `execute = true`, so
-the output is baked into the generated markdown as static text. Since the
-cached data in docs/src/data/ already exists, that subprocess only reloads
-results — it doesn't rerun the simulations.
+`sunny_interop.jl` is the single example. It defines one Sunny system and one local move, then
+runs parallel tempering, Wang-Landau, replica-exchange Wang-Landau, and parallel tempering over
+Sunny's own `Langevin` integrator on top of them.
 
-Current examples:
+Run it standalone with `julia -t auto examples/external/sunny/sunny_interop.jl` — the script
+activates this folder itself, so package-compatibility constraints (notably Sunny's git-sourced
+dependency) stay isolated from the main examples env. Append `--rerun` to recompute instead of
+reloading the cached results in `docs/src/data/`.
 
-- `sunny_heisenberg.jl`: classical Heisenberg ferromagnet (magnetization
-  profile over temperature).
-- `sunny_ising.jl`: 2D Ising model.
-- `sunny_pt.jl`: parallel tempering on the 2D Ising model, with WHAM analysis.
-- `sunny_wl.jl`: Wang-Landau on the 2D Ising model.
-- `sunny_rewl.jl`: replica-exchange Wang-Landau on the 2D Ising model.
+`docs/make.jl` renders it out of process by shelling out to `build_docs.jl` in this environment
+(Sunny never becomes a `docs/Project.toml` dependency) with `Literate`'s `execute = true`, so the
+output is baked into the generated markdown as static text. Because the cached data already
+exists, that subprocess only reloads results — it doesn't rerun the simulations.

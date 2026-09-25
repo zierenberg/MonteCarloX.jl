@@ -45,11 +45,12 @@ end
 end
 
 # indexing
-@inline index(rx::ReplicaExchange{<:ThreadsBackend}, i::Integer) = rx.indices[i]
-@inline index(rx::ReplicaExchange{<:ThreadsBackend}) = rx.indices
-@inline index(rx::ReplicaExchange{<:MPIBackend}) = rx.indices[rank(rx) + 1]
+@inline ensemble_index(rx::ReplicaExchange{<:ThreadsBackend}, i::Integer) = rx.indices[i]
+@inline ensemble_index(rx::ReplicaExchange{<:ThreadsBackend}) = rx.indices
+@inline ensemble_index(rx::ReplicaExchange{<:MPIBackend}) = rx.indices[rank(rx) + 1]
 
-function ReplicaExchange(backend::ThreadsBackend, alg::AbstractVector{<:AbstractMarkovChainMonteCarlo})
+function ReplicaExchange(backend::ThreadsBackend,
+                         alg::AbstractVector{<:AbstractMarkovChainMonteCarlo})
     n = length(alg)
     n >= 2 || throw(ArgumentError("need at least 2 algorithms for replica exchange"))
     pc = ParallelChains(backend, alg)
@@ -64,9 +65,40 @@ function ReplicaExchange(backend::MPIBackend, alg::AbstractMarkovChainMonteCarlo
     return ReplicaExchange(pc, 0, collect(1:n), zeros(Int, nedges), zeros(Int, nedges))
 end
 
+"""
+    ReplicaExchange(ensembles; seed=1000, rng=Xoshiro, algorithm=MetropolisAlgorithm, backend=nothing)
+
+One replica per ensemble, each with its own RNG seeded `seed + i`.
+
+```julia
+ReplicaExchange([BoltzmannEnsemble(T = T) for T in Ts])      # parallel tempering
+ReplicaExchange([window_ensemble(w) for w in windows])       # replica-exchange Wang-Landau
+```
+
+The replicas need not differ in temperature, or even be of one kind — any ensembles work, and
+exchanges are attempted between neighbours in the given order.
+
+`backend=nothing` or `::ThreadsBackend` gives threads mode; `::MPIBackend` gives MPI mode, the
+rank-local replica selected by rank.
+"""
+function ReplicaExchange(ensembles::AbstractVector{<:AbstractEnsemble};
+                         seed::Integer=1000,
+                         rng=Xoshiro,
+                         algorithm=MetropolisAlgorithm,
+                         backend::Union{Nothing,ThreadsBackend,MPIBackend}=nothing)
+    n = length(ensembles)
+    n >= 2 || throw(ArgumentError("need at least 2 replicas"))
+    backend === nothing && (backend = ThreadsBackend(n))
+    size(backend) == n || throw(ArgumentError(
+        "size(backend) (=$(size(backend))) must equal length(ensembles) (=$n)"))
+
+    backend isa ThreadsBackend &&
+        return ReplicaExchange(backend, [algorithm(rng(seed + i), ensembles[i]) for i in 1:n])
+    i = rank(backend) + 1
+    return ReplicaExchange(backend, algorithm(rng(seed + i), ensembles[i]))
+end
+
 function reset!(rx::ReplicaExchange)
-    rx.stage = 0
-    rx.indices .= eachindex(rx.indices)
     fill!(rx.steps, 0)
     fill!(rx.accepted, 0)
     return rx
@@ -107,7 +139,7 @@ end
 
 Replica-exchange swap log-ratio for two ensembles and their local observables.
 """
-@inline function exchange_log_ratio(ens_i, ens_j, arg_i::Real, arg_j::Real)
+@inline function exchange_log_ratio(ens_i, ens_j, arg_i, arg_j)
     return (logweight(ens_i, arg_j) - logweight(ens_i, arg_i)) +
            (logweight(ens_j, arg_i) - logweight(ens_j, arg_j))
 end
@@ -123,8 +155,8 @@ Returns `true` if accepted.
 """
 function attempt_exchange_pair!(alg_i::AbstractMarkovChainMonteCarlo,
                                 alg_j::AbstractMarkovChainMonteCarlo,
-                                arg_i::Real,
-                                arg_j::Real,
+                                arg_i,
+                                arg_j,
                                 u::Real)
     isfinite(u) || throw(ArgumentError("shared random number `u` must be finite"))
     log_ratio = exchange_log_ratio(alg_i.ensemble, alg_j.ensemble, arg_i, arg_j)
@@ -154,8 +186,21 @@ function _partner_rank(rx::ReplicaExchange, partner_index::Int)
     return partner_pos - 1
 end
 
-################ exchange logic (Threads specific) ################
-function update!(rx::ReplicaExchange{ThreadsBackend}, xs::AbstractVector{<:Real})
+"""
+    attempt_exchange!(rx::ReplicaExchange, coordinates)
+
+Attempt one round of exchanges — every ladder edge of the current parity, alternating between
+calls — using the replicas' reaction `coordinates` — whatever the ensembles score, one entry per
+replica (threads) or the rank-local value (MPI).
+
+Configurations never move: chain or rank `r` keeps its own system throughout, which is why
+MonteCarloX never has to copy a model. What moves on acceptance is the **ensemble**, and
+[`ensemble_index`](@ref)`(rx, r)` is the label that travels with it. Per-replica state that depends
+on the rung must therefore be re-read afterwards.
+
+Pairs with [`advance!`](@ref), which does the sampling half of the loop.
+"""
+function attempt_exchange!(rx::ReplicaExchange{ThreadsBackend}, xs::AbstractVector)
     length(xs) == size(rx) || throw(ArgumentError("xs must have length size(rx)"))
 
     # Inverse permutation: position[ladder_index] = chain position. Built once in O(n) so the
@@ -172,7 +217,8 @@ function update!(rx::ReplicaExchange{ThreadsBackend}, xs::AbstractVector{<:Real}
 
         rx.steps[pair_id] += 1
         u = rand(algorithm(rx, ri).rng)
-        did_accept = attempt_exchange_pair!(algorithm(rx, ri), algorithm(rx, rj), xs[ri], xs[rj], u)
+        did_accept = attempt_exchange_pair!(algorithm(rx, ri), algorithm(rx, rj),
+                                            xs[ri], xs[rj], u)
         if did_accept
             rx.accepted[pair_id] += 1
             rx.indices[ri], rx.indices[rj] = rx.indices[rj], rx.indices[ri]
@@ -197,24 +243,33 @@ function _exchange_packet_mpi(comm, packet, partner_rank::Int, tag::Integer, is_
     return recv_packet
 end
 
+# Three-phase pair exchange. The log-ratio splits into two halves, each evaluable from one rank's
+# own ensemble — logR = [W_i(x_j) − W_i(x_i)] + [W_j(x_i) − W_j(x_j)] — so the decision needs only
+# the coordinates and one scalar per rank. The ensemble crosses the wire solely on acceptance,
+# which matters for tabulated ensembles (muca, Wang-Landau) that carry O(bins) arrays. Both ranks
+# sum the same two floats, so they agree bitwise and reach the same decision from the shared `u`.
 function _update_pair!(rx::ReplicaExchange{<:MPIBackend},
                        alg::AbstractMarkovChainMonteCarlo,
-                       x::Real,
+                       x,
                        pair_id::Int,
                        partner_index::Int)
-    my_index = index(rx)
+    my_index = ensemble_index(rx)
     partner_rank = _partner_rank(rx, partner_index)
     is_owner = rank(rx) < partner_rank
+    comm = rx.replica.backend.comm
     ens = alg.ensemble
+    tag = 3 * rx.stage
 
-    packet = (ensemble=ens, x=x, u=float(is_owner ? rand(alg.rng) : NaN))
-    packet_p = _exchange_packet_mpi(rx.replica.backend.comm, packet, partner_rank, rx.stage, is_owner)
-
-    ens_p = packet_p.ensemble
-    x_p = packet_p.x
-    u = is_owner ? packet.u : packet_p.u
+    # Phase 1 — coordinates and the shared random number. O(1); the ensemble stays put.
+    local_packet = (x=x, u=float(is_owner ? rand(alg.rng) : NaN))
+    partner_packet = _exchange_packet_mpi(comm, local_packet, partner_rank, tag, is_owner)
+    u = is_owner ? local_packet.u : partner_packet.u
     isfinite(u) || throw(ArgumentError("Replica-exchange received non-finite shared random number `u`; check rank owner logic"))
-    log_ratio = exchange_log_ratio(ens, ens_p, x, x_p)
+
+    # Phase 2 — each rank owns the half of the log-ratio only its own ensemble can evaluate.
+    half = logweight(ens, partner_packet.x) - logweight(ens, x)
+    half_partner = _exchange_packet_mpi(comm, half, partner_rank, tag + 1, is_owner)
+    log_ratio = half + half_partner
 
     if is_owner
         rx.steps[pair_id] += 1
@@ -224,18 +279,19 @@ function _update_pair!(rx::ReplicaExchange{<:MPIBackend},
         if is_owner
             rx.accepted[pair_id] += 1
         end
-        alg.ensemble = ens_p
+        # Phase 3 — only now is the ensemble itself sent.
+        alg.ensemble = _exchange_packet_mpi(comm, ens, partner_rank, tag + 2, is_owner)
         return partner_index
     end
 
     return my_index
 end
 
-function update!(rx::ReplicaExchange{<:MPIBackend}, x::Real)
+function attempt_exchange!(rx::ReplicaExchange{<:MPIBackend}, x)
     comm = rx.replica.backend.comm
     MPI.Barrier(comm)
 
-    my_index = index(rx)
+    my_index = ensemble_index(rx)
     pair = _resolve_pair(my_index, rx.stage, size(rx))
 
     new_index = my_index
@@ -254,51 +310,30 @@ end
 # ── Parallel tempering: the β-ladder specialization of replica exchange ──────
 
 # Constructors dispatching on backend
-ParallelTempering(backend::ThreadsBackend, alg::AbstractVector{<:AbstractMarkovChainMonteCarlo}) =
-    ReplicaExchange(backend, alg)
-ParallelTempering(backend::MPIBackend, alg::AbstractMarkovChainMonteCarlo) =
-    ReplicaExchange(backend, alg)
+ParallelTempering(backend::ThreadsBackend, alg::AbstractVector{<:AbstractMarkovChainMonteCarlo}; kwargs...) =
+    ReplicaExchange(backend, alg; kwargs...)
+ParallelTempering(backend::MPIBackend, alg::AbstractMarkovChainMonteCarlo; kwargs...) =
+    ReplicaExchange(backend, alg; kwargs...)
 
 """
-    ParallelTempering(betas; seed=1000, rng=Xoshiro, backend=nothing)
+    ParallelTempering(betas; seed=1000, rng=Xoshiro, backend=nothing, observable=identity)
 
-Convenience constructor that creates per-replica RNGs from `seed + i` and builds
-`MetropolisAlgorithm` replicas over `betas`.
+[`ReplicaExchange`](@ref) over `BoltzmannEnsemble`s — `ReplicaExchange([BoltzmannEnsemble(β=β)
+for β in betas])`. Equivalent to writing that out, and `BoltzmannEnsemble(T=T)` if temperatures
+read better.
 
 - `backend=nothing` (default): threads mode.
 - `backend::ThreadsBackend`: threads mode.
 - `backend::MPIBackend`: MPI mode; rank-local replica is selected by backend rank.
 """
-function ParallelTempering(betas::AbstractVector{<:Real};
-                           seed::Integer=1000,
-                           rng=Xoshiro,
-                           backend::Union{Nothing,ThreadsBackend,MPIBackend}=nothing)
-    n = length(betas)
-    n >= 2 || throw(ArgumentError("need at least 2 replicas"))
-    vals = collect(float.(betas))
+ParallelTempering(betas::AbstractVector{<:Real}; kwargs...) =
+    ReplicaExchange([BoltzmannEnsemble(β=float(β)) for β in betas]; kwargs...)
 
-    # if nothing: create a threads backend with one thread per beta
-    if backend === nothing
-        backend = ThreadsBackend(n)
-        alg = [MetropolisAlgorithm(rng(seed + i); β=vals[i]) for i in 1:n]
-        return ReplicaExchange(backend, alg)
-    end
+# ── Driving the ladder ──────────────────────────────────────────────────────
 
-    if backend isa ThreadsBackend
-        size(backend) == n || throw(ArgumentError("size(backend) (=$(size(backend))) must equal length(betas) (=$n)"))
-        alg = [MetropolisAlgorithm(rng(seed + i); β=vals[i]) for i in 1:n]
-        return ReplicaExchange(backend, alg)
-    end
-
-    if backend isa MPIBackend
-        size(backend) == n || throw(ArgumentError("size(backend) (=$(size(backend))) must equal length(betas) (=$n)"))
-        i = rank(backend) + 1
-        alg = MetropolisAlgorithm(rng(seed + i); β=vals[i])
-        return ReplicaExchange(backend, alg)
-    end
-
-    throw(ArgumentError("unsupported backend type $(typeof(backend))"))
-end
+# Without this a ReplicaExchange, being an AbstractAlgorithm, would take the single-chain method.
+@inline advance!(sweep!, rx::ReplicaExchange, states, n::Integer) =
+    advance!(sweep!, rx.replica, states, n)
 
 """
     _group_samples(local_samples, n)
@@ -357,13 +392,13 @@ function optimize_exchange_interval!(pt::ReplicaExchange,
         end
 
         MPI.Bcast!(sweeps_after_exchange, root, comm)
-        return sweeps_after_exchange[index(pt)]
+        return sweeps_after_exchange[ensemble_index(pt)]
     end
 
     grouped = _group_samples(local_samples, n)
     taus = integrated_autocorrelation_times(grouped; min_points=min_points, max_lag=max_lag)
     _retune_exchange_sweeps!(sweeps_after_exchange, taus, base_sweeps, min_sweeps, max_sweeps)
-    return sweeps_after_exchange[index(pt)]
+    return sweeps_after_exchange[ensemble_index(pt)]
 end
 
 function _retune_exchange_sweeps!(sweeps_after_exchange::AbstractVector{<:Integer},

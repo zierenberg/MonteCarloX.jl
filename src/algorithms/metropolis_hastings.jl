@@ -82,8 +82,12 @@ absolute pair `accept!(alg, arg_new, arg_old)` instead.
 `correction` is the log proposal-ratio `log[q(x′→x)/q(x→x′)]` (the Metropolis–Hastings term for
 an asymmetric move); it also carries any additive log-target factor the ensemble argument does
 not, such as a reference-process log-density. It defaults to `0` (symmetric proposal).
+
+`Δarg` is whatever the ensemble's logweight consumes and need not be a scalar: a composite
+coordinate (e.g. `(ΔE₀, ΔE₁)` for a weight `-β(E₀ + λE₁)` tempered in `λ`) works as long as the
+logweight is linear in it.
 """
-@inline function accept!(alg::MetropolisHastingsAlgorithm, Δarg::Real; correction::Real=0)
+@inline function accept!(alg::MetropolisHastingsAlgorithm, Δarg; correction::Real=0)
     ens = ensemble(alg)
     assert_linear_ensemble(ens, "accept!(alg, Δarg)")
     logR = logweight(ens, Δarg)

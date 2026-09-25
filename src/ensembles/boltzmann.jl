@@ -30,3 +30,6 @@ linear_logweight(::BoltzmannEnsemble) = true
 @inline logweight(e::BoltzmannEnsemble, E::Real) = -e.beta * E
 @inline logweight(e::BoltzmannEnsemble, E::AbstractArray) = -e.beta * sum(E)
 @inline logweight(e::BoltzmannEnsemble) = x -> logweight(e, x)
+
+# Fallback for unsupported types
+logweight(e::BoltzmannEnsemble, E) = throw(MethodError(logweight, (e, E)))

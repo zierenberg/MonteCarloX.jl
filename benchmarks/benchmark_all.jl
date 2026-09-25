@@ -23,8 +23,8 @@
 # benchmarks/benchmark_all.jl` to regenerate.
 #
 # External framework comparisons are isolated by package:
-# `benchmarks/MonteCarlo`, `benchmarks/Carlo`, `benchmarks/SpinMC`, and
-# `benchmarks/Sunny` each contain their own `Project.toml` + `benchmark.jl`.
+# `benchmarks/MonteCarlo`, `benchmarks/Carlo` and `benchmarks/SpinMC` each
+# contain their own `Project.toml` + `benchmark.jl`.
 # This file is the orchestrator and only spawns those scripts when cache files
 # are missing.
 
@@ -185,32 +185,3 @@ plot!(d[:, 1], d[:, 4]; yerror=d[:, 5], marker=:diamond, ls=:dash, lw=2,        
 plot!(d[:, 1], d[:, 4] .- d[:, 2]; yerror=sqrt.(d[:, 3].^2 .+ d[:, 5].^2),        # hide
       marker=:circle, lw=2, color=:gray, label="MCX − SpinMC.jl",                 # hide
       xscale=:log10, xlabel="T", ylabel="Δ⟨|m|⟩", subplot=2)                      # hide
-
-# ## Sunny.jl
-#
-# Reference: [Sunny.jl](https://github.com/SunnySuite/Sunny.jl) on its
-# [Monte Carlo Ising prime example](https://github.com/SunnySuite/Sunny.jl/blob/main/examples/05_MC_Ising.jl)
-# — 2D Ising with a `System` and `LocalSampler(..., propose=propose_flip)`.
-# Physics is checked against the exact Beale referee on a small lattice; speed is measured
-# for the local-update kernel in ns/attempted flip, matched to MCX's random-site `spin_flip!`.
-#
-# Sunny depends on a newer JLD2 than MonteCarlo.jl, so this benchmark runs in
-# a dedicated environment (`benchmarks/Sunny/Project.toml`). If the cached data
-# file is missing, we regenerate it by spawning `benchmarks/Sunny/benchmark.jl`.
-
-if !isfile(bench_file("sunny_ising"))                                             # hide
-status("running Sunny benchmark env")                                             # hide
-run(`$(Base.julia_cmd()) --project=$(joinpath(@__DIR__, "Sunny")) $(joinpath(@__DIR__, "Sunny", "benchmark.jl"))`)  # hide
-else                                                                              # hide
-status("using cached Sunny benchmark")                                           # hide
-end                                                                               # hide
-
-d = readdlm(bench_file("sunny_ising"), '\t'; header=true)[1]                     # hide
-plot(d[:, 1], d[:, 2]; marker=:circle, lw=2, label="Sunny.jl",                    # hide
-     ylabel="e per site", title="2D Ising 8×8, exact referee",                    # hide
-     layout=(2, 1), legend=:bottomright, subplot=1)                               # hide
-plot!(d[:, 1], d[:, 3]; marker=:diamond, ls=:dash, lw=2, label="MCX", subplot=1)  # hide
-plot!(d[:, 1], d[:, 4]; ls=:dot, color=:gray, lw=2, label="exact", subplot=1)     # hide
-plot!(d[:, 1], d[:, 2] .- d[:, 4]; marker=:circle, lw=2,                          # hide
-      label="Sunny.jl − exact", xlabel="T", ylabel="Δe vs exact", subplot=2)      # hide
-plot!(d[:, 1], d[:, 3] .- d[:, 4]; marker=:diamond, lw=2, label="MCX − exact", subplot=2)  # hide
