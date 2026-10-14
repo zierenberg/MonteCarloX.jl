@@ -26,6 +26,11 @@ The per-step gain is `rate * (t + t0)^{-decay}` (Robbins–Monro):
 Stop calling `adapt!` once warm-up ends to freeze the step — the sampling phase then
 uses a fixed proposal and is exactly reversible.
 
+Adaptation assumes that the target acceptance rate is achievable by adjusting the
+proposal magnitude. If the acceptance rate is capped below `target` by external factors
+(e.g., in ABC-MCMC), the step size can drift toward zero; a warning is issued if the
+step collapses by orders of magnitude while acceptance remains below target.
+
 ```julia
 step = AdaptiveStep(0.1; target=0.234)
 for i in 1:(warmup + n)
@@ -35,47 +40,56 @@ for i in 1:(warmup + n)
     i <= warmup && adapt!(step, acc)      # adapt during warm-up only
     ...
 end
-```
+
 """
 mutable struct AdaptiveStep{T}
-    base::T
-    logscale::Float64
-    target::Float64
-    rate::Float64
-    decay::Float64
-    t0::Int
-    t::Int
+base::T
+logscale::Float64
+target::Float64
+rate::Float64
+decay::Float64
+t0::Int
+t::Int
+accept_count::Int
+warned::Bool
 end
 
 AdaptiveStep(base; target::Real = 0.234, rate::Real = 1.0, decay::Real = 0.7, t0::Integer = 10) =
-    AdaptiveStep(base, 0.0, Float64(target), Float64(rate), Float64(decay), Int(t0), 0)
+AdaptiveStep(base, 0.0, Float64(target), Float64(rate), Float64(decay), Int(t0), 0, 0, false)
 
 """
-    step_size(a::AdaptiveStep)
+step_size(a::AdaptiveStep)
 
-Current proposal step size: the initial `base` scaled by the adapted magnitude.
+Current proposal step size: the initial base scaled by the adapted magnitude.
 """
 @inline step_size(a::AdaptiveStep) = a.base .* exp(a.logscale)
 
 """
-    adapt!(a::AdaptiveStep, accepted::Bool) -> step
+adapt!(a::AdaptiveStep, accepted::Bool) -> step
 
 Update the step magnitude from one accept/reject decision (Robbins–Monro) and return
-the new [`step_size`](@ref). Call only during warm-up.
+the new step_size. Call only during warm-up.
 """
 @inline function adapt!(a::AdaptiveStep, accepted::Bool)
-    a.t += 1
-    a.logscale += a.rate * (accepted - a.target) / (a.t + a.t0)^a.decay
-    return step_size(a)
+a.t += 1
+a.accept_count += accepted
+a.logscale += a.rate * (accepted - a.target) / (a.t + a.t0)^a.decay
+if !a.warned && a.logscale < -10.0 && (a.accept_count / a.t) < a.target
+@warn "AdaptiveStep size has collapsed by orders of magnitude while acceptance rate remains below target. Target acceptance may be unreachable."
+a.warned = true
+end
+return step_size(a)
 end
 
 """
-    reset!(a::AdaptiveStep)
+reset!(a::AdaptiveStep)
 
-Reset the adaptation state (magnitude back to `base`, counter to zero).
+Reset the adaptation state (magnitude back to base, counter to zero).
 """
 function reset!(a::AdaptiveStep)
-    a.logscale = 0.0
-    a.t = 0
-    return a
+a.logscale = 0.0
+a.t = 0
+a.accept_count = 0
+a.warned = false
+return a
 end
