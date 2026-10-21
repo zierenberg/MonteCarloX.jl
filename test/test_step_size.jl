@@ -85,6 +85,17 @@ function test_two_phase_adaptation()
     return pass
 end
 
+# A warning is triggered when the step collapses due to unreachable acceptance rate.
+function test_step_size_collapse_warning()
+    step = AdaptiveStep(1.0; target = 0.5)
+    @test_logs (:warn, r"AdaptiveStep size has collapsed") begin
+        for _ in 1:2_000
+            adapt!(step, false)
+        end
+    end
+    return check(step.warned && step.logscale < -10.0, "step size: warning emitted on collapse\n")
+end
+
 @testset "AdaptiveStep" begin
     @testset "targets acceptance rate" begin
         @test test_step_size_targets_acceptance()
@@ -97,5 +108,8 @@ end
     end
     @testset "two-phase adaptation" begin
         @test test_two_phase_adaptation()
+    end
+    @testset "collapse warning" begin
+        @test test_step_size_collapse_warning()
     end
 end
